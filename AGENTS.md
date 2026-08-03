@@ -29,11 +29,19 @@ ceremony **do not apply here**. The single fleet convention this repo adopts is
 | Tests | vitest (+ jsdom per-file for components) |
 | Architecture model | PASM — YAML under `pasm/spec/`, tool pinned from vellum |
 | Rules of record | gamespec, at `C:\AnalogueGames\analogue-projects\GameProjects\raven_banner` |
-| Hosting | GitHub Pages, deploy-from-branch `main` / root. No build step. |
+| Hosting | GitHub Pages, from the `gh-pages` branch, published by CI |
 
-There is deliberately no build. What is committed is what is served. For a
-three-hour live event with sixteen strangers on sixteen networks, a zero-build
-deploy is the single biggest reliability win available.
+There is deliberately no build. What is committed is what is served, byte for
+byte. For a three-hour live event with sixteen strangers on sixteen networks, a
+zero-build deploy is the single biggest reliability win available.
+
+The `gh-pages` branch is generated, never edited by hand and never checked out.
+CI assembles it from `index.html`, `host.html`, `gui/`, `data/`, `assets/` and
+`vendor/` after both gates pass, and force-pushes. That is a copy, not a build:
+nothing is transformed. It exists so a failing commit cannot reach players, and
+so the model, the tests and the transcription tools are not served to them.
+**Adding a runtime file means adding it to the copy list in
+`.github/workflows/ci.yml`, or the live site will 404 on it.**
 
 ## The three laws
 
@@ -86,6 +94,8 @@ therefore a failing test, not a bug report from a player mid-game.
 ## Common commands
 
 ```bash
+serve.bat                       # run it locally — the consoles fetch JSON,
+                                # so file:// gets you a blank page
 npm test                        # vitest
 npm run data:validate           # the published checksums and structural integrity
 uv run pasm validate pasm/spec  # spec integrity

@@ -33,13 +33,20 @@ and why. The app tracks the state and does the arithmetic.
 
 ## For developers
 
-Vanilla ES modules, no build step, served straight off `main` via GitHub Pages.
-PeerJS star topology with the facilitator's browser as the authoritative host.
+Vanilla ES modules, no build step. PeerJS star topology with the facilitator's
+browser as the authoritative host. CI publishes the runtime files to the
+`gh-pages` branch once the tests pass, so the live site is always a revision
+that was green.
 
 ```bash
 npm install
 npm test
+serve.bat        # then open http://localhost:8173/host.html
 ```
+
+Opening `index.html` from disk will not work — the consoles fetch their data as
+JSON, and browsers refuse that over `file://`. `serve.bat` exists for that one
+reason.
 
 See [AGENTS.md](AGENTS.md) for the architecture, the three invariants the
 codebase is built around, and where the rules of record actually live.
