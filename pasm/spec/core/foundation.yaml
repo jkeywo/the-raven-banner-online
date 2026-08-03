@@ -1,0 +1,87 @@
+entities:
+  - system: raven-banner-online
+    core:
+      status: provisional
+      confidence: confirmed
+      title: The Raven Banner Online
+      summary: >-
+        Browser client for a sixteen-player megagame, run fully remotely with
+        voice happening elsewhere. One facilitator's browser tab holds the only
+        authoritative game state; every other participant is a PeerJS client.
+      goals:
+        - Let a published paper megagame be run without a venue, posters, or dice.
+        - Enforce the rules for players so nobody has to police arithmetic mid-negotiation.
+        - Leave every judgement call the paper game leaves to a human with that human.
+        - Survive a facilitator refreshing or crashing their browser without ending the game.
+      references:
+        - browser-host-authority
+        - no-bundler-static-hosting
+        - gamespec-is-spec-js-is-implementation
+        - rules-core-is-pure
+      open_questions:
+        - Whether the facilitator-to-player channel is one thread per seat or one per topic.
+        - Whether Settle Shire consent is an in-app poll or a facilitator adjudication.
+        - What happens to a player whose character dies at three wounds.
+
+  - decision: browser-host-authority
+    core:
+      status: accepted
+      confidence: confirmed
+      title: The Facilitator's Browser Is Authoritative
+      summary: >-
+        A single browser tab, opened by the primary facilitator, owns the only
+        copy of game state. Players and the co-facilitator are clients that hold
+        redacted projections of it.
+      rationale:
+        - The facilitator is already the trusted umpire in the paper game, so trusting their client is not a new assumption.
+        - Because the host legitimately sees every secret, simultaneous reveals need no commit-reveal cryptography — only a redaction layer that stops secrets reaching other players.
+        - A dedicated server would need hosting, an operator, and a deploy story for a game that runs a handful of times a year.
+        - A peer mesh with CRDTs cannot express "the umpire decides", which is the game's central mechanism.
+      assumptions:
+        - The facilitator's machine stays awake and online for roughly three hours.
+      references:
+        - host-tab-lost
+
+  - decision: no-bundler-static-hosting
+    core:
+      status: accepted
+      confidence: confirmed
+      title: No Build Step
+      summary: >-
+        Vanilla ES modules and custom elements, committed as served, deployed
+        from the default branch by GitHub Pages.
+      rationale:
+        - What is committed is what runs, so a live-event hotfix is a commit rather than a build and a deploy.
+        - There is no toolchain to break on the morning of a game.
+        - PeerJS is vendored rather than loaded from a CDN so the page is same-origin and survives a CDN outage.
+
+  - decision: gamespec-is-spec-js-is-implementation
+    core:
+      status: accepted
+      confidence: confirmed
+      title: gamespec Specifies, JavaScript Implements
+      summary: >-
+        The rules of record are encoded in gamespec, in Python, in the
+        analogue-projects repository. The shipped rules engine is JavaScript in
+        this repository. Generated conformance vectors keep the two honest.
+      rationale:
+        - Running the Python mechanisms in the browser would mean shipping a Python runtime to sixteen clients, which is not a trade worth making for a rules engine measured in hundreds of lines.
+        - Two independent implementations of the same rules will drift unless something forces them together, so the Python mechanisms generate input-and-expected-output vectors that the JavaScript test suite replays.
+        - A rules disagreement therefore surfaces as a failing test rather than as an argument between players mid-clash.
+      assumptions:
+        - The vector export is run manually and its output committed; neither repository builds against the other.
+
+  - decision: rules-core-is-pure
+    core:
+      status: accepted
+      confidence: confirmed
+      title: The Rules Core Is Pure
+      summary: >-
+        Everything under the rules module is pure functions over state and
+        static data, with no transport, no persistence, and no DOM.
+      rationale:
+        - The host imports it to enforce the rules and the clients import it to grey out unaffordable buttons; only a dependency-free core can be shared that way.
+        - It makes the whole rule set testable in Node without a browser or a network.
+        - Static data is passed as an argument rather than imported, so tests inject fixtures instead of mutating a global.
+      references:
+        - command-admission

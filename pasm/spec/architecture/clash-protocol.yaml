@@ -1,0 +1,106 @@
+entities:
+  - mechanic: clash-resolution
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Clash Resolution
+      summary: >-
+        One paired duel inside a battle, run as an explicit state machine —
+        awaiting tactics, tactics revealed, awaiting lead declarations, lead
+        revealed with an amendment window, rolling, resolved.
+      rationale:
+        - This is the only part of the game with a genuine simultaneous reveal, and the only place where a client behaving badly could cheat, so the reveal is enforced by the projector rather than by client etiquette.
+        - The machine advances only inside the reducer. The amendment window's expiry is dispatched as a command rather than handled by a UI timer, so it appears in the log and replays identically.
+        - Extra attackers with no opponent are seeded as already-resolved automatic wins at pairing time, so shire capture is one uniform tally rather than a special case.
+      references:
+        - lead-the-charge-ratchet
+    game_design:
+      participating_roles:
+        - attacking-combatant
+        - defending-combatant
+        - facilitator
+
+  - state: clash-machine-state
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Clash Machine State
+      summary: Which stage a single clash has reached, plus each side's submitted tactic, lead declaration, reinforcements and roll.
+      rationale:
+        - The visibility manifest gates the tactic and lead fields on this stage, so the machine's position is what makes a secret a secret.
+    architecture:
+      classification: authoritative
+      owner: game-host
+      writers:
+        - game-host
+
+  - decision: lead-the-charge-ratchet
+    core:
+      status: accepted
+      confidence: confirmed
+      title: Lead The Charge Is A Ratchet
+      summary: >-
+        A combatant may switch to leading the charge after seeing their
+        opponent's declaration, but never away from it. Amendment rounds
+        therefore reach a fixpoint after at most two changes.
+      rationale:
+        - Read as a free two-way switch the paper rule never terminates, because each side would keep responding to the other. Read as monotone it terminates on its own, and that is what the rule actually says.
+        - Admission rejects an amendment from leading back to not leading, which is what makes the fixpoint guaranteed rather than merely likely.
+        - The countdown on the amendment window is therefore a courtesy to a player who has walked away, not a correctness requirement.
+      assumptions:
+        - Each side changes its declaration at most once, so the stage closes after at most two amendment rounds.
+
+  - message: submit-tactic-command
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Submit Tactic
+      summary: A combatant's choice of tactic card, freely changeable until both sides have submitted.
+      rationale:
+        - Admission rejects a card whose value exceeds the combatant's soldiers, which is the paper rule that stops a weakened player charging.
+    architecture:
+      authority: request
+      producer:
+        - client-command-gateway
+      consumer:
+        - command-admission
+      validator:
+        - command-admission
+      trust_boundary: client-to-host
+      payload: clash-and-card
+
+  - message: declare-lead-command
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Declare Lead The Charge
+      summary: A combatant's leadership declaration, and any later amendment to it.
+    architecture:
+      authority: request
+      producer:
+        - client-command-gateway
+      consumer:
+        - command-admission
+      validator:
+        - command-admission
+      trust_boundary: client-to-host
+      payload: clash-and-leading-flag
+
+  - message: amend-window-expired-command
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Amendment Window Expired
+      summary: A host-originated command closing a clash's amendment window so the stage can advance without every combatant present.
+      rationale:
+        - Issued as a command rather than handled inline so the timeout is recorded in the log and a replay reproduces the same clash.
+    architecture:
+      authority: request
+      producer:
+        - game-host
+      consumer:
+        - command-admission
+      validator:
+        - command-admission
+      trust_boundary: facilitator
+      payload: clash-identifier

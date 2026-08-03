@@ -1,0 +1,27 @@
+# Tooling pyproject: exists to pull PASM, ships no Python of its own.
+[project]
+name = "the-raven-banner-online-tooling"
+version = "0.1.0"
+description = "Development tooling for the-raven-banner-online. Ships no Python; exists to pull PASM."
+requires-python = ">=3.11"
+dependencies = [
+  # PASM lives in the fleet's shared repository, consumed as a subdirectory,
+  # pinned to a rev. This repo is NOT a vellum fleet game — it consumes PASM
+  # and nothing else from vellum, so a bump here is a one-line change to this
+  # rev plus the matching `uses:` in .github/workflows/ci.yml.
+  "pasm @ git+https://github.com/jkeywo/vellum@186e64f724d648539c3a1f25e29307eb90e2873a#subdirectory=pasm",
+]
+
+[tool.uv]
+package = false
+
+# Local override against a sibling vellum checkout — uncomment for local
+# work, re-comment before committing. The committed state always resolves
+# the pinned rev.
+# [tool.uv.sources]
+# pasm = { path = "../vellum/pasm", editable = true }
+
+[dependency-groups]
+dev = [
+  "pytest>=8.0",
+]

@@ -1,0 +1,60 @@
+/* console.css — one stylesheet for both consoles.
+   No build step, so this is plain CSS with custom properties rather than
+   anything that needs compiling. */
+
+:root {
+  --rb-ink: #1c1815;
+  --rb-parchment: #efe6d4;
+  --rb-parchment-deep: #ddd0b6;
+  --rb-blood: #7c2529;
+  --rb-gold: #b08d33;
+  --rb-muted: #6b6156;
+  --rb-rule: #c4b699;
+
+  --rb-serif: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+  --rb-sans: system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body.rb-shell {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--rb-parchment);
+  color: var(--rb-ink);
+  font-family: var(--rb-sans);
+  line-height: 1.55;
+}
+
+.rb-placeholder {
+  max-width: 34rem;
+  margin: 0 auto;
+  padding: 4rem 1.5rem;
+}
+
+.rb-placeholder h1 {
+  font-family: var(--rb-serif);
+  font-size: 2.5rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  margin: 0;
+}
+
+.rb-subtitle {
+  font-family: var(--rb-serif);
+  font-style: italic;
+  color: var(--rb-blood);
+  margin: 0.25rem 0 2rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--rb-rule);
+}
+
+.rb-meta {
+  color: var(--rb-muted);
+  font-size: 0.9rem;
+}
+
+a {
+  color: var(--rb-blood);
+  text-underline-offset: 0.15em;
+}

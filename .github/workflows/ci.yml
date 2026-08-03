@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  js:
+    name: tests and data checksums
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm test
+      - run: npm run data:validate
+
+  pasm:
+    name: PASM model
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # This repo is not a fleet game and does not call vellum's reusable
+      # fleet-ci workflow (that one is Rust/Trunk shaped). It uses the one
+      # composite action it actually needs. The rev here must match the pin
+      # in pyproject.toml.
+      - uses: jkeywo/vellum/actions/pasm-validate@186e64f724d648539c3a1f25e29307eb90e2873a
+        with:
+          spec-path: pasm/spec
+          scan: gate
+          scenario-glob: pasm/spec/scenarios/*.yaml

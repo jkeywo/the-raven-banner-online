@@ -1,0 +1,282 @@
+entities:
+  - role: owning-player
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Owning Player
+      summary: >-
+        The player holding the role a given piece of private information
+        belongs to. The audience of one for a brief, a resource total, or a
+        tactic card before its reveal.
+
+  - role: same-team-player
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Same-Team Player
+      summary: >-
+        A player on the same starting team, and so party to what the paper game
+        protects by seating the teams at separate tables.
+
+  - role: facilitator
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Facilitator
+      summary: >-
+        The umpire. Runs the clock, pairs clashes, roleplays the four
+        non-played factions, and decides everything the rules leave to
+        judgement.
+      rationale:
+        - Sees all information without exception, because they wrote the briefs and hold the only copy of state.
+
+  - role: primary-facilitator
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Primary Facilitator
+      summary: The facilitator whose browser is the authoritative host and owns the phase clock.
+
+  - role: co-facilitator
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Co-Facilitator
+      summary: >-
+        The second facilitator. Adjudicates alongside the primary, and holds a
+        full mirror of state that can be promoted to host if the primary dies.
+
+  - role: attacking-combatant
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Attacking Combatant
+      summary: A player fighting on the attacking side of a clash. Wins ties.
+
+  - role: defending-combatant
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Defending Combatant
+      summary: A player fighting on the defending side of a clash, possibly with a bonus from defended settlements.
+
+  - verb: claim-role
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Claim Role
+      summary: A seat takes an unheld character. Separate from identifying, so a seat can exist before it has a role and survive losing one.
+    game_design:
+      owner_role: owning-player
+      architecture_links:
+        - player-command-message
+      enforcement_links:
+        - command-admission
+
+  - verb: declare-initiative-target
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Declare Initiative Target
+      summary: An initiative token holder names the shire they intend to attack, visible to their team until the battle phase announces it.
+    game_design:
+      owner_role: owning-player
+      produces_facts:
+        - initiative-target-declared
+      architecture_links:
+        - player-command-message
+      enforcement_links:
+        - command-admission
+
+  - verb: join-battle
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Join Battle
+      summary: A player commits to a declared battle as an attacker or a defender, before the facilitator pairs the clashes.
+    game_design:
+      owner_role: owning-player
+      architecture_links:
+        - player-command-message
+      enforcement_links:
+        - command-admission
+
+  - verb: submit-tactic
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Submit Tactic
+      summary: A combatant chooses a tactic card in secret, changeable until both sides have chosen.
+    game_design:
+      owner_role: owning-player
+      produces_facts:
+        - both-tactics-submitted
+      architecture_links:
+        - submit-tactic-command
+      enforcement_links:
+        - command-admission
+
+  - verb: declare-lead
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Declare Lead The Charge
+      summary: A combatant declares whether they lead the charge, and may afterwards switch to leading but never away from it.
+    game_design:
+      owner_role: owning-player
+      produces_facts:
+        - both-lead-declarations-submitted
+      architecture_links:
+        - declare-lead-command
+      enforcement_links:
+        - command-admission
+
+  - verb: facilitator-override
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Facilitator Override
+      summary: A facilitator sets any value in the game directly, including forcing a stalled clash forward.
+      rationale:
+        - Travels the same admission-and-reducer pipeline as a player command, so an override is replayable and shows up in the log rather than silently diverging the state from its history.
+        - Forcing a clash forward past an absent combatant is the same fact as both sides having submitted, which is why this verb produces it.
+    game_design:
+      owner_role: facilitator
+      produces_facts:
+        - both-tactics-submitted
+        - both-lead-declarations-submitted
+      architecture_links:
+        - player-command-message
+      enforcement_links:
+        - command-admission
+
+  - verb: advance-phase
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Advance Phase
+      summary: The primary facilitator closes the current phase and opens the next, announcing it to everyone at once.
+      rationale:
+        - Announcing the battle targets is a consequence of this verb, which is why it is what releases the team-scoped initiative declarations to everyone.
+    game_design:
+      owner_role: primary-facilitator
+      produces_facts:
+        - battle-phase-begun
+      architecture_links:
+        - player-command-message
+      enforcement_links:
+        - command-admission
+
+  - mechanic: phase-clock
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Phase Clock
+      summary: >-
+        The turn structure — five turns of four hard-timed phases, five minutes
+        each but ten for the encounter phase, advanced by the primary
+        facilitator.
+      rationale:
+        - Derived from a wall-clock deadline rather than an accumulated tick count, so a backgrounded and throttled tab still shows the right remaining time.
+        - The facilitator can pause, extend and advance, because a paper megagame's clock has always been a person with a watch and an opinion.
+    game_design:
+      participating_roles:
+        - primary-facilitator
+
+  - resource: momentum
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Momentum
+      summary: The currency of special actions. Earned in the maintenance phase, capped at four, and never tradeable.
+    game_design:
+      owner_role: owning-player
+      protected: true
+      capacity: four
+      sources:
+        - two per maintenance phase for every archetype
+        - one more for a Saxon Priest whose faction controls ten or more churches
+      sinks:
+        - reinforcing a settlement
+        - raiding a settlement
+        - missionary expeditions and rousing sermons
+        - settling a shire and driving out missionaries
+        - claiming a crown and rebelling against a liege
+      must_not_be:
+        - traded-between-players
+        - accumulated-past-the-cap
+
+  - resource: soldiers
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Soldiers
+      summary: Fighting strength, roughly a hundred troops each. Caps the tactic card a combatant may play, and must be fed after a clash or lost.
+    game_design:
+      owner_role: owning-player
+      protected: true
+      sources:
+        - recruited for five silver
+        - the mandatory pagan Danish upkeep payment
+        - a rousing sermon from a Saxon Priest
+        - raising Christian banners, once per game
+      sinks:
+        - casualties taken in a clash
+        - going unfed after a clash
+        - settling a shire
+        - transferred to a liege on rebelling
+      must_not_be:
+        - traded-between-players
+
+  - resource: silver
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Silver
+      summary: Income from towns. Buys ships, soldiers, envoys and rebuilt settlements. Freely tradeable outside the battle phase.
+    game_design:
+      owner_role: owning-player
+      sources:
+        - two per town held in a supported shire
+        - raiding a town or a church
+        - a trade contract paying out each maintenance phase
+        - traded from another player
+      sinks:
+        - recruiting soldiers
+        - building ships
+        - sending an envoy to a non-played faction
+        - rebuilding a destroyed settlement
+        - settling a shire
+        - the mandatory pagan Danish upkeep payment
+
+  - resource: food
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Food
+      summary: Income from farms. Feeds soldiers after a clash. Freely tradeable outside the battle phase.
+    game_design:
+      owner_role: owning-player
+      sources:
+        - one per farm held in a supported shire
+        - raiding a farm
+        - traded from another player
+      sinks:
+        - feeding surviving soldiers after a clash
+        - traded to another player
+
+  - resource: ships
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Ships
+      summary: Bought access to coastal shires, and the price of an amphibious attack. Freely tradeable outside the battle phase.
+    game_design:
+      owner_role: owning-player
+      sources:
+        - built during the maintenance phase
+        - traded from another player
+      sinks:
+        - buying adjacency to a coastal shire for a turn
+        - committed to a defensive fleet
+        - traded to another player

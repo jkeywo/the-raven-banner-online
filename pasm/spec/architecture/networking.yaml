@@ -1,0 +1,204 @@
+entities:
+  - component: host-peer-listener
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Host Peer Listener
+      summary: >-
+        The accept loop in the primary facilitator's tab. Claims a peer id
+        derived from the join code, accepts inbound data connections, resolves
+        each to a seat, and broadcasts projected views.
+      rationale:
+        - The peer id is derived from the join code rather than issued by the broker, so a host that refreshes reclaims the same address and every client's existing retry loop reconnects with no user action.
+        - The broker holds a dead id briefly and answers with an unavailable-id error, so that error is retryable rather than fatal.
+    architecture:
+      kind: host-transport
+      authority: authoritative
+      classification: authoritative
+      owns:
+        - seat-registry
+      receives:
+        - identify-message
+        - player-command-message
+      sends:
+        - projected-view-message
+        - command-result-message
+      runs_in:
+        - facilitator-browser-runtime
+      trust_boundary: facilitator
+
+  - component: client-connection-manager
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Client Connection Manager
+      summary: >-
+        The client half of the transport. Dials the host's derived peer id,
+        reconnects on exponential backoff, and re-sends its identity on every
+        reopen so a refresh resumes the same seat.
+      rationale:
+        - Ported from an existing implementation in project-phoenix-v2 rather than written fresh; its generation guards, ICE timeout and retry-rather-than-fail behaviour are the reconnection design.
+        - Clearing the identity-sent flag on close is what makes reconnection resume a seat instead of creating a new one.
+    architecture:
+      kind: client-transport
+      authority: non-authoritative
+      sends:
+        - identify-message
+        - player-command-message
+      receives:
+        - projected-view-message
+        - command-result-message
+      runs_in:
+        - player-browser-runtime
+      trust_boundary: client-to-host
+
+  - component: client-command-gateway
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Client Command Gateway
+      summary: >-
+        The single module that knows the command envelope's shape and how to
+        reach the transport. Every player intent leaves the browser through it.
+      rationale:
+        - Consoles importing a gateway rather than hand-rolling envelopes makes "this control talks to the network" an observable code edge instead of a convention.
+        - It is free of DOM and of import-time side effects so it can be unit tested in Node, resolving its transport either from an argument or from the live connection manager.
+    architecture:
+      kind: client-interface
+      authority: non-authoritative
+      sends:
+        - player-command-message
+      runs_in:
+        - player-browser-runtime
+
+  - state: seat-registry
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Seat Registry
+      summary: >-
+        The map from a durable seat token to a connected human, their chosen
+        name, the role they hold, and whether they are a player or a
+        facilitator. Seats are runtime identity; roles are static data.
+      rationale:
+        - Separating the two is what lets a player refresh, a facilitator reassign a role, and a role sit vacant, all without special cases.
+        - Facilitator authority is gated on a PIN shown only on the host screen, because otherwise anyone holding the join code could claim to be the umpire.
+    architecture:
+      classification: authoritative
+      owner: host-peer-listener
+      writers:
+        - host-peer-listener
+
+  - message: identify-message
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Identify
+      summary: The first message on every opened connection, carrying the durable seat token, a display name, and optionally a facilitator PIN.
+    architecture:
+      authority: request
+      producer:
+        - client-connection-manager
+      consumer:
+        - host-peer-listener
+      validator:
+        - host-peer-listener
+      trust_boundary: client-to-host
+      payload: seat-token-and-name
+
+  - message: player-command-message
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Player Command
+      summary: A verb, a payload, and a per-client sequence number. The only way a player changes anything.
+      rationale:
+        - The sequence number lets the host drop a duplicate replayed by a reconnecting client, which makes every command idempotent under reconnection.
+    architecture:
+      authority: request
+      producer:
+        - client-command-gateway
+      consumer:
+        - host-peer-listener
+        - command-admission
+      validator:
+        - command-admission
+      trust_boundary: client-to-host
+      payload: verb-and-payload
+
+  - message: command-result-message
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Command Result
+      summary: The host's acknowledgement of one command, carrying the sequence number and, on rejection, a human-readable reason.
+      rationale:
+        - Returning the reason rather than a boolean is what lets a console render "you cannot afford that" against the exact control the player pressed.
+    architecture:
+      authority: response
+      producer:
+        - host-peer-listener
+      consumer:
+        - client-connection-manager
+      payload: sequence-and-outcome
+
+  - message: projected-view-message
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Projected View
+      summary: A per-recipient redaction of authoritative state, rebuilt and rebroadcast after every accepted command.
+    architecture:
+      authority: broadcast
+      producer:
+        - view-projector
+      consumer:
+        - client-connection-manager
+      validator:
+        - view-projector
+      trust_boundary: facilitator
+      payload: redacted-game-state
+
+  - failure: host-tab-lost
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Host Tab Lost
+      summary: >-
+        The primary facilitator's tab is refreshed, crashes, or its machine
+        dies. The only copy of authoritative state is in that tab.
+      rationale:
+        - This is the one failure that can end a three-hour game outright, so it gets three independent recoveries rather than one good one.
+    game_design:
+      causes:
+        - facilitator refreshes the page
+        - browser or operating system crash
+        - laptop sleeps or loses power
+      consequences:
+        - every client loses its connection and enters backoff retry
+        - unsaved state since the last autosave is lost
+      recovery_paths:
+        - the reopened host reclaims the peer id derived from the join code and clients reconnect unaided
+        - autosaved state in local storage is offered for resume on host boot
+        - an exported save file is imported into a fresh browser on different hardware
+      terminal: false
+
+  - failure: broker-id-unavailable
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Broker Holds A Dead Peer Id
+      summary: >-
+        A host that reopens too quickly is refused its own derived peer id,
+        because the signalling broker has not yet released the previous
+        registration.
+      rationale:
+        - Treating this as fatal would break the primary recovery path for the failure it most often accompanies.
+    game_design:
+      causes:
+        - the host reopens before the broker has expired the previous registration
+      consequences:
+        - the host cannot accept connections and clients keep retrying against an address nobody answers
+      recovery_paths:
+        - retry the claim on the same backoff schedule the clients use, surfacing the wait on screen rather than an error
+      terminal: false

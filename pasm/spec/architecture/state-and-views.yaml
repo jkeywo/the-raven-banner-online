@@ -1,0 +1,197 @@
+entities:
+  - state: authoritative-game-state
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Authoritative Game State
+      summary: >-
+        One plain JSON-serialisable object holding the whole game — phase and
+        clock, seats, roles and their resources, the eighteen shires, the
+        battle in progress, votes, envoy threads, and the command log.
+      rationale:
+        - Plain objects rather than classes so structured cloning, saving to local storage, exporting to a file and deep-equality assertions all come for free.
+        - Derived values are deliberately absent. Support, effective adjacency, income and the four Aftermath counters are recomputed on demand, because storing them is how the map and the tracker come to disagree.
+    architecture:
+      classification: authoritative
+      owner: game-host
+      writers:
+        - game-host
+      replicas:
+        - projected-player-view
+        - projected-facilitator-view
+
+  - component: game-host
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Game Host
+      summary: >-
+        Owns authoritative state and the pipeline that changes it — admit,
+        reduce, log, persist, reproject, broadcast.
+      rationale:
+        - Facilitator overrides travel this same pipeline rather than mutating state directly, which keeps the game replayable from its seed and log and keeps "what did the umpire change?" answerable.
+    architecture:
+      kind: host-coordinator
+      authority: authoritative
+      owns:
+        - authoritative-game-state
+        - clash-machine-state
+      coordinates:
+        - command-admission
+        - view-projector
+      runs_in:
+        - facilitator-browser-runtime
+
+  - component: command-admission
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Command Admission
+      summary: >-
+        The one place the rules are enforced. Decides whether a command is
+        legal for this actor in this phase against this state, returning a
+        human-readable reason when it is not.
+      rationale:
+        - Clients import the same admission functions to grey out unaffordable controls, but their answer is presentation only — the host's answer is the one that counts.
+        - Commands whose legality depends on a secret the client cannot see are marked host-only, so a client renders them as available-but-unverified rather than guessing wrong.
+        - Facilitator commands pass through admission too; theirs simply always admit, and their log entries are tagged as overrides.
+    architecture:
+      kind: rules-gate
+      authority: authoritative
+      classification: authoritative
+      validates:
+        - player-command-message
+      reads:
+        - authoritative-game-state
+      must_not_depend_on:
+        - client-connection-manager
+        - host-peer-listener
+        - view-projector
+
+  - component: view-projector
+    core:
+      status: proposed
+      confidence: confirmed
+      title: View Projector
+      summary: >-
+        Builds each recipient's redacted copy of state by walking a declarative
+        visibility manifest. Nothing leaves the host by any other route.
+      rationale:
+        - Redaction sprinkled across send sites fails open when someone adds a field; a manifest with a completeness test fails closed, because a path with no entry is a test failure.
+        - The facilitator projection short-circuits to a full copy — they wrote the briefs and hold the state, so there is nothing to hide from them.
+        - Reveal timing is expressed as a condition on a manifest entry rather than as branching in a send site, so a player cannot receive an opponent's card early even if their client misbehaves.
+    architecture:
+      kind: redaction
+      authority: authoritative
+      reads:
+        - authoritative-game-state
+      produces:
+        - projected-player-view
+        - projected-facilitator-view
+        - projected-view-message
+
+  - state: projected-player-view
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Projected Player View
+      summary: One player's redacted copy of state — the public map, their own sheet and brief, their team's private business, and nothing else.
+    architecture:
+      classification: replica
+      derived_from:
+        - authoritative-game-state
+      owner: view-projector
+
+  - state: projected-facilitator-view
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Projected Facilitator View
+      summary: A facilitator's copy of state, unredacted, plus the derived values the console displays.
+      rationale:
+        - The co-facilitator receives this too, which doubles as a warm standby copy of the game should the primary host die.
+    architecture:
+      classification: replica
+      derived_from:
+        - authoritative-game-state
+      owner: view-projector
+
+  - information: player-private-brief
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Player Private Brief
+      summary: A role's backstory, private goals and strategic hints. The paper rules say players must not show these to each other.
+    game_design:
+      visibility: role-visible
+      enforcement_links:
+        - view-projector
+      permitted_viewers:
+        - owning-player
+        - facilitator
+
+  - information: player-resource-holdings
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Player Resource Holdings
+      summary: A role's momentum, silver, food, soldiers, ships and wounds.
+      rationale:
+        - Nothing in the paper rules requires disclosure, and concealed strength is a negotiating lever, so these stay private by default rather than appearing on a public roster.
+    game_design:
+      visibility: role-visible
+      enforcement_links:
+        - view-projector
+      permitted_viewers:
+        - owning-player
+        - facilitator
+
+  - information: secret-tactic-selection
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Secret Tactic Selection
+      summary: The card a combatant has chosen for a clash, before the simultaneous reveal.
+    game_design:
+      visibility: role-visible
+      enforcement_links:
+        - view-projector
+      permitted_viewers:
+        - owning-player
+        - facilitator
+      reveal_conditions:
+        - both-tactics-submitted
+
+  - information: lead-the-charge-declaration
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Lead The Charge Declaration
+      summary: Whether a combatant is leading the charge, before the reveal that opens the amendment window.
+    game_design:
+      visibility: role-visible
+      enforcement_links:
+        - view-projector
+      permitted_viewers:
+        - owning-player
+        - facilitator
+      reveal_conditions:
+        - both-lead-declarations-submitted
+
+  - information: team-phase-initiative-target
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Team Phase Initiative Target
+      summary: The shire an initiative token holder intends to attack, decided at a team table before it is announced.
+      rationale:
+        - In the paper game this is protected by the teams sitting at separate tables, which is exactly a team-scoped audience.
+    game_design:
+      visibility: team-visible
+      enforcement_links:
+        - view-projector
+      permitted_viewers:
+        - same-team-player
+        - facilitator
+      reveal_conditions:
+        - battle-phase-begun

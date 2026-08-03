@@ -1,0 +1,39 @@
+scenario:
+  id: turn-one-vertical-slice
+  steps:
+    - kind: action
+      actor: owning-player
+      value: claim-role
+    - kind: action
+      actor: owning-player
+      value: declare-initiative-target
+    - kind: action
+      actor: primary-facilitator
+      value: advance-phase
+      requires_facts:
+        - initiative-target-declared
+    - kind: reveal
+      value: team-phase-initiative-target
+    - kind: action
+      actor: owning-player
+      value: join-battle
+      requires_facts:
+        - battle-phase-begun
+    - kind: action
+      actor: owning-player
+      value: submit-tactic
+      requires_facts:
+        - battle-phase-begun
+    - kind: reveal
+      value: secret-tactic-selection
+    - kind: action
+      actor: owning-player
+      value: declare-lead
+      requires_facts:
+        - both-tactics-submitted
+    - kind: reveal
+      value: lead-the-charge-declaration
+    - kind: fail
+      value: host-tab-lost
+    - kind: recover
+      value: host-tab-lost

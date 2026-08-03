@@ -1,0 +1,10 @@
+node_modules/
+.venv/
+.uv-cache/
+*.egg-info/
+.vitest/
+__pycache__/
+
+# 300dpi page renders of the map PDFs, used as the transcription reference.
+# Large, derivable, and not the source of truth — see tools/map-trace.html.
+raw/
