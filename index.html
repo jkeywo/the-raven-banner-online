@@ -68,6 +68,7 @@
           <button type="button" role="tab" data-pane="map" aria-selected="true">The board</button>
           <button type="button" role="tab" data-pane="battle" id="tab-battle" aria-selected="false">Battle</button>
           <button type="button" role="tab" data-pane="me" aria-selected="false">Your sheet</button>
+          <button type="button" role="tab" data-pane="envoys" aria-selected="false">Envoys</button>
           <button type="button" role="tab" data-pane="aftermath" aria-selected="false">England</button>
         </nav>
       </header>
@@ -81,6 +82,11 @@
 
       <div data-pane-body="battle" class="rb-pane" hidden>
         <rb-clash-panel id="clash"></rb-clash-panel>
+      </div>
+
+      <div data-pane-body="envoys" class="rb-pane" hidden>
+        <h2>Envoys</h2>
+        <rb-envoy-channel id="envoys"></rb-envoy-channel>
       </div>
 
       <div data-pane-body="me" class="rb-pane rb-pane-me" hidden>

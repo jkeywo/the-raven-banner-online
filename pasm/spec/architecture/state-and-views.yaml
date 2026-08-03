@@ -64,6 +64,8 @@ entities:
         - shared-console-components
         - phase-clock
         - clash-resolution
+        - envoy-negotiation
+        - facilitator-override-inspector
     implementation:
       status: declared
       paths:
@@ -209,6 +211,7 @@ entities:
         - shared-console-components
         - phase-clock
         - clash-resolution
+        - envoy-negotiation
     implementation:
       status: declared
       paths:
@@ -252,6 +255,66 @@ entities:
       derived_from:
         - authoritative-game-state
       owner: view-projector
+
+  - information: envoy-negotiation
+    core:
+      status: implemented
+      confidence: confirmed
+      title: Envoy Negotiation
+      summary: >-
+        A private thread between one player and the facilitator, who answers as
+        the Franks, the Britons, the Danish Kings or the Pope.
+      rationale:
+        - Every envoy action on every printed sheet ends "by talking to an organiser", because the deal is a conversation rather than a table of prices. The action buys the hearing, not the outcome.
+        - Private to its sender for the same reason a brief is. What Wessex offered Rome is exactly the sort of thing another player would pay to know.
+    game_design:
+      visibility: role-visible
+      enforcement_links:
+        - view-projector
+      permitted_viewers:
+        - owning-player
+        - facilitator
+    implementation:
+      status: declared
+      paths:
+        - gui/components/rb-envoy-channel.js
+        - gui/components/rb-envoy-queue.js
+      symbols:
+        - RbEnvoyChannel
+        - RbEnvoyQueue
+      tests:
+        - npm test
+
+  - component: facilitator-override-inspector
+    core:
+      status: implemented
+      confidence: confirmed
+      title: Facilitator Override Inspector
+      summary: >-
+        A searchable tree of the whole game where a facilitator can change any
+        value, short of the ones that would break replay.
+      rationale:
+        - It exists because the app will get something wrong during a game, and the alternative to fixing it is a room of sixteen people watching an apology. A paper megagame never had this problem -- the umpire crosses out a number.
+        - Every edit travels the same admission and reducer as a player's command, so it lands in the log tagged as an override and a replay reproduces it. Otherwise "the facilitator can change anything" would mean "the history is a polite fiction".
+        - The seed, the cursor and the log itself are not editable. Changing one of those would make the record disagree with the game it describes, which is worse than any bug it could paper over.
+        - Values keep their type on the way back in. A castle count that quietly became the string "3" would compare wrong everywhere afterwards and nobody would know why.
+    architecture:
+      kind: client-interface
+      authority: non-authoritative
+      reads:
+        - projected-facilitator-view
+      runs_in:
+        - facilitator-browser-runtime
+    implementation:
+      status: declared
+      paths:
+        - gui/components/rb-state-inspector.js
+      symbols:
+        - RbStateInspector
+        - collectLeaves
+        - coerce
+      tests:
+        - npm test
 
   - information: player-private-brief
     core:

@@ -1,5 +1,5 @@
 {
- "_generated": "raven_banner gamespec @ analogue-projects 34b77cb via tools/export_web_data.py",
+ "_generated": "raven_banner gamespec @ analogue-projects d1ca1d8 via tools/export_web_data.py",
  "_doNotEdit": true,
  "starting": {
   "D": "Danish Invasion",
@@ -39,5 +39,67 @@
  "danishArchetypes": [
   "danish_warrior",
   "danish_trader"
- ]
+ ],
+ "npc": {
+  "britons": {
+   "name": "the Britons",
+   "wants": "silver, and the border shires they still remember holding",
+   "offers": "food, soldiers, and raids on whoever you name"
+  },
+  "franks": {
+   "name": "the Franks",
+   "wants": "English territory, or a vassal who answers to them",
+   "offers": "money, soldiers, infrastructure, a fleet, and refuge"
+  },
+  "danish_kings": {
+   "name": "the Danish Kings",
+   "wants": "silver, tribute, land and fealty",
+   "offers": "ships and soldiers"
+  },
+  "pope": {
+   "name": "the Pope",
+   "wants": "episcopal freedom, monastic reform, and conversions",
+   "offers": "silver, defended settlements, mercenaries and soldiers"
+  }
+ },
+ "envoy": {
+  "saxon_warrior": {
+   "to": [
+    "britons",
+    "franks",
+    "danish_kings"
+   ],
+   "cost": {
+    "silver": 2
+   }
+  },
+  "danish_warrior": {
+   "to": [
+    "britons",
+    "franks",
+    "danish_kings"
+   ],
+   "cost": {
+    "silver": 2
+   }
+  },
+  "danish_trader": {
+   "to": [
+    "britons",
+    "franks",
+    "danish_kings"
+   ],
+   "cost": {
+    "silver": 1
+   }
+  },
+  "saxon_priest": {
+   "to": [
+    "pope"
+   ],
+   "cost": {
+    "momentum": 1
+   }
+  }
+ }
 }

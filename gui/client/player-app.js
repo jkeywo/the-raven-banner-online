@@ -27,6 +27,7 @@ import '../components/rb-aftermath.js';
 import '../components/rb-phase-clock.js';
 import '../components/rb-action-list.js';
 import '../components/rb-clash-panel.js';
+import '../components/rb-envoy-channel.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -179,6 +180,8 @@ export async function startPlayerApp({ location = window.location } = {}) {
 
     $('clash').data = data;
     $('clash').view = view;
+    $('envoys').data = data;
+    $('envoys').view = view;
     // The battle tab announces itself, because a phase you can miss is a
     // phase you will miss.
     $('tab-battle').dataset.live = String(view.phase.name === 'battle');

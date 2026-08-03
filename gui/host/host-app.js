@@ -21,6 +21,8 @@ import '../components/rb-connection-dot.js';
 import '../components/rb-seat-roster.js';
 import '../components/rb-phase-clock.js';
 import '../components/rb-facilitator-grid.js';
+import '../components/rb-envoy-queue.js';
+import '../components/rb-state-inspector.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -144,6 +146,13 @@ export async function startHostApp({ location = window.location } = {}) {
     $('clock').phase = phase;
     $('battle-grid').data = data;
     $('battle-grid').state = host.state;
+    $('envoy-queue').data = data;
+    $('envoy-queue').state = host.state;
+    $('inspector').state = host.state;
+    const waiting = Object.values(host.state.envoys).filter((t) => t.open
+      && t.messages.at(-1)?.from === t.roleId).length;
+    $('envoy-count').textContent = waiting
+      ? `${waiting} waiting on you` : 'nothing waiting';
     $('battle-panel').hidden = phase.name !== 'battle';
     $('advance-phase').textContent = phase.name === 'lobby' ? 'Begin the game'
       : phase.name === 'epilogue' ? 'The game is over' : 'Next phase';

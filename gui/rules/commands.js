@@ -44,6 +44,16 @@ const holdsShipyard = (state, roleId) =>
  */
 const owesUpkeep = (state, data, roleId) => isPagan(state, data, roleId);
 
+/** Who this archetype may send envoys to, and what it costs them. */
+const envoyRules = (data, roleId) =>
+  data.factions.envoy?.[data.roles.roles[roleId]?.archetype] ?? null;
+
+/** An open conversation between this role and this court, if there is one. */
+const openThread = (state, roleId, npcFaction) =>
+  Object.values(state.envoys).find(
+    (thread) => thread.roleId === roleId && thread.npcFaction === npcFaction && thread.open,
+  ) ?? null;
+
 /**
  * Where a role may circle a settlement.
  *
@@ -431,6 +441,122 @@ export const COMMANDS = {
       if (ctx.cmd.payload.give === 'silver') { role.silver -= 3; role.food += 1; }
       else { role.food -= 1; role.silver += 2; }
       role.perTurn.tradesUsed += 1;
+    },
+  },
+
+  // --- encounter phase -----------------------------------------------------
+  /**
+   * Open a line to a power nobody plays.
+   *
+   * Every envoy action on every sheet ends the same way — "by talking to an
+   * organiser" — because the deal is a conversation, not a table of prices.
+   * So this does not buy anything. It buys the *conversation*: a private
+   * thread with the facilitator, who speaks for the Franks and the Britons and
+   * the Pope and will want something for whatever you are asking.
+   *
+   * A priest deals with Rome and pays in momentum; everyone else deals with
+   * the secular powers and pays in silver, and Frida pays half because trade
+   * is the whole of her character.
+   */
+  'send-envoy': {
+    phases: ['encounter'],
+    actor: 'player',
+    probe: (state, data, roleId) => ({
+      npcFaction: envoyRules(data, roleId)?.to?.[0],
+    }),
+    admit(ctx) {
+      const roleId = subjectOf(ctx);
+      const rules = envoyRules(ctx.data, roleId);
+      if (!rules) return no('your archetype sends no envoys');
+
+      const { npcFaction } = ctx.cmd.payload ?? {};
+      if (!rules.to.includes(npcFaction)) {
+        const names = rules.to.map((id) => ctx.data.factions.npc[id]?.name ?? id);
+        return no(`you can send to ${names.join(', ')}`);
+      }
+      // One open thread per power: a second envoy to the same court is the
+      // same conversation, and should join it rather than start a rival.
+      if (openThread(ctx.state, roleId, npcFaction)) {
+        return no('you already have that conversation open');
+      }
+      const reason = affordable(ctx.state.roles[roleId], rules.cost);
+      return reason ? no(reason) : ok();
+    },
+    effects(draft, ctx, { data }) {
+      const roleId = subjectOf(ctx);
+      const { npcFaction } = ctx.cmd.payload;
+      spend(draft.roles[roleId], envoyRules(data, roleId).cost);
+      const id = `${roleId}:${npcFaction}:${Object.keys(draft.envoys).length + 1}`;
+      draft.envoys[id] = {
+        id,
+        roleId,
+        npcFaction,
+        open: true,
+        messages: [],
+      };
+    },
+  },
+
+  /** Say something down a thread you already have open. */
+  'envoy-message': {
+    phases: '*',
+    actor: 'player',
+    admit(ctx) {
+      const thread = ctx.state.envoys[ctx.cmd.payload?.threadId];
+      if (!thread) return no('no such conversation');
+      if (thread.roleId !== subjectOf(ctx) && ctx.actor.kind !== 'facilitator') {
+        return no('that conversation is not yours');
+      }
+      if (!thread.open) return no('that conversation is closed');
+      const text = String(ctx.cmd.payload?.text ?? '').trim();
+      if (!text) return no('say something');
+      if (text.length > 2000) return no('that is too long to send');
+      return ok();
+    },
+    effects(draft, ctx) {
+      const thread = draft.envoys[ctx.cmd.payload.threadId];
+      thread.messages.push({
+        from: ctx.actor.kind === 'facilitator' ? thread.npcFaction : thread.roleId,
+        text: String(ctx.cmd.payload.text).trim(),
+        at: ctx.now,
+      });
+    },
+  },
+
+  /**
+   * The facilitator answering as the Franks, or the Pope, or whoever.
+   *
+   * Their own verb rather than a flag on the player's, so the log reads as a
+   * conversation between two parties and an audit can tell who said what.
+   */
+  'facilitator:envoy-reply': {
+    phases: '*',
+    actor: 'facilitator',
+    admit(ctx) {
+      const thread = ctx.state.envoys[ctx.cmd.payload?.threadId];
+      if (!thread) return no('no such conversation');
+      return String(ctx.cmd.payload?.text ?? '').trim() ? ok() : no('say something');
+    },
+    effects(draft, ctx) {
+      const thread = draft.envoys[ctx.cmd.payload.threadId];
+      thread.messages.push({
+        from: thread.npcFaction,
+        text: String(ctx.cmd.payload.text).trim(),
+        at: ctx.now,
+      });
+      thread.open = true;
+    },
+  },
+
+  /** Close a thread once the deal is struck or refused. */
+  'facilitator:envoy-close': {
+    phases: '*',
+    actor: 'facilitator',
+    admit(ctx) {
+      return ctx.state.envoys[ctx.cmd.payload?.threadId] ? ok() : no('no such conversation');
+    },
+    effects(draft, ctx) {
+      draft.envoys[ctx.cmd.payload.threadId].open = false;
     },
   },
 
