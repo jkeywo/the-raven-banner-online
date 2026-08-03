@@ -53,6 +53,25 @@ entities:
         - view-projector
       runs_in:
         - facilitator-browser-runtime
+      persists:
+        - authoritative-game-state
+      depends_on:
+        - authoritative-game-state
+        - command-admission
+        - view-projector
+        - host-peer-listener
+    implementation:
+      status: declared
+      paths:
+        - gui/host/game-host.js
+        - gui/host/persistence.js
+        - gui/host/host-app.js
+      symbols:
+        - GameHost
+        - Persistence
+        - parseSave
+      tests:
+        - npm test
 
   - component: command-admission
     core:

@@ -5,18 +5,86 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>The Raven Banner — Facilitator</title>
   <link rel="stylesheet" href="gui/console.css">
+  <script src="vendor/peerjs.min.js"></script>
 </head>
 <body class="rb-shell">
-  <main class="rb-placeholder">
-    <h1>Facilitator Console</h1>
-    <p class="rb-subtitle">The Raven Banner</p>
-    <p>
-      Not built yet. When it is, this page will mint a join code, hold the whole
-      game, and be the thing you must not close.
-    </p>
-    <p class="rb-meta">
-      Players join at <a href="index.html">index.html</a>.
-    </p>
+  <header class="rb-bar">
+    <span class="rb-brand">The Raven Banner <span class="rb-tag">facilitator</span></span>
+    <rb-connection-dot id="connection" status="connecting"></rb-connection-dot>
+  </header>
+
+  <main class="rb-main">
+    <!-- starting or resuming ---------------------------------------------- -->
+    <section id="screen-start" class="rb-panel" hidden>
+      <h1>Run a game</h1>
+      <p class="rb-lede">
+        The game lives in this tab. Keep it open, keep the laptop plugged in,
+        and turn off sleep.
+      </p>
+      <button id="new-game" type="button" class="rb-primary">Start a new game</button>
+      <p id="start-error" class="rb-error" role="alert"></p>
+
+      <div id="resume" hidden>
+        <h2>Or pick up where you left off</h2>
+        <ul id="resume-list" class="rb-resumes"></ul>
+      </div>
+
+      <h2>Or open a saved game</h2>
+      <p class="rb-meta">
+        A downloaded save can be opened on any machine — this is how a game
+        survives a laptop dying.
+      </p>
+      <input id="import-file" type="file" accept="application/json,.json">
+    </section>
+
+    <!-- running ------------------------------------------------------------ -->
+    <section id="screen-running" class="rb-panel rb-wide" hidden>
+      <div class="rb-columns">
+        <div>
+          <h1>Game <span id="join-code" class="rb-code"></span></h1>
+          <p class="rb-lede">Read the code out. Paste the link.</p>
+
+          <label for="player-link">Player link</label>
+          <div class="rb-row">
+            <input id="player-link" readonly>
+            <button id="copy-link" type="button">Copy</button>
+          </div>
+
+          <p class="rb-pin">
+            Facilitator PIN <strong id="facilitator-pin"></strong>
+            <span class="rb-meta">
+              Only the other facilitator gets this. Anyone with it can edit the game.
+            </span>
+          </p>
+
+          <h2>Keeping the game</h2>
+          <p class="rb-meta">
+            Saved automatically as you go. Download one before anything
+            important — it is the only copy that survives this machine.
+          </p>
+          <button id="download-save" type="button">Download save</button>
+          <p id="save-warning" class="rb-error" role="alert" hidden>
+            Could not save to this browser — storage is full or blocked.
+            Download a save instead.
+          </p>
+          <p id="replay-warning" class="rb-error" role="alert" hidden></p>
+        </div>
+
+        <div>
+          <h2>Who is here</h2>
+          <p id="seated-count" class="rb-meta"></p>
+          <rb-seat-roster id="roster"></rb-seat-roster>
+
+          <h2>Connections</h2>
+          <pre id="host-log" class="rb-log"></pre>
+        </div>
+      </div>
+    </section>
   </main>
+
+  <script type="module">
+    import { startHostApp } from './gui/host/host-app.js';
+    startHostApp();
+  </script>
 </body>
 </html>

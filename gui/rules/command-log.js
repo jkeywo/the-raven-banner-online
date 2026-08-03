@@ -45,8 +45,17 @@ export function overrides(log) {
 }
 
 /**
- * What a save file holds. Deliberately not the state: a seed and a log replay
- * to the state, and cannot disagree with it.
+ * What a save file holds.
+ *
+ * Deliberately not the state: a seed and a log replay to the state, and cannot
+ * disagree with it.
+ *
+ * Seats ride along beside the history rather than inside it. They are not
+ * game events — nobody *did* sitting down — so they are not commanded, not
+ * logged and not replayed. But they are exactly what a host coming back from a
+ * crash needs, because without the token-to-seat binding every returning
+ * player is a stranger and loses the role they were playing. So: replay the
+ * history, then put everyone back in their chairs.
  */
 export function toSave(state) {
   return {
@@ -54,6 +63,8 @@ export function toSave(state) {
     joinCode: state.joinCode,
     seed: state.seed,
     log: state.log,
+    seats: state.seats,
+    seatByToken: state.seatByToken,
     savedAt: null,      // stamped by the host, which owns the clock
   };
 }

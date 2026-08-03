@@ -5,18 +5,62 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>The Raven Banner</title>
   <link rel="stylesheet" href="gui/console.css">
+  <script src="vendor/peerjs.min.js"></script>
 </head>
 <body class="rb-shell">
-  <main class="rb-placeholder">
-    <h1>The Raven Banner</h1>
-    <p class="rb-subtitle">England, 871</p>
-    <p>
-      The player client is not built yet. When it is, this page will ask you for
-      the join code your facilitator gave you.
-    </p>
-    <p class="rb-meta">
-      Facilitators start a game at <a href="host.html">host.html</a>.
-    </p>
+  <header class="rb-bar">
+    <span class="rb-brand">The Raven Banner</span>
+    <rb-connection-dot id="connection" status="connecting"></rb-connection-dot>
+  </header>
+
+  <main class="rb-main">
+    <!-- 1. the code ------------------------------------------------------- -->
+    <section id="screen-code" class="rb-panel" hidden>
+      <h1>Join the game</h1>
+      <p class="rb-lede">Your facilitator will read out a seven-character code.</p>
+      <form id="code-form" class="rb-form">
+        <label for="join-code">Join code</label>
+        <input id="join-code" name="join-code" autocomplete="off" autocapitalize="characters"
+               spellcheck="false" maxlength="12" placeholder="RAVEN7Z" required>
+        <p id="code-error" class="rb-error" role="alert"></p>
+        <button type="submit" class="rb-primary">Continue</button>
+      </form>
+    </section>
+
+    <!-- 2. the name ------------------------------------------------------- -->
+    <section id="screen-name" class="rb-panel" hidden>
+      <h1>Who are you?</h1>
+      <p class="rb-lede">
+        Your own name, not your character's — you will choose a character next.
+        This is what the others see on the roster.
+      </p>
+      <form id="name-form" class="rb-form">
+        <label for="player-name">Your name</label>
+        <input id="player-name" name="player-name" autocomplete="nickname"
+               maxlength="40" required>
+        <button type="submit" class="rb-primary">Join</button>
+      </form>
+    </section>
+
+    <!-- 3. the lobby ------------------------------------------------------ -->
+    <section id="screen-lobby" class="rb-panel rb-wide" hidden>
+      <h1>England, 871</h1>
+      <p class="rb-lede">
+        Game <strong id="lobby-code" class="rb-code"></strong>.
+        <span id="lobby-message"></span>
+      </p>
+      <p id="claim-error" class="rb-error" role="alert"></p>
+
+      <div id="role-picker" class="rb-roles" hidden></div>
+
+      <h2>Who is here</h2>
+      <rb-seat-roster id="roster"></rb-seat-roster>
+    </section>
   </main>
+
+  <script type="module">
+    import { startPlayerApp } from './gui/client/player-app.js';
+    startPlayerApp();
+  </script>
 </body>
 </html>

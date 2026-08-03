@@ -1,15 +1,17 @@
 /* console.css — one stylesheet for both consoles.
-   No build step, so this is plain CSS with custom properties rather than
-   anything that needs compiling. */
+   No build step, so this is plain CSS with custom properties. Desktop-first,
+   because the game is played remotely with everyone at their own machine. */
 
 :root {
   --rb-ink: #1c1815;
   --rb-parchment: #efe6d4;
-  --rb-parchment-deep: #ddd0b6;
+  --rb-paper: #faf6ec;
   --rb-blood: #7c2529;
   --rb-gold: #b08d33;
   --rb-muted: #6b6156;
   --rb-rule: #c4b699;
+  --rb-green: #4a7c3f;
+  --rb-amber: #b8791b;
 
   --rb-serif: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
   --rb-sans: system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -26,35 +28,258 @@ body.rb-shell {
   line-height: 1.55;
 }
 
-.rb-placeholder {
+/* --- chrome ------------------------------------------------------------- */
+
+.rb-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.7rem 1.5rem;
+  background: var(--rb-ink);
+  color: var(--rb-paper);
+}
+
+.rb-brand { font-family: var(--rb-serif); font-size: 1.15rem; letter-spacing: 0.02em; }
+
+.rb-tag {
+  font-family: var(--rb-sans);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--rb-gold);
+  margin-left: 0.4rem;
+}
+
+.rb-main { padding: 2rem 1.5rem 4rem; }
+
+.rb-panel {
   max-width: 34rem;
   margin: 0 auto;
-  padding: 4rem 1.5rem;
+  background: var(--rb-paper);
+  border: 1px solid var(--rb-rule);
+  border-radius: 4px;
+  padding: 2rem;
 }
 
-.rb-placeholder h1 {
+.rb-panel.rb-wide { max-width: 60rem; }
+
+.rb-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+  gap: 2.5rem;
+}
+
+h1 {
   font-family: var(--rb-serif);
-  font-size: 2.5rem;
+  font-size: 1.9rem;
   font-weight: 600;
-  letter-spacing: 0.01em;
-  margin: 0;
+  margin: 0 0 0.4rem;
 }
 
-.rb-subtitle {
+h2 {
   font-family: var(--rb-serif);
-  font-style: italic;
-  color: var(--rb-blood);
-  margin: 0.25rem 0 2rem;
-  padding-bottom: 1.5rem;
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin: 2rem 0 0.5rem;
+  padding-bottom: 0.3rem;
   border-bottom: 1px solid var(--rb-rule);
 }
 
-.rb-meta {
-  color: var(--rb-muted);
-  font-size: 0.9rem;
+.rb-lede { color: var(--rb-muted); margin: 0 0 1.5rem; }
+.rb-meta { color: var(--rb-muted); font-size: 0.85rem; }
+.rb-empty { color: var(--rb-muted); font-style: italic; }
+
+.rb-error { color: var(--rb-blood); font-size: 0.9rem; min-height: 1.2em; margin: 0.4rem 0; }
+.rb-error:empty { margin: 0; }
+
+.rb-code {
+  font-family: ui-monospace, 'Cascadia Mono', Menlo, monospace;
+  letter-spacing: 0.12em;
+  color: var(--rb-blood);
 }
 
-a {
-  color: var(--rb-blood);
-  text-underline-offset: 0.15em;
+/* --- forms -------------------------------------------------------------- */
+
+.rb-form { display: flex; flex-direction: column; gap: 0.4rem; }
+
+label {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--rb-muted);
 }
+
+input[type="text"], input:not([type]), input[type="file"] {
+  font: inherit;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid var(--rb-rule);
+  border-radius: 3px;
+  background: #fff;
+  color: inherit;
+  width: 100%;
+}
+
+#join-code {
+  font-family: ui-monospace, monospace;
+  font-size: 1.4rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+button {
+  font: inherit;
+  padding: 0.55rem 1.1rem;
+  border: 1px solid var(--rb-rule);
+  border-radius: 3px;
+  background: #fff;
+  color: inherit;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) { background: var(--rb-parchment); }
+button:disabled { opacity: 0.45; cursor: default; }
+
+.rb-primary {
+  align-self: flex-start;
+  margin-top: 0.6rem;
+  background: var(--rb-blood);
+  border-color: var(--rb-blood);
+  color: #fff;
+}
+
+.rb-primary:hover:not(:disabled) { background: #943034; }
+
+.rb-row { display: flex; gap: 0.5rem; align-items: center; }
+.rb-row input { flex: 1; }
+
+.rb-pin { margin-top: 1.5rem; }
+.rb-pin strong {
+  font-family: ui-monospace, monospace;
+  font-size: 1.2rem;
+  letter-spacing: 0.15em;
+  color: var(--rb-blood);
+}
+.rb-pin .rb-meta { display: block; }
+
+/* --- connection dot ----------------------------------------------------- */
+
+rb-connection-dot {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.rb-dot {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  background: var(--rb-amber);
+}
+
+rb-connection-dot[data-tone="ready"] .rb-dot { background: var(--rb-green); }
+rb-connection-dot[data-tone="away"] .rb-dot { background: var(--rb-blood); }
+rb-connection-dot[data-tone="connecting"] .rb-dot { animation: rb-pulse 1.4s ease-in-out infinite; }
+
+@keyframes rb-pulse { 50% { opacity: 0.25; } }
+
+.rb-dot-retry {
+  padding: 0.15rem 0.5rem;
+  font-size: 0.78rem;
+  background: transparent;
+  border-color: currentColor;
+  color: inherit;
+}
+
+/* --- roster ------------------------------------------------------------- */
+
+.rb-roster { list-style: none; margin: 0; padding: 0; }
+
+.rb-seat {
+  display: grid;
+  grid-template-columns: 0.6rem 1fr auto auto;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--rb-rule);
+}
+
+.rb-seat-dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: var(--rb-green);
+}
+
+.rb-seat[data-connected="false"] { opacity: 0.5; }
+.rb-seat[data-connected="false"] .rb-seat-dot { background: var(--rb-muted); }
+
+.rb-seat-role { font-family: var(--rb-serif); color: var(--rb-blood); }
+.rb-seat-role em { color: var(--rb-muted); }
+
+.rb-seat-tag {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--rb-gold);
+}
+
+/* --- role picker -------------------------------------------------------- */
+
+.rb-roles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  gap: 0.5rem;
+  margin: 1rem 0 0;
+}
+
+.rb-role {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.1rem;
+  text-align: left;
+  padding: 0.7rem 0.8rem;
+}
+
+.rb-role-name {
+  font-family: var(--rb-serif);
+  font-size: 1.05rem;
+  text-transform: capitalize;
+}
+
+.rb-role-team {
+  font-size: 0.75rem;
+  color: var(--rb-muted);
+  text-transform: capitalize;
+}
+
+.rb-role-taken {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--rb-blood);
+}
+
+/* --- host odds and ends -------------------------------------------------- */
+
+.rb-resumes { list-style: none; margin: 0.5rem 0 0; padding: 0; display: grid; gap: 0.4rem; }
+.rb-resume { display: flex; justify-content: space-between; gap: 1rem; width: 100%; }
+.rb-resume span { color: var(--rb-muted); font-size: 0.85rem; }
+
+.rb-log {
+  font-family: ui-monospace, 'Cascadia Mono', Menlo, monospace;
+  font-size: 0.75rem;
+  color: var(--rb-muted);
+  background: var(--rb-parchment);
+  border: 1px solid var(--rb-rule);
+  border-radius: 3px;
+  padding: 0.6rem;
+  max-height: 14rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  margin: 0;
+}
+
+a { color: var(--rb-blood); text-underline-offset: 0.15em; }
