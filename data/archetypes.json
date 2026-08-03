@@ -1,0 +1,44 @@
+{
+ "_generated": "raven_banner gamespec @ analogue-projects c6fc66e via tools/export_web_data.py",
+ "_doNotEdit": true,
+ "teams": [
+  {
+   "id": "wessex",
+   "display_name": "Kingdom of Wessex"
+  },
+  {
+   "id": "mercia",
+   "display_name": "Kingdom of Mercia"
+  },
+  {
+   "id": "great_heathen_army",
+   "display_name": "Great Heathen Army"
+  },
+  {
+   "id": "great_summer_army",
+   "display_name": "Great Summer Army"
+  }
+ ],
+ "archetypes": [
+  {
+   "id": "saxon_warrior",
+   "display_name": "Saxon Warrior",
+   "roles": 7
+  },
+  {
+   "id": "saxon_priest",
+   "display_name": "Saxon Priest",
+   "roles": 2
+  },
+  {
+   "id": "danish_warrior",
+   "display_name": "Danish Warrior",
+   "roles": 6
+  },
+  {
+   "id": "danish_trader",
+   "display_name": "Danish Trader",
+   "roles": 1
+  }
+ ]
+}

@@ -63,9 +63,19 @@ answerable.
 
 `data/*.json` and `tests/vectors/*.json` are generated from the gamespec project
 at `C:\AnalogueGames\analogue-projects\GameProjects\raven_banner` by
-`tools/export_web_data.py` and `tools/export_vectors.py` **in that repo**. Each
-file carries a `_generated` provenance line naming the `analogue-projects`
-commit it came from, and `_doNotEdit: true`.
+`tools/export_web_data.py`, `tools/export_map_geometry.py` and (later)
+`tools/export_vectors.py` **in that repo**. Each file carries a `_generated`
+provenance line naming the `analogue-projects` commit it came from, and
+`_doNotEdit: true`. `assets/maps/*.png` are rendered from the map PDFs the same
+way. To change any of them, change the authored gamespec module and re-export.
+
+`data/geometry.json` is kept apart from the rules data on purpose. It holds
+where things sit on the printed maps — shire outlines and settlement anchors —
+so that `map.gamespec.md` stays a readable rules document instead of a few
+hundred lines of SVG path data, and so re-tracing the artwork never touches the
+rules. Its coordinates are in PDF points against a 1191×1684 viewBox, which is
+the aspect the map images were rendered at, so an SVG overlay lines up with the
+image at any display size.
 
 The gamespec project is the specification of record; `gui/rules/` is the
 implementation. They are two languages and they will drift unless something
@@ -77,10 +87,14 @@ therefore a failing test, not a bug report from a player mid-game.
 
 ```bash
 npm test                        # vitest
-npm run data:validate           # the 74/3/3/3 checksums and structural integrity
+npm run data:validate           # the published checksums and structural integrity
 uv run pasm validate pasm/spec  # spec integrity
 uv run pasm scan pasm/spec      # observed-vs-declared dependency edges
 ```
+
+`tools/map-check.html` draws `data/` over the printed maps so a misread shire is
+visible at a glance. It needs the repo served over http rather than opened from
+disk, because it fetches JSON.
 
 In the gamespec project (note: `python3` on this box is usually `py -3`):
 

@@ -1,0 +1,322 @@
+{
+ "_generated": "raven_banner gamespec @ analogue-projects c6fc66e via tools/export_web_data.py",
+ "_doNotEdit": true,
+ "roles": {
+  "king_alfred": {
+   "id": "king_alfred",
+   "name": "King Alfred",
+   "team": "wessex",
+   "archetype": "saxon_warrior",
+   "liege": null,
+   "claims": [
+    "wessex",
+    "kent"
+   ],
+   "stewardship": [
+    "wiltshire",
+    "west_country"
+   ],
+   "start": {
+    "momentum": 0,
+    "silver": 4,
+    "food": 4,
+    "soldiers": 4,
+    "ships": 0,
+    "wounds": 0
+   }
+  },
+  "cenred": {
+   "id": "cenred",
+   "name": "Cenred",
+   "team": "wessex",
+   "archetype": "saxon_warrior",
+   "liege": "king_alfred",
+   "claims": [
+    "sussex"
+   ],
+   "stewardship": [
+    "sussex",
+    "essex",
+    "redding"
+   ],
+   "start": {
+    "momentum": 0,
+    "silver": 4,
+    "food": 4,
+    "soldiers": 3,
+    "ships": 0,
+    "wounds": 0
+   }
+  },
+  "godric": {
+   "id": "godric",
+   "name": "Godric",
+   "team": "wessex",
+   "archetype": "saxon_warrior",
+   "liege": "king_alfred",
+   "claims": [
+    "east_anglia"
+   ],
+   "stewardship": [],
+   "start": {
+    "momentum": 0,
+    "silver": 6,
+    "food": 4,
+    "soldiers": 6,
+    "ships": 0,
+    "wounds": 0
+   }
+  },
+  "ceowulf": {
+   "id": "ceowulf",
+   "name": "Ceowulf",
+   "team": "mercia",
+   "archetype": "saxon_warrior",
+   "liege": null,
+   "claims": [
+    "mercia"
+   ],
+   "stewardship": [
+    "wrekinsets",
+    "magonsets"
+   ],
+   "start": {
+    "momentum": 0,
+    "silver": 4,
+    "food": 4,
+    "soldiers": 3,
+    "ships": 0,
+    "wounds": 0
+   }
+  },
+  "gainbeald": {
+   "id": "gainbeald",
+   "name": "Gainbeald",
+   "team": "mercia",
+   "archetype": "saxon_warrior",
+   "liege": null,
+   "claims": [
+    "mercia",
+    "lindsey"
+   ],
+   "stewardship": [
+    "north_mercia",
+    "lindsey"
+   ],
+   "start": {
+    "momentum": 0,
+    "silver": 4,
+    "food": 4,
+    "soldiers": 3,
+    "ships": 0,
+    "wounds": 0
+   }
+  },
+  "uchtred": {
+   "id": "uchtred",
+   "name": "Uchtred",
+   "team": "mercia",
+   "archetype": "saxon_warrior",
+   "liege": null,
+   "claims": [
+    "east_anglia"
+   ],
+   "stewardship": [
+    "middle_anglia",
+    "lundenwic"
+   ],
+   "start": {
+    "momentum": 0,
+    "silver": 4,
+    "food": 4,
+    "soldiers": 3,
+    "ships": 0,
+    "wounds": 0
+   }
+  },
+  "king_ecgberht": {
+   "id": "king_ecgberht",
+   "name": "King Ecgberht",
+   "team": "great_heathen_army",
+   "archetype": "saxon_warrior",
+   "liege": "halfdan_ragnarsson",
+   "claims": [
+    "northumbria"
+   ],
+   "stewardship": [
+    "bernicia"
+   ],
+   "start": {
+    "momentum": 0,
+    "silver": 4,
+    "food": 5,
+    "soldiers": 2,
+    "ships": 0,
+    "wounds": 0
+   }
+  },
+  "archbishop_aethelred": {
+   "id": "archbishop_aethelred",
+   "name": "Archbishop Æthelred",
+   "team": "wessex",
+   "archetype": "saxon_priest",
+   "liege": "king_alfred",
+   "claims": [],
+   "stewardship": [
+    "kent"
+   ],
+   "start": {
+    "momentum": 0,
+    "silver": 4,
+    "food": 3,
+    "soldiers": 4,
+    "ships": 0,
+    "wounds": 0
+   }
+  },
+  "abbess_wenyld": {
+   "id": "abbess_wenyld",
+   "name": "Abbess Wenyld",
+   "team": "mercia",
+   "archetype": "saxon_priest",
+   "liege": null,
+   "claims": [],
+   "stewardship": [
+    "hwicce",
+    "south_mercia"
+   ],
+   "start": {
+    "momentum": 0,
+    "silver": 4,
+    "food": 3,
+    "soldiers": 4,
+    "ships": 0,
+    "wounds": 0
+   }
+  },
+  "halfdan_ragnarsson": {
+   "id": "halfdan_ragnarsson",
+   "name": "Halfdan Ragnarsson",
+   "team": "great_heathen_army",
+   "archetype": "danish_warrior",
+   "liege": null,
+   "claims": [],
+   "stewardship": [
+    "jorvik",
+    "ribble"
+   ],
+   "start": {
+    "momentum": 0,
+    "silver": 8,
+    "food": 3,
+    "soldiers": 12,
+    "ships": 4,
+    "wounds": 0
+   }
+  },
+  "ubba_ragnarsson": {
+   "id": "ubba_ragnarsson",
+   "name": "Ubba Ragnarsson",
+   "team": "great_heathen_army",
+   "archetype": "danish_warrior",
+   "liege": "halfdan_ragnarsson",
+   "claims": [],
+   "stewardship": [],
+   "start": {
+    "momentum": 0,
+    "silver": 8,
+    "food": 3,
+    "soldiers": 12,
+    "ships": 4,
+    "wounds": 0
+   }
+  },
+  "guthrum_the_old": {
+   "id": "guthrum_the_old",
+   "name": "Guthrum the Old",
+   "team": "great_summer_army",
+   "archetype": "danish_warrior",
+   "liege": null,
+   "claims": [],
+   "stewardship": [
+    "east_anglia"
+   ],
+   "start": {
+    "momentum": 0,
+    "silver": 8,
+    "food": 3,
+    "soldiers": 12,
+    "ships": 4,
+    "wounds": 0
+   }
+  },
+  "gyda_the_bold": {
+   "id": "gyda_the_bold",
+   "name": "Gyda the Bold",
+   "team": "great_summer_army",
+   "archetype": "danish_warrior",
+   "liege": "guthrum_the_old",
+   "claims": [],
+   "stewardship": [],
+   "start": {
+    "momentum": 0,
+    "silver": 8,
+    "food": 3,
+    "soldiers": 12,
+    "ships": 4,
+    "wounds": 0
+   }
+  },
+  "anwend_the_steady": {
+   "id": "anwend_the_steady",
+   "name": "Anwend the Steady",
+   "team": "great_summer_army",
+   "archetype": "danish_warrior",
+   "liege": "guthrum_the_old",
+   "claims": [],
+   "stewardship": [],
+   "start": {
+    "momentum": 0,
+    "silver": 8,
+    "food": 3,
+    "soldiers": 12,
+    "ships": 4,
+    "wounds": 0
+   }
+  },
+  "oscatel_the_brave": {
+   "id": "oscatel_the_brave",
+   "name": "Oscatel the Brave",
+   "team": "great_summer_army",
+   "archetype": "danish_warrior",
+   "liege": "guthrum_the_old",
+   "claims": [],
+   "stewardship": [],
+   "start": {
+    "momentum": 0,
+    "silver": 8,
+    "food": 3,
+    "soldiers": 12,
+    "ships": 4,
+    "wounds": 0
+   }
+  },
+  "frida_anundottir": {
+   "id": "frida_anundottir",
+   "name": "Frida Anundottir",
+   "team": "great_heathen_army",
+   "archetype": "danish_trader",
+   "liege": "halfdan_ragnarsson",
+   "claims": [],
+   "stewardship": [],
+   "start": {
+    "momentum": 0,
+    "silver": 12,
+    "food": 3,
+    "soldiers": 8,
+    "ships": 6,
+    "wounds": 0
+   }
+  }
+ }
+}

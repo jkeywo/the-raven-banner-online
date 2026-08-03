@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Map check — The Raven Banner</title>
+  <style>
+    :root { --ink:#1c1815; --parchment:#efe6d4; --blood:#7c2529; --muted:#6b6156; }
+    * { box-sizing: border-box; }
+    body { margin:0; background:var(--parchment); color:var(--ink);
+           font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; }
+    header { padding:1rem 1.5rem; border-bottom:1px solid #c4b699;
+             display:flex; gap:1.5rem; align-items:baseline; flex-wrap:wrap; }
+    h1 { font-size:1.15rem; margin:0; }
+    .note { color:var(--muted); font-size:.85rem; max-width:46rem; }
+    nav button { font:inherit; padding:.35rem .8rem; margin-right:.4rem; cursor:pointer;
+                 border:1px solid #c4b699; background:#fff; border-radius:3px; }
+    nav button[aria-pressed="true"] { background:var(--blood); color:#fff; border-color:var(--blood); }
+    label { font-size:.85rem; margin-right:1rem; }
+    main { padding:1.5rem; }
+    .wrap { position:relative; max-width:1100px; margin:0 auto; }
+    img, svg { display:block; width:100%; }
+    svg { position:absolute; inset:0; }
+    .shire { fill:currentColor; fill-opacity:.16; stroke:currentColor; stroke-width:2.5;
+             stroke-opacity:.85; }
+    .shire:hover { fill-opacity:.34; }
+    .pip { stroke:#fff; stroke-width:2; }
+    .pip-label { font:bold 13px system-ui; fill:#fff; text-anchor:middle;
+                 dominant-baseline:central; pointer-events:none; }
+    .ring { fill:none; stroke:#111; stroke-width:2.5; }
+    .tag { font:bold 15px system-ui; fill:#111; paint-order:stroke;
+           stroke:#fff; stroke-width:4; text-anchor:middle; }
+    table { border-collapse:collapse; margin:1.5rem auto 0; font-size:.85rem; }
+    th, td { border:1px solid #c4b699; padding:.3rem .6rem; text-align:left; }
+    th { background:#e2d7bf; }
+    td.num { text-align:right; font-variant-numeric:tabular-nums; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Map check</h1>
+  <nav id="sheets"></nav>
+  <label><input type="checkbox" id="regions" checked> shire outlines</label>
+  <label><input type="checkbox" id="pips" checked> settlements</label>
+  <p class="note">
+    <code>data/</code> drawn over the printed maps. Every settlement pip should sit on
+    the letter it was read from, and inside the outline of the shire it was assigned to.
+    A pip in the wrong colour region is a misassignment; a pip with no letter under it
+    is an invention. This is the check the checksums cannot do.
+  </p>
+</header>
+<main>
+  <div class="wrap">
+    <img id="art" alt="">
+    <svg id="overlay" preserveAspectRatio="none"></svg>
+  </div>
+  <div id="summary"></div>
+</main>
+
+<script type="module">
+const SVG = 'http://www.w3.org/2000/svg';
+// Enough hues to tell six neighbouring shires apart at a glance.
+const HUES = ['#c0392b', '#2471a3', '#b7950b', '#1e8449', '#7d3c98', '#ca6f1e'];
+const TYPE = { farm: 'F', town: 'T', church: 'C' };
+
+const [shireData, geometry] = await Promise.all([
+  fetch('../data/shires.json').then((r) => r.json()),
+  fetch('../data/geometry.json').then((r) => r.json()),
+]);
+
+const sheets = shireData.sheets.map((s) => s.id);
+let current = sheets[0];
+
+const nav = document.getElementById('sheets');
+for (const id of sheets) {
+  const b = document.createElement('button');
+  b.textContent = id;
+  b.onclick = () => { current = id; draw(); };
+  nav.append(b);
+}
+document.getElementById('regions').onchange = draw;
+document.getElementById('pips').onchange = draw;
+
+function draw() {
+  for (const b of nav.children) b.setAttribute('aria-pressed', String(b.textContent === current));
+  document.getElementById('art').src = `../assets/maps/${current}.png`;
+
+  const svg = document.getElementById('overlay');
+  svg.setAttribute('viewBox', `0 0 ${geometry.viewBox[0]} ${geometry.viewBox[1]}`);
+  svg.replaceChildren();
+
+  const showRegions = document.getElementById('regions').checked;
+  const showPips = document.getElementById('pips').checked;
+  const here = Object.entries(shireData.shires).filter(([, s]) => s.map === current);
+
+  here.forEach(([id, shire], i) => {
+    const colour = HUES[i % HUES.length];
+    const g = geometry.shires[id];
+    if (!g) return;
+
+    if (showRegions && g.polygon) {
+      const path = document.createElementNS(SVG, 'path');
+      path.setAttribute('d', g.polygon);
+      path.setAttribute('class', 'shire');
+      path.setAttribute('color', colour);
+      path.append(Object.assign(document.createElementNS(SVG, 'title'), {
+        textContent: `${shire.name} — ${shire.initialSteward}, ${shire.castles} castles, ` +
+          `support ${shire.support.join('/')}, ship ${shire.shipCost ?? 'landlocked'}`,
+      }));
+      svg.append(path);
+    }
+
+    // The steward frame carries the counts, in the same place the print does.
+    const [x0, , x1, y1] = g.frame;
+    const tag = document.createElementNS(SVG, 'text');
+    tag.setAttribute('class', 'tag');
+    tag.setAttribute('x', (x0 + x1) / 2);
+    tag.setAttribute('y', y1 + 66);
+    tag.setAttribute('fill', colour);
+    tag.textContent = `${shire.castles}⌂  ${shire.settlements.length}◦  ` +
+      (shire.shipCost === null ? 'inland' : `⛵${shire.shipCost}`);
+    svg.append(tag);
+
+    if (!showPips) return;
+    shire.settlements.forEach((settlement, n) => {
+      const at = g.settlements[n];
+      if (!at) return;
+      const [cx, cy] = at;
+      const dot = document.createElementNS(SVG, 'circle');
+      dot.setAttribute('class', 'pip');
+      dot.setAttribute('cx', cx); dot.setAttribute('cy', cy); dot.setAttribute('r', 11);
+      dot.setAttribute('fill', colour);
+      dot.append(Object.assign(document.createElementNS(SVG, 'title'), {
+        textContent: `${shire.name}: ${settlement.type}${settlement.defended ? ', defended' : ''}`,
+      }));
+      svg.append(dot);
+
+      const label = document.createElementNS(SVG, 'text');
+      label.setAttribute('class', 'pip-label');
+      label.setAttribute('x', cx); label.setAttribute('y', cy);
+      label.textContent = TYPE[settlement.type] ?? '?';
+      svg.append(label);
+
+      if (settlement.defended) {
+        const ring = document.createElementNS(SVG, 'circle');
+        ring.setAttribute('class', 'ring');
+        ring.setAttribute('cx', cx); ring.setAttribute('cy', cy); ring.setAttribute('r', 17);
+        svg.append(ring);
+      }
+    });
+  });
+
+  const rows = here.map(([, s]) => `<tr>
+      <td>${s.name}</td><td>${s.initialSteward}</td><td>${s.support.join(', ')}</td>
+      <td class="num">${s.castles}</td>
+      <td class="num">${s.shipCost ?? '—'}</td>
+      <td>${s.settlements.map((x) => TYPE[x.type] + (x.defended ? '*' : '')).join(' ')}</td>
+      <td class="num">${s.settlements.length}</td>
+    </tr>`).join('');
+  document.getElementById('summary').innerHTML = `<table>
+    <tr><th>Shire</th><th>Steward</th><th>Support</th><th>Castles</th><th>Ship</th>
+        <th>Settlements</th><th>n</th></tr>${rows}</table>`;
+}
+
+draw();
+</script>
+</body>
+</html>

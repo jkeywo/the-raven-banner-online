@@ -1,0 +1,237 @@
+{
+ "_generated": "raven_banner gamespec @ analogue-projects c6fc66e via tools/export_web_data.py",
+ "_doNotEdit": true,
+ "briefs": {
+  "king_alfred": {
+   "goals": [
+    "Keep Wessex united under your sole rule.",
+    "Keep the church strong, and free from papal influence.",
+    "Prove yourself in battle.",
+    "If all else fails, make sure at least one Christian Kingdom survives."
+   ],
+   "guidance": [
+    "Whoever becomes King of Mercia, work with them, but make sure you do so from a position of strength. If loyalties start to waver in Mercia, try to bring them over to Wessex rather than see Saxons defect to the Danes.",
+    "Guthrum and his"
+   ]
+  },
+  "cenred": {
+   "goals": [
+    "Support King Alfred in his endeavours.",
+    "Seek allies in the fight against the Danes",
+    "Mercia, Frankia, even the Britons.",
+    "The south east must remain in Christian hands.",
+    "If all else fails, make sure at least one Christian Kingdom survives."
+   ],
+   "guidance": [
+    "You have the stewardship of Redding, and with that a say in who the next King of Mercia will be",
+    "the two candidates are Ceowulf and Gainbeald. Being on good terms with the new King will help diplomatic efforts later.",
+    "Alfred will need your support, so make sure you see if he needs any help. Encourage him to delegate tasks to you.",
+    "Send Envoy will let you talk to the Franks, who may be willing to provide aid. If all else fails, having the south east in Frankish hands is preferable to Danish hands."
+   ]
+  },
+  "godric": {
+   "goals": [
+    "Establish your reputation as a strong and trustworthy noble.",
+    "Avenge your uncle",
+    "kill or defeat Halfdan Ragnarsson.",
+    "Reclaim East Anglia, preferably in your own right, but as a vassal king if not. If not then at least gain some lands of your own.",
+    "If all else fails, make sure at least one Christian Kingdom survives."
+   ],
+   "guidance": [
+    "Make sure you get on Alfred's good side, he's the best chance for a strong and united Saxon England and may even be able to grant you East Anglia.",
+    "If it doesn't look like Alfred is going to be in a position to win you East Anglia, then maybe talking to Guthrum directly will help.",
+    "To get revenge on Halfdan you will probably need to do some fighting up north.",
+    "With no lands of your own your momentum is best spent raiding Danish held lands.",
+    "If you can get some ships and the support of someone with an initiative token then you could even try assaulting East Anglia by sea."
+   ]
+  },
+  "ceowulf": {
+   "goals": [
+    "Claim the Mercian Crown, and end the game with it.",
+    "Defend Mercia as a kingdom, preferably an independent one.",
+    "Stability is important, but only if you have some power.",
+    "If all else fails, make sure at least one Christian Kingdom survives."
+   ],
+   "guidance": [
+    "The players with a vote on the next Mercian King are yourself, Gainbeald, Uchtred, Wenlyd and Cenred. Gainbeald is the other claimant to the throne. You will need to sort this out quickly.",
+    "Should you not get the throne through diplomacy then you could try making a deal with the Danes, like Ecgbert did in the north and have them conquer the kingdom for you.",
+    "Help with the defence of Mercia initially, a strong Mercia will only help your position in the long run regardless of where you end up.",
+    "Diplomacy with the neighbouring Britons could provide a way out of tricky situations, if you're willing to compromise."
+   ]
+  },
+  "gainbeald": {
+   "goals": [
+    "Prove the Mercians still have some fight left in them.",
+    "Claim the Mercian crown, or at least revive the old Kingdom of Lindsey.",
+    "England shouild remain as Christian, prosperous and stable as possible.",
+    "If all else fails, make sure at least one Christian Kingdom survives."
+   ],
+   "guidance": [
+    "The players with a vote on the next Mercian King are yourself, Ceolwulf, Uchtred, Wenlyd and Cenred. Ceolwulf is the other claimant to the throne. You will need to sort this out quickly.",
+    "Should you not get the throne through diplomacy then you may want to talk to either the new King, or the Danes, with an eye to setting up the Kingdom of Lindsey.",
+    "Help with the defence of Mercia, a strong Mercia will only help your position in the long run regardless of where you end up.",
+    "Raiding the Danish farms will help starve them of food, which will help in the long run."
+   ]
+  },
+  "uchtred": {
+   "goals": [
+    "Avoid making political enemies and re-establish a new status quo",
+    "keep stability high.",
+    "Amass personal wealth.",
+    "Press your claim on the East Anglian throne, if you can find a way that has a chance of success.",
+    "If all else fails, make sure at least one Christian Kingdom survives."
+   ],
+   "guidance": [
+    "Unlike the rest of Mercia your main threat is the East Anglian Danes, a problem shared with Wessex. Coordinating the defence with King Alfred should be a priority.",
+    "If Mercia collapses you may be able to talk to Guthrum about setting up in East Anglia, if you can give him enough of an incentive.",
+    "Reinforce your lands to stop them being tempting targets for battles or raids, especially your towns.",
+    "Controlling Lundenwic's shipyards gives you cheaper ships than most Saxons, you may be able to use or sell them."
+   ]
+  },
+  "king_ecgberht": {
+   "goals": [
+    "Keep your throne and try to become steward of more of Northumbria.",
+    "If possible, regain your independence, but not at the expense of your crown.",
+    "Strengthen the Christian presence in the north."
+   ],
+   "guidance": [
+    "Assist the Danes to start, but only so far as will keep them from turning on you.",
+    "Feel out Halfdan, your current Liege, to see if he will grant you more of Northumbria if you assist in his ventures, or at the very least support Christianity in the north.",
+    "As other Saxons lose their lands to the Danes you may be able to recruit them into a potential rebellion.",
+    "If you want to keep the north Christian you will need the help of Abbess Wenyld and Archbishop Æthelred for Missionaries and/or Baptisms.",
+    "Fortifying your own lands will give you a better bargaining position when talking to the Danes.",
+    "If you are going to rebel, gather allies (other players and/or the neighbouring Britons), and try to do so by the end of turn 3",
+    "this will give you time to get an initiative token and fight for more land."
+   ]
+  },
+  "archbishop_aethelred": {
+   "goals": [
+    "Keep England Christian, especially Kent.",
+    "Ensure that bishops, not kings, remain in authority in all church matters",
+    "try to increase Papal influence in England.",
+    "If the Heathens cannot be driven out, then baptise them.",
+    "If all else fails, make sure at least one Christian Kingdom survives."
+   ],
+   "guidance": [
+    "To keep Christianity strong throughout England you will need to coordinate with Abbess Wenyld, even though she has diverged from the Pope's teachings.",
+    "To spread Papal influence, try to offer aid to Kings in return for religious concessions.",
+    "Reinforcing Kent should be your top priority, as should providing Rousing Sermons to anyone likely to defend it with you.",
+    "Later in the game look at placing Missionary Crosses in pagan shires to stop Christian influence from waning.",
+    "The worse things are going the more likely a Papal envoy is going to return with aid."
+   ]
+  },
+  "abbess_wenyld": {
+   "goals": [
+    "Keep Christianity strong in England.",
+    "Ensure the Kings of England show proper christian virtue (a baptised heathen is just as christian as a Saxon).",
+    "Maintain the freedom the English church has enjoyed from papal influence.",
+    "If all else fails, make sure at least one Christian Kingdom survives."
+   ],
+   "guidance": [
+    "Until you can swear allegiance to a King of Mercia you won't have support in your shires.",
+    "To keep Christianity strong throughout England you will need to coordinate with Archbishop Æthelred, even though he is the Pope's man.",
+    "Getting King Alfred and the new King of Mercia (whoever that ends up being) talking about joint defence will help make your job easier.",
+    "Any Dane is a potential convert",
+    "especially those of stewarding lands with a lot of forti?ied settlements that won't provide income until they have support with a baptism.",
+    "Provide military support in defence of Mercia.",
+    "Later in the game look at placing crosses in pagan shires."
+   ]
+  },
+  "halfdan_ragnarsson": {
+   "goals": [
+    "Keep the east and west coasts connected by Danish lands, and expand your territory and wealth.",
+    "You are here to stay",
+    "make sure the island is prosperous and stable by the game's end.",
+    "Ensure the Danes are feared and respected by the Saxons."
+   ],
+   "guidance": [
+    "Coordinate your aggression with Guthrum's followers.",
+    "Seek Danegeld from the Saxons",
+    "Kings or Stewards.",
+    "\"Settle Shire\" will help the long term stability of your realm and the island as a whole. \"Rebuild Settlement\" is expensive but will help with long term prosperity."
+   ]
+  },
+  "ubba_ragnarsson": {
+   "goals": [
+    "Gain control of some lands of your own.",
+    "Fight against Christianity in Danish lands.",
+    "Ensure the Danes remain in England and the island is prosperous."
+   ],
+   "guidance": [
+    "Halfdan is in the best position to grant you lands from conquest, but failing that Guthrum may be able to help instead.",
+    "You can extract Danegeld from Saxons that you threaten to raid.",
+    "Support Halfdan in his conquests, but get promises that your assistance will be rewarded.",
+    "Raiding will build up a good income of soldiers, silver and food."
+   ]
+  },
+  "guthrum_the_old": {
+   "goals": [
+    "Retain your power and gain wealth.",
+    "Make/find a permanent home here in England",
+    "you are interested in the island's long term stability by the game's end as well as the number of shires held by you or under Danelaw.",
+    "You're old but you're not past it, prove it."
+   ],
+   "guidance": [
+    "Your followers only follow you because you bring them victory, make sure to find out what they want if you expect to rely on their continued support",
+    "To settle properly, you'll need to open up diplomacy with the Saxons",
+    "at least those stewarding shires that surround your own lands.",
+    "Press the assault with an eye to where you wish to attack next. Remember you can use ships to attack nearly anywhere if you make sure your allies have the required number."
+   ]
+  },
+  "gyda_the_bold": {
+   "goals": [
+    "Explore the world",
+    "talk to everyone, see what is happening throughout the island.",
+    "Make a name for yourself",
+    "as a raider, a warrior, a diplomat, a spy.",
+    "Gain status",
+    "through hoarding silver or controlling land."
+   ],
+   "guidance": [
+    "While you are supporting Guthrum now, be sure to check with the northern Danes in case there are opportunities there.",
+    "Befriending a Saxon or two, assuming you can find ones that you haven't attacked or raided, could provide intelligence on their plans or provide new opportunities.",
+    "Raiding in the right places will help you gain a ?ierce reputation, and let you start extracting Danegeld from the threat of attack."
+   ]
+  },
+  "anwend_the_steady": {
+   "goals": [
+    "Ensure the Danes work together, this includes both teams if possible.",
+    "Make sure you get paid (either by tribute or raiding).",
+    "Settling in England is a possibility, but if not make sure you return to Denmark a rich man."
+   ],
+   "guidance": [
+    "Talk to both Guthrum and Halfdan (or a representative) to make sure the Danes are working in each others best interests.",
+    "Raiding in the right places will help you gain a ?ierce reputation, and let you start extracting Danegeld from the threat of attack.",
+    "If you are granted land from an attack, try and get it settled by the end of the game and try to make sure the island is stable and prosperous."
+   ]
+  },
+  "oscatel_the_brave": {
+   "goals": [
+    "Amass silver",
+    "it doesn't matter if this comes from raiding, a paid Danegelt or even mercenary work.",
+    "Gain glory in battle and through raiding, but survive to enjoy it.",
+    "A good war leader always pays his men."
+   ],
+   "guidance": [
+    "While you have bene?ited from following Guthrum so far, make sure this continues to be the case, otherwise give your allegiance to someone more pro?itable.",
+    "If you help someone out, make sure they know and give you credit.",
+    "Use your ships to raid in unexpected places.",
+    "You could approach the various foreign powers if you aren't getting the opportunities you need."
+   ]
+  },
+  "frida_anundottir": {
+   "goals": [
+    "Make sure England becomes a pro?itable land for yourself, and your countrymen, whether that's through regular Danegeld payments, owning stable territory, raiding or making trade contracts.",
+    "Make sure the other Danish leaders show you respect.",
+    "While not important for your immediate pro?its the island's overall prosperity will increase your long term wealth."
+   ],
+   "guidance": [
+    "Support Halfdan, at least to start, but anyone who can offer you good deals",
+    "Any steward of a shire that can build a trade port is a good person to talk to. You may need to give them assurances the reduced ship cost won't lead to an increase in raids.",
+    "If they will not talk, persuading a leader to conquer the shire will make things much easier for you..",
+    "Raiding people that don't seem like good trade partners provides a good secondary income",
+    "either directly or through a Danegeld."
+   ]
+  }
+ }
+}

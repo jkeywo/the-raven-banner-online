@@ -1,23 +1,140 @@
 import { describe, it, expect } from 'vitest';
-import { validateData, dataExists, CHECKSUMS } from '../../tools/validate-data.mjs';
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import {
+  validateData, dataExists, DATA_DIR, CHECKSUMS, KNOWN_DISCREPANCIES,
+} from '../../tools/validate-data.mjs';
 
-// data/ is generated from the gamespec project and is not present until M1.
-// Resolved once, at module scope, so the suite below can branch on it.
 const HAVE_DATA = await dataExists();
+const load = async (name) => JSON.parse(await readFile(join(DATA_DIR, name), 'utf8'));
 
 describe('data/ checksums', () => {
   it('states the published turn-zero values it gates against', () => {
     // Not a tautology: these are transcribed from the "England in the
-    // Aftermath" sheet, and this test is where a future reader finds out
-    // where the magic numbers came from.
-    expect(CHECKSUMS.settlements).toBe(74);
-    expect(CHECKSUMS.shires).toBe(18);
-    expect(CHECKSUMS.paganShires).toBe(3);
-    expect(CHECKSUMS.danishShires).toBe(3);
-    expect(CHECKSUMS.unsupportedShires).toBe(3);
+    // Aftermath" sheet, and this is where a future reader finds out where
+    // the magic numbers came from.
+    expect(CHECKSUMS).toMatchObject({
+      shires: 18, shiresPerMap: 6, roles: 16, landedRoles: 10,
+      paganShires: 3, danishShires: 3, unsupportedShires: 3, settlements: 74,
+    });
+  });
+
+  it('records the one place the artwork and the printed tracker disagree', () => {
+    // Kept visible rather than quietly accommodated. If this ever resolves,
+    // the discrepancy entry goes away and the counts simply agree.
+    expect(KNOWN_DISCREPANCIES.settlements).toMatchObject({ published: 74, extracted: 75 });
+    expect(KNOWN_DISCREPANCIES.settlements.note).toMatch(/author/);
   });
 
   it.runIf(HAVE_DATA)('finds nothing wrong with the dataset', async () => {
     expect(await validateData()).toEqual([]);
+  });
+});
+
+describe.runIf(HAVE_DATA)('the role table', () => {
+  // Transcribed independently of data/roles.json, from the printed reference
+  // sheets. Two transcriptions agreeing is evidence; one agreeing with itself
+  // is not. Silver / food / soldiers / ships.
+  const PRINTED = {
+    king_alfred: [4, 4, 4, 0], cenred: [4, 4, 3, 0], godric: [6, 4, 6, 0],
+    archbishop_aethelred: [4, 3, 4, 0], ceowulf: [4, 4, 3, 0], gainbeald: [4, 4, 3, 0],
+    uchtred: [4, 4, 3, 0], abbess_wenyld: [4, 3, 4, 0], king_ecgberht: [4, 5, 2, 0],
+    halfdan_ragnarsson: [8, 3, 12, 4], ubba_ragnarsson: [8, 3, 12, 4],
+    frida_anundottir: [12, 3, 8, 6], guthrum_the_old: [8, 3, 12, 4],
+    gyda_the_bold: [8, 3, 12, 4], anwend_the_steady: [8, 3, 12, 4],
+    oscatel_the_brave: [8, 3, 12, 4],
+  };
+
+  it('matches an independent transcription of the printed sheets', async () => {
+    const { roles } = await load('roles.json');
+    expect(Object.keys(roles).sort()).toEqual(Object.keys(PRINTED).sort());
+    for (const [id, [silver, food, soldiers, ships]] of Object.entries(PRINTED)) {
+      expect(roles[id].start, id).toMatchObject({ silver, food, soldiers, ships, momentum: 0 });
+    }
+  });
+
+  it('gives every role a private brief with at least one goal', async () => {
+    const { roles } = await load('roles.json');
+    const { briefs } = await load('briefs.json');
+    for (const id of Object.keys(roles)) {
+      expect(briefs[id]?.goals.length, id).toBeGreaterThan(0);
+    }
+  });
+
+  it('splits the sixteen roles across four archetypes as printed', async () => {
+    const { roles } = await load('roles.json');
+    const tally = {};
+    for (const r of Object.values(roles)) tally[r.archetype] = (tally[r.archetype] ?? 0) + 1;
+    expect(tally).toEqual({
+      saxon_warrior: 7, saxon_priest: 2, danish_warrior: 6, danish_trader: 1,
+    });
+  });
+});
+
+describe.runIf(HAVE_DATA)('the tactic table', () => {
+  it('matches the clash table printed on every action sheet', async () => {
+    const { tactics } = await load('tactics.json');
+    // card: [battle score, losses dealt, losses received]
+    const PRINTED = {
+      A: [1, -1, -1], 2: [2, 0, -1], 3: [3, 2, 0], 4: [4, 1, 0], 5: [5, 2, 1],
+    };
+    for (const [card, [score, lossesDealt, lossesReceived]] of Object.entries(PRINTED)) {
+      expect(tactics[card], card).toMatchObject({ score, lossesDealt, lossesReceived });
+    }
+  });
+
+  it('scores leadership as printed, with a wound on a six either way', async () => {
+    const { leadership } = await load('meta.json');
+    expect(leadership.normal).toEqual({ 1: 0, 2: 0, 3: 0, 4: 1, 5: 1, 6: 2 });
+    expect(leadership.lead).toEqual({ 1: -1, 2: 1, 3: 2, 4: 3, 5: 3, 6: 4 });
+    expect(leadership.woundOnSix).toBe(true);
+  });
+});
+
+/** Ray casting against an SVG polyline of the form "M x,y L x,y ... Z". */
+function pointInPath(d, [px, py]) {
+  const pts = d.replace(/^M\s*/, '').replace(/\s*Z$/, '').split(/\s*L\s*/)
+    .map((p) => p.split(',').map(Number));
+  let inside = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const [xi, yi] = pts[i];
+    const [xj, yj] = pts[j];
+    if ((yi > py) !== (yj > py) && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+describe.runIf(HAVE_DATA)('map geometry', () => {
+  it('places every settlement inside the shire it was assigned to', async () => {
+    // This is the check that a settlement letter was read into the right
+    // shire. The outlines come from flooding the drawn borders and the anchors
+    // from where the letters were printed, so the two are independent: a pip
+    // outside its own outline means the assignment is wrong, which no count
+    // would catch because the totals would still come out right.
+    const { shires } = await load('shires.json');
+    const geometry = await load('geometry.json');
+    const strays = [];
+    for (const [id, shire] of Object.entries(shires)) {
+      const g = geometry.shires[id];
+      g.settlements.forEach((at, n) => {
+        if (!pointInPath(g.polygon, at)) {
+          strays.push(`${id} ${shire.settlements[n].type} at ${at}`);
+        }
+      });
+    }
+    expect(strays).toEqual([]);
+  });
+
+  it('gives every shire an outline and one anchor per settlement', async () => {
+    const { shires } = await load('shires.json');
+    const geometry = await load('geometry.json');
+    for (const [id, shire] of Object.entries(shires)) {
+      const g = geometry.shires[id];
+      expect(g, id).toBeDefined();
+      expect(g.polygon, `${id} outline`).toMatch(/^M .* Z$/);
+      // The overlay pairs settlements to anchors by index, so a mismatch here
+      // would silently draw a pip in the wrong place.
+      expect(g.settlements.length, `${id} anchors`).toBe(shire.settlements.length);
+    }
   });
 });
