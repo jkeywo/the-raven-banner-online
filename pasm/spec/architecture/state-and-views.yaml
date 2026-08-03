@@ -60,6 +60,8 @@ entities:
         - command-admission
         - view-projector
         - host-peer-listener
+        - room-addressing
+        - shared-console-components
     implementation:
       status: declared
       paths:
@@ -149,6 +151,74 @@ entities:
         - unclassifiedPaths
         - auditProjection
         - FIELD_VISIBILITY
+      tests:
+        - npm test
+
+  - component: shared-console-components
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Shared Console Components
+      summary: >-
+        The two controls both consoles need: whether the game can still hear
+        you, and who is in the room.
+      rationale:
+        - Neither console owns them, so neither should be where they live. Hanging them off the player console made the facilitator's page look like it depended on the player's.
+        - The roster renders names people typed, which is the only free text in the game everyone else's browser displays, so it escapes rather than trusting.
+    architecture:
+      kind: client-interface
+      authority: non-authoritative
+    implementation:
+      status: declared
+      paths:
+        - gui/components/rb-connection-dot.js
+        - gui/components/rb-seat-roster.js
+      symbols:
+        - RbConnectionDot
+        - RbSeatRoster
+      tests:
+        - npm test
+
+  - component: player-console
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Player Console
+      summary: >-
+        What a player looks at: the three printed sheets with the live game
+        drawn over them, their own private sheet, and how England is doing.
+      rationale:
+        - Renders a projection and nothing else. It holds no game state, patches nothing and predicts nothing, so a reconnect costs nothing to reconcile -- the next projection is simply what is true now.
+        - It cannot leak what it was never sent. Another player's resources are absent from the projection rather than present and hidden, so no rendering mistake could show them.
+        - The map is the printed artwork with an SVG overlay sharing its viewBox. The outlines exist because a click needs a target and a faction needs a tint, not to replace a map that took an artist a long time.
+    architecture:
+      kind: client-interface
+      authority: non-authoritative
+      reads:
+        - projected-player-view
+      runs_in:
+        - player-browser-runtime
+      depends_on:
+        - client-connection-manager
+        - client-command-gateway
+        - wire-protocol
+        - room-addressing
+        - shared-console-components
+    implementation:
+      status: declared
+      paths:
+        - gui/client/player-app.js
+        - gui/client/client-state.js
+        - gui/client/load-data.js
+        - gui/components/rb-map.js
+        - gui/components/rb-private-sheet.js
+        - gui/components/rb-aftermath.js
+      symbols:
+        - startPlayerApp
+        - ClientState
+        - RbMap
+        - RbPrivateSheet
+        - RbAftermath
       tests:
         - npm test
 

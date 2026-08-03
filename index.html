@@ -56,6 +56,38 @@
       <h2>Who is here</h2>
       <rb-seat-roster id="roster"></rb-seat-roster>
     </section>
+
+    <!-- 4. the game ------------------------------------------------------- -->
+    <section id="screen-game" class="rb-panel rb-full" hidden>
+      <header class="rb-game-head">
+        <div>
+          <h1 id="game-role"></h1>
+          <p class="rb-meta" id="game-phase"></p>
+        </div>
+        <nav id="game-tabs" class="rb-tabs" role="tablist">
+          <button type="button" role="tab" data-pane="map" aria-selected="true">The board</button>
+          <button type="button" role="tab" data-pane="me" aria-selected="false">Your sheet</button>
+          <button type="button" role="tab" data-pane="aftermath" aria-selected="false">England</button>
+        </nav>
+      </header>
+
+      <div data-pane-body="map" class="rb-pane rb-pane-map">
+        <rb-map id="map" sheet="northern"></rb-map>
+        <aside id="shire-detail" class="rb-detail-panel">
+          <p class="rb-empty">Choose a shire on the map.</p>
+        </aside>
+      </div>
+
+      <div data-pane-body="me" class="rb-pane" hidden>
+        <rb-private-sheet id="sheet"></rb-private-sheet>
+      </div>
+
+      <div data-pane-body="aftermath" class="rb-pane" hidden>
+        <rb-aftermath id="aftermath"></rb-aftermath>
+        <h2>Who is here</h2>
+        <rb-seat-roster id="game-roster"></rb-seat-roster>
+      </div>
+    </section>
   </main>
 
   <script type="module">

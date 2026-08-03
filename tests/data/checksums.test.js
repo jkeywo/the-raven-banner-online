@@ -61,6 +61,33 @@ describe.runIf(HAVE_DATA)('the role table', () => {
     }
   });
 
+  it('does not cut a brief off mid-sentence', async () => {
+    // Guidance runs from a heading to the team name that closes the page, and
+    // two of the teams are called "Great ... Army" — so a stop pattern
+    // matching the bare word truncated every line that mentioned one.
+    // Alfred's advice about Guthrum ended at "Guthrum and his" and read as
+    // perfectly complete, which is why this looks for the actual signature
+    // rather than for a full stop: plenty of real bullets are as terse as
+    // "Amass silver" and never had one.
+    const DANGLING = /\b(and|or|but|the|a|an|of|to|with|for|in|on|at|by|from|his|her|their|its|your|that|which|is|are|was|were)$/i;
+    const { briefs } = await load('briefs.json');
+    const truncated = [];
+    for (const [id, brief] of Object.entries(briefs)) {
+      for (const line of [...brief.goals, ...brief.guidance]) {
+        if (DANGLING.test(line.trim())) truncated.push(`${id}: "${line}"`);
+      }
+    }
+    expect(truncated).toEqual([]);
+  });
+
+  it('keeps every line of guidance the sheets print', async () => {
+    const { briefs } = await load('briefs.json');
+    const lines = Object.values(briefs).reduce((n, b) => n + b.guidance.length, 0);
+    expect(lines).toBe(70);
+    // The line that was silently losing its second half.
+    expect(briefs.king_alfred.guidance[1]).toMatch(/Great Summer Army are your immediate threat/);
+  });
+
   it('splits the sixteen roles across four archetypes as printed', async () => {
     const { roles } = await load('roles.json');
     const tally = {};

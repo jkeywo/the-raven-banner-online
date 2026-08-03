@@ -26,6 +26,33 @@ entities:
       tests:
         - npm test
 
+  - component: room-addressing
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Room Addressing
+      summary: >-
+        The join code, the address derived from it, and the facilitator PIN.
+        How both ends agree where a game lives without anything in the middle
+        keeping a list of rooms.
+      rationale:
+        - "Deriving the host's address from the code rather than accepting one issued by the broker is what makes host recovery work at all: a refreshed host asks for the same address its clients are already retrying."
+        - Shared by the host and every client, so it belongs to neither. Owning it from the host made a client that merely reads a code look like it depended on the host.
+        - A code is normalised for case and spacing but never guessed at. O and I are excluded from the alphabet, so a code containing one was misheard, and correcting it could produce a different valid code and send someone into the wrong game.
+    architecture:
+      kind: protocol
+    implementation:
+      status: declared
+      paths:
+        - gui/net/join-code.js
+      symbols:
+        - mintJoinCode
+        - isValidJoinCode
+        - peerIdForCode
+        - mintFacilitatorPin
+      tests:
+        - npm test
+
   - component: connection-backoff
     core:
       status: proposed
@@ -76,15 +103,13 @@ entities:
       depends_on:
         - wire-protocol
         - connection-backoff
+        - room-addressing
     implementation:
       status: declared
       paths:
         - gui/net/host-peer.js
-        - gui/net/join-code.js
       symbols:
         - HostPeer
-        - peerIdForCode
-        - mintJoinCode
       tests:
         - npm test
 

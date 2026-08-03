@@ -283,3 +283,248 @@ rb-connection-dot[data-tone="connecting"] .rb-dot { animation: rb-pulse 1.4s eas
 }
 
 a { color: var(--rb-blood); text-underline-offset: 0.15em; }
+
+/* --- the game ------------------------------------------------------------ */
+
+.rb-panel.rb-full { max-width: 92rem; }
+
+.rb-game-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.2rem;
+}
+
+.rb-game-head h1 { margin: 0; }
+
+.rb-tabs { display: flex; gap: 0.3rem; }
+
+.rb-tabs button,
+.rb-map-tabs button {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  border-bottom-color: transparent;
+}
+
+.rb-tabs [aria-selected="true"],
+.rb-map-tabs [aria-selected="true"] {
+  background: var(--rb-ink);
+  border-color: var(--rb-ink);
+  color: var(--rb-paper);
+}
+
+.rb-pane-map {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(16rem, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+@media (max-width: 60rem) {
+  .rb-pane-map { grid-template-columns: 1fr; }
+}
+
+/* --- the map ------------------------------------------------------------- */
+
+.rb-map-tabs { display: flex; gap: 0.3rem; margin-bottom: -1px; }
+
+.rb-map-stage {
+  position: relative;
+  border: 1px solid var(--rb-rule);
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--rb-paper);
+}
+
+.rb-map-art { display: block; width: 100%; height: auto; }
+
+.rb-map-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.rb-shire {
+  fill: currentColor;
+  fill-opacity: 0.14;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-opacity: 0.5;
+  color: var(--rb-muted);
+  cursor: pointer;
+  transition: fill-opacity 120ms ease;
+}
+
+.rb-shire:hover { fill-opacity: 0.3; }
+
+.rb-shire.is-selected {
+  fill-opacity: 0.34;
+  stroke-width: 5;
+  stroke-opacity: 1;
+}
+
+/* Held without support: the defended settlements pay nothing and the shire
+   counts toward Disorder, so it is hatched rather than merely tinted. */
+.rb-shire.is-unsupported {
+  stroke-dasharray: 14 9;
+  stroke-width: 5;
+  stroke-opacity: 0.95;
+}
+
+.rb-shire-tokens { pointer-events: none; }
+
+.rb-shire-label {
+  font: 26px var(--rb-serif);
+  fill: var(--rb-ink);
+  text-anchor: middle;
+  paint-order: stroke;
+  stroke: var(--rb-paper);
+  stroke-width: 5;
+}
+
+.rb-settlement-gone {
+  font: bold 30px var(--rb-sans);
+  fill: var(--rb-blood);
+  text-anchor: middle;
+  dominant-baseline: central;
+  paint-order: stroke;
+  stroke: var(--rb-paper);
+  stroke-width: 4;
+  pointer-events: all;
+}
+
+/* --- shire detail -------------------------------------------------------- */
+
+.rb-detail-panel {
+  background: var(--rb-parchment);
+  border: 1px solid var(--rb-rule);
+  border-radius: 3px;
+  padding: 1rem 1.2rem;
+  position: sticky;
+  top: 1rem;
+}
+
+.rb-detail-panel h3 { font-family: var(--rb-serif); font-size: 1.3rem; margin: 0; }
+
+.rb-detail { display: grid; grid-template-columns: auto 1fr; gap: 0.3rem 0.9rem; margin: 1rem 0 0; }
+.rb-detail dt { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--rb-muted); }
+.rb-detail dd { margin: 0; }
+
+.rb-warn {
+  color: var(--rb-blood);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-left: 0.4rem;
+}
+
+/* --- private sheet ------------------------------------------------------- */
+
+rb-private-sheet { display: block; max-width: 44rem; }
+
+.rb-sheet-head h2 { margin: 0; border: 0; padding: 0; font-size: 1.7rem; }
+
+.rb-momentum { display: flex; align-items: center; gap: 0.7rem; margin: 1.2rem 0; }
+.rb-track-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--rb-muted); }
+.rb-pips { display: inline-flex; gap: 0.3rem; }
+
+.rb-pip {
+  width: 0.85rem;
+  height: 0.85rem;
+  border: 1px solid var(--rb-gold);
+  border-radius: 50%;
+}
+
+.rb-pip.is-full { background: var(--rb-gold); }
+
+.rb-tracks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+  gap: 0.6rem;
+  margin: 0 0 1.2rem;
+}
+
+.rb-track {
+  background: var(--rb-parchment);
+  border: 1px solid var(--rb-rule);
+  border-radius: 3px;
+  padding: 0.6rem 0.8rem;
+}
+
+.rb-track dt { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--rb-muted); }
+.rb-track dd { margin: 0; font-family: var(--rb-serif); font-size: 1.6rem; }
+
+.rb-wounds {
+  border-left: 3px solid var(--rb-amber);
+  padding-left: 0.8rem;
+  color: var(--rb-amber);
+}
+
+.rb-wounds.is-grave { border-color: var(--rb-blood); color: var(--rb-blood); }
+
+.rb-lands { list-style: none; margin: 0; padding: 0; }
+.rb-lands li { display: flex; align-items: baseline; gap: 0.7rem; padding: 0.3rem 0; border-bottom: 1px solid var(--rb-rule); }
+.rb-land-name { font-family: var(--rb-serif); }
+
+.rb-goals, .rb-guidance { padding-left: 1.2rem; }
+.rb-goals li { margin-bottom: 0.4rem; }
+.rb-guidance li { margin-bottom: 0.5rem; color: var(--rb-muted); font-size: 0.9rem; }
+
+h3 { font-family: var(--rb-serif); font-size: 1rem; margin: 1.6rem 0 0.4rem; }
+
+/* --- aftermath ----------------------------------------------------------- */
+
+.rb-counters {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 1rem;
+}
+
+.rb-counter {
+  background: var(--rb-parchment);
+  border: 1px solid var(--rb-rule);
+  border-radius: 3px;
+  padding: 0.9rem 1rem;
+}
+
+.rb-counter-head { display: flex; justify-content: space-between; align-items: baseline; }
+.rb-counter-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--rb-muted); }
+.rb-counter-value { font-family: var(--rb-serif); font-size: 1.7rem; }
+
+.rb-bands { display: flex; gap: 0.2rem; margin: 0.5rem 0; }
+
+.rb-band {
+  flex: 1;
+  height: 0.35rem;
+  background: var(--rb-rule);
+  border-radius: 2px;
+}
+
+.rb-band.is-here { background: var(--rb-blood); }
+
+.rb-counter-text { font-family: var(--rb-serif); margin: 0.4rem 0 0.2rem; }
+
+/* --- narrow windows ------------------------------------------------------ */
+
+/* The page body never scrolls sideways. Wide things — the map, the log —
+   scroll inside their own box instead, so the layout stays put while the
+   content moves. */
+.rb-map-stage, .rb-log { max-width: 100%; }
+
+@media (max-width: 30rem) {
+  .rb-main { padding: 1rem 0.75rem 3rem; }
+  .rb-panel { padding: 1.1rem; }
+  .rb-game-head { gap: 0.8rem; }
+  .rb-tabs, .rb-map-tabs { flex-wrap: wrap; }
+  .rb-tracks { grid-template-columns: repeat(auto-fit, minmax(5rem, 1fr)); }
+  .rb-seat { grid-template-columns: 0.6rem 1fr auto; }
+  .rb-seat-tag { grid-column: 2 / -1; }
+  .rb-detail { grid-template-columns: 1fr; gap: 0 0; }
+  .rb-detail dd { margin-bottom: 0.5rem; }
+}
