@@ -28,6 +28,9 @@ import { factionReach, isChristian, isPagan, isDanishHeld } from '../rules/deriv
  * @property {number} [max]
  */
 
+const crownName = (crown) => String(crown ?? '').replace(/_/g, ' ')
+  .replace(/\b\w/g, (c) => c.toUpperCase());
+
 const settlementLabel = (settlement) => {
   const kind = settlement.type[0].toUpperCase() + settlement.type.slice(1);
   return settlement.defended ? `${kind} (defended)` : kind;
@@ -279,6 +282,40 @@ export function fieldsFor(verb, view, data) {
             label: data.shires.shires[c.shireId]?.name ?? c.shireId,
           })),
       }];
+
+    case 'request-allegiance':
+      return [{
+        name: 'liegeId',
+        label: 'Follow',
+        kind: 'select',
+        // Only people who could actually take you: a crowned Saxon, or a Dane.
+        options: Object.keys(view.roles ?? {})
+          .filter((id) => id !== me
+            && (Object.values(view.crownHolders ?? {}).includes(id)
+              || view.derived?.roles?.[id]?.danish))
+          .map((id) => ({ value: id, label: data.roles.roles[id]?.name ?? id })),
+      }];
+
+    case 'claim-crown':
+      return [{
+        name: 'crown',
+        label: 'Claim',
+        kind: 'select',
+        options: (mine.claims ?? [])
+          .filter((crown) => !view.crownHolders?.[crown])
+          .map((crown) => ({ value: crown, label: crownName(crown) })),
+      }];
+
+    case 'rebel': {
+      // What it costs him, as the facilitator has left it.
+      const relief = view.rebellionRelief?.[me];
+      return (relief?.shires ?? 1) === 0 ? [] : [{
+        name: 'shireId',
+        label: 'Hand over',
+        kind: 'select',
+        options: held(),
+      }];
+    }
 
     case 'collect-income':
       // Only a pagan Dane is asked; everyone else just collects.

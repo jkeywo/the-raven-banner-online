@@ -23,12 +23,10 @@ entities:
       status: declared
       paths:
         - gui/rules/state.js
-        - gui/rules/derive.js
       symbols:
         - createInitialState
-        - deriveAll
-        - hasSupport
-        - aftermath
+        - liegeChain
+        - seatForToken
       tests:
         - npm test
 
@@ -50,6 +48,7 @@ entities:
         - clash-machine-state
         - consent-request-state
         - trade-contract-record
+        - crown-holders
       coordinates:
         - command-admission
         - view-projector
@@ -68,7 +67,7 @@ entities:
         - clash-resolution
         - envoy-negotiation
         - facilitator-override-inspector
-        - contract-timing-gap
+        - crown-election
     implementation:
       status: declared
       paths:
@@ -144,7 +143,7 @@ entities:
       reads:
         - authoritative-game-state
       depends_on:
-        - authoritative-game-state
+        - crown-and-support
       produces:
         - projected-player-view
         - projected-facilitator-view
@@ -216,6 +215,7 @@ entities:
         - clash-resolution
         - envoy-negotiation
         - neighbour-consent
+        - crown-election
     implementation:
       status: declared
       paths:

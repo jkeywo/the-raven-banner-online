@@ -39,6 +39,10 @@ const LABELS = {
   'offer-contract': 'Offer a trade contract',
   'answer-contract': 'Answer a trade offer',
   'cancel-contract': 'Cancel a trade contract',
+  'request-allegiance': 'Ask to swear allegiance',
+  'claim-crown': 'Claim a crown',
+  'cast-vote': 'Cast your vote',
+  rebel: 'Rebel against your liege',
 };
 
 const NOTES = {
@@ -64,6 +68,9 @@ const NOTES = {
   'offer-contract': 'A soldier each. Then two silver each, every turn.',
   'answer-contract': 'It costs you a soldier, and opens your port.',
   'cancel-contract': 'Team Phase only. The ship value goes back up.',
+  'request-allegiance': 'They must agree, and must wear a crown or be a Dane.',
+  'claim-crown': 'Every shire that supports it gets a say.',
+  rebel: 'A shire and two soldiers to the man you are leaving.',
 };
 
 /** Verbs that need the player to say more before they mean anything. */
@@ -74,6 +81,7 @@ export const NEEDS_CHOICE = new Set([
   'missionary-expedition', 'rousing-sermon', 'baptise',
   'request-settle', 'drive-out-missionaries',
   'offer-contract', 'answer-contract', 'cancel-contract',
+  'request-allegiance', 'claim-crown', 'rebel',
 ]);
 
 export class RbActionList extends HTMLElement {

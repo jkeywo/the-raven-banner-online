@@ -12,13 +12,34 @@
 import { liegeChain } from './state.js';
 
 /**
+ * The crowns a role speaks for.
+ *
+ * A crown nobody wears is spoken for by everyone who claims it — which is the
+ * whole of turn zero, since "Mercia starts the game without a king" and Alfred
+ * has only just inherited Wessex. Once a king is crowned, a claim stops being
+ * enough: the crown answers to its holder, and to nobody else who wanted it.
+ *
+ * That is what makes an election worth holding. The moment Ceowulf wins
+ * Mercia, Gainbeald's Mercian shires stop supporting him, and he is a lord
+ * with land he cannot tax.
+ */
+export function crownsOf(state, roleId) {
+  const role = state.roles[roleId];
+  if (!role) return [];
+  const held = Object.entries(state.crownHolders ?? {})
+    .filter(([, who]) => who === roleId).map(([crown]) => crown);
+  const unheld = role.claims.filter((crown) => !state.crownHolders?.[crown]);
+  return [...new Set([...held, ...unheld])];
+}
+
+/**
  * The factions a role counts as, for support.
  *
- * Their team's faction to begin with, plus one for every crown they hold. The
- * map legend makes these the same list: the starting factions are D, M and W,
- * and the "potential factions" are exactly the crowns a player can claim. So
- * "the Northumbrian faction" and "whoever holds the crown of Northumbria" are
- * one idea, and support is one rule rather than two.
+ * Their team's faction to begin with, plus one for every crown they speak for.
+ * The map legend makes these the same list: the starting factions are D, M and
+ * W, and the "potential factions" are exactly the crowns a player can claim.
+ * So "the Northumbrian faction" and "whoever holds the crown of Northumbria"
+ * are one idea, and support is one rule rather than two.
  *
  * @returns {string[]} faction initials as printed in a shire's support box
  */
@@ -27,9 +48,16 @@ export function factionsOf(state, data, roleId) {
   if (!role) return [];
   const { crownLetter, teamLetter } = data.factions;
   const letters = new Set();
+  // A kingdom without a king is spoken for by everyone in it — which is why
+  // the turn-zero tracker reads three unsupported shires rather than seven.
+  // Once it has a king it speaks through him, and a Mercian who did not win
+  // the election is a lord with land he cannot tax until he swears to the man
+  // who did. That is the whole point of holding one.
   const team = teamLetter[role.teamId];
-  if (team) letters.add(team);
-  for (const crown of role.crowns) {
+  const teamCrown = crownLetter[role.teamId] ? role.teamId : null;
+  const kingOfHisKingdom = teamCrown ? state.crownHolders?.[teamCrown] ?? null : null;
+  if (team && (!kingOfHisKingdom || kingOfHisKingdom === roleId)) letters.add(team);
+  for (const crown of crownsOf(state, roleId)) {
     if (crownLetter[crown]) letters.add(crownLetter[crown]);
   }
   return [...letters];
@@ -237,6 +265,39 @@ export function momentumGain(state, data, roleId) {
   const notional = factionChurches(state, roleId)
     + 2 * (state.roles[roleId]?.baptismsPerformed ?? 0);
   return base + (notional >= 10 ? 1 : 0);
+}
+
+/**
+ * Who elects a king, and with how many votes each.
+ *
+ * Printed whole in the Facilitators Guide: "All saxon stewards of shires that
+ * have support for this crown (regardless of who their liege is) can vote…
+ * Each character has one vote for every shire they are steward of that supports
+ * the crown, plus one extra vote for every 2 churches in their shires."
+ *
+ * "Regardless of who their liege is" is the load-bearing clause. A king cannot
+ * pack the electorate by taking vassals — he has to hold the ground, because
+ * the votes are attached to shires and not to people.
+ *
+ * @returns {Record<string, number>} roleId to weight, only those with a vote
+ */
+export function electorate(state, data, crown) {
+  const letter = data.factions.crownLetter[crown];
+  if (!letter) return {};
+  const weights = {};
+  for (const [id, shire] of Object.entries(state.shires)) {
+    const steward = shire.stewardRoleId;
+    if (!steward || isDanish(state, data, steward)) continue;
+    if (!data.shires.shires[id].support.includes(letter)) continue;
+    weights[steward] = (weights[steward] ?? 0) + 1;
+  }
+  // The churches are counted across everything they steward, not only the
+  // shires that gave them a vote in the first place: a bishop's influence
+  // does not stop at a county line.
+  for (const roleId of Object.keys(weights)) {
+    weights[roleId] += Math.floor(churchesHeld(state, roleId) / 2);
+  }
+  return weights;
 }
 
 /** Settlements still standing, across the whole board. */

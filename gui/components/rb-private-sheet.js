@@ -65,7 +65,7 @@ export class RbPrivateSheet extends HTMLElement {
       ${this._wounds(role.wounds ?? 0, fatal)}
       ${this._income(derived.income)}
       ${this._lands(held)}
-      ${this._claims(role.crowns ?? [])}
+      ${this._claims(role.claims ?? [])}
       ${this._brief(this._view.brief)}
     `;
   }
@@ -121,9 +121,25 @@ export class RbPrivateSheet extends HTMLElement {
     return `<h3>Lands</h3><ul class="rb-lands">${rows}</ul>`;
   }
 
+  /**
+   * What you claim, and which of it you actually wear.
+   *
+   * The difference is the whole feudal game: a claim on a crown somebody else
+   * has been elected to is worth nothing, and a player should be able to see
+   * that at a glance rather than by noticing their income has fallen.
+   */
   _claims(crowns) {
-    if (!crowns.length) return '';
-    return `<h3>Claims</h3><p>${crowns.map((c) => title(c)).join(', ')}</p>`;
+    const worn = Object.entries(this._view.crownHolders ?? {})
+      .filter(([, who]) => who === this._view.viewer?.roleId).map(([crown]) => crown);
+    const taken = crowns.filter((c) => this._view.crownHolders?.[c]
+      && this._view.crownHolders[c] !== this._view.viewer?.roleId);
+    if (!crowns.length && !worn.length) return '';
+
+    return `
+      ${worn.length ? `<h3>Crowns</h3><p>${worn.map((c) => title(c)).join(', ')}</p>` : ''}
+      ${crowns.length ? `<h3>Claims</h3><p>${crowns.map((c) => (
+    taken.includes(c) ? `<s>${title(c)}</s>` : title(c))).join(', ')}
+        ${taken.length ? '<span class="rb-warn">crowned elsewhere</span>' : ''}</p>` : ''}`;
   }
 
   _brief(brief) {

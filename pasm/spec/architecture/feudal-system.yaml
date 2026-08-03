@@ -1,0 +1,233 @@
+entities:
+  - mechanic: crown-and-support
+    core:
+      status: implemented
+      confidence: confirmed
+      title: Crowns And Support
+      summary: >-
+        Who a shire's peasants will accept, computed from the crowns a player
+        speaks for — their claims while a crown is unworn, and only their own
+        crowns once it has a king.
+      rationale:
+        - Support decides three things at once - what a defended settlement pays, where an army may move without a border, and whether a shire counts toward Disorder at the end. Changing how it is computed changes the score of the whole game, which is why the turn-zero counters are asserted before and after.
+        - A crown nobody wears is spoken for by everyone who claims it. That is the whole of turn zero, and it is what makes an election worth calling rather than a formality.
+        - A kingdom with no king is likewise spoken for by everyone in it, which is the reading that reproduces the printed tracker exactly. Recorded as a gap, because the guide's own support examples imply a stricter reading and a different number.
+      references:
+        - crownless-kingdom-support-gap
+        - crown-election
+    implementation:
+      status: declared
+      paths:
+        - gui/rules/derive.js
+      symbols:
+        - crownsOf
+        - factionsOf
+        - hasSupport
+        - electorate
+      tests:
+        - npm test
+    evidence:
+      - kind: source-document
+        reference: Raven Banner Players Guide v1.1.pdf, pages 25-26
+        summary: >-
+          "For Saxons to count as having support they must possess one of the
+          crowns that the Shire supports, or their liege must have support
+          there", with four worked examples from the starting board.
+      - kind: test
+        reference: tests/rules/feudal.test.js
+        summary: >-
+          Turn zero still reads 3 pagan, 3 Danish and 3 unsupported after the
+          rewrite, and crowning Ceowulf takes Gainbeald's Mercian support, his
+          income and his place outside the Disorder count.
+
+  - mechanic: crown-election
+    core:
+      status: implemented
+      confidence: confirmed
+      title: Crown Election
+      summary: >-
+        A vote of the Saxon stewards whose shires support a crown, weighted one
+        per such shire plus one per two churches they hold, settling who has the
+        right to wear it.
+      rationale:
+        - "The electorate is made of ground rather than of people: \"regardless of who their liege is\" means a king cannot pack it by taking vassals, only by holding shires whose peasants would accept him."
+        - A vassal whose liege stands is compelled to vote for them and barred from standing themselves, which is exactly Ceowulf and Gainbeald's problem — same team, same crown, one throne.
+        - The roll is fixed when the election opens. A shire changing hands mid-count would otherwise silently change who was voting.
+        - A tie fails and the crown stays unworn. An app breaking it would be an app deciding who rules England on a rule nobody wrote down.
+      references:
+        - crown-vote-tie-gap
+    game_design:
+      participating_roles:
+        - settling-dane
+        - adjacent-steward
+        - facilitator
+    implementation:
+      status: declared
+      paths:
+        - gui/rules/commands.js
+        - gui/components/rb-ballot.js
+        - gui/components/rb-crown-panel.js
+      symbols:
+        - resolveVote
+        - RbBallot
+        - RbCrownPanel
+      tests:
+        - npm test
+    evidence:
+      - kind: source-document
+        reference: Raven Banner Facilitators Guide v1.1.pdf, page 11
+        summary: >-
+          "All saxon stewards of shires that have support for this crown
+          (regardless of who their liege is) can vote… one vote for every shire
+          they are steward of that supports the crown, plus one extra vote for
+          every 2 churches in their shires."
+      - kind: test
+        reference: tests/rules/feudal.test.js
+        summary: >-
+          A compelled vassal is refused any vote but their liege's, a tie leaves
+          the crown unworn and re-contestable, and the facilitator can call the
+          count on an election waiting for somebody who has gone home.
+
+  - mechanic: homage-and-rebellion
+    core:
+      status: implemented
+      confidence: confirmed
+      title: Homage And Rebellion
+      summary: >-
+        How a player changes who they answer to. Danes choose freely in the Team
+        Phase; a Saxon must be unsworn, must ask somebody who wears a crown or
+        is a Dane, and must rebel before they can ask anyone else.
+      rationale:
+        - "Homage rides the existing consent machinery rather than a second one: it is the same shape as a settle request with one person asked instead of several, and reusing it means one set of facilitator overrides covers both."
+        - "A crownless Saxon can take no vassals at all, which is the second thing that makes an election worth winning: it is not only support, it is followers."
+        - The rebellion price is a facilitator's judgement as much as a rule, so the relief is set separately and in the open. A price a vassal cannot see before deciding is not a price they can weigh.
+        - The relief is cleared when it is used. It was a ruling about one rebellion, not a standing rate.
+    implementation:
+      status: declared
+      paths:
+        - gui/rules/commands.js
+      symbols:
+        - swearTo
+        - rebellionCost
+        - homageReason
+      tests:
+        - npm test
+    evidence:
+      - kind: source-document
+        reference: Raven Banner Facilitators Guide v1.1.pdf, page 11
+        summary: >-
+          "Cost: Transfer one shire and two soldiers to your liege. This cost
+          will be reduced (potentially down to zero) by the organisers if the
+          liege has lost the favour of God."
+      - kind: test
+        reference: tests/rules/feudal.test.js
+        summary: >-
+          A rebel pays his shire and soldiers to the man he leaves, takes his
+          remaining lands into a faction of his own, and is then free to claim
+          the crown his liege was blocking.
+
+  - state: crown-holders
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Crown Holders
+      summary: Which player wears each crown. Empty at the start of the game.
+      rationale:
+        - Public without qualification. A coronation is the most visible event in the game, and the support it moves is visible on the map whether anybody announces it or not.
+    architecture:
+      classification: authoritative
+      owner: game-host
+      writers:
+        - game-host
+
+  - decision: crownless-kingdom-support-gap
+    core:
+      status: implemented
+      confidence: inferred
+      title: A Kingdom With No King Is Spoken For By Everyone In It
+      summary: >-
+        The Aftermath tracker starts Disorder at three; the Players Guide's own
+        support examples imply seven. The app follows the tracker by letting a
+        team's members speak for their kingdom until it has a king.
+      rationale:
+        - The tracker is the sheet the game is scored from, and its turn-zero marks are the only external check on the support rule.
+        - The stricter reading would leave Wenyld, Uchtred and four shires unsupported before anybody had done anything, and would make the printed starting position wrong on its own sheet.
+        - Recorded as a discrepancy for the author as well as a gap for the facilitator, because only they can settle which sheet is right.
+    implementation:
+      status: declared
+      paths:
+        - gui/rules/gaps.js
+        - tools/validate-data.mjs
+      symbols:
+        - KNOWN_GAPS
+        - KNOWN_DISCREPANCIES
+      tests:
+        - npm run data:validate
+
+  - decision: crown-vote-tie-gap
+    core:
+      status: implemented
+      confidence: inferred
+      title: A Tied Election Fails
+      summary: The guide gives the electorate and the weights but no tiebreaker, so a tie leaves the crown unworn to be contested again.
+      rationale:
+        - Failing hands the decision back to the room, which is where a megagame's undecided questions belong.
+    implementation:
+      status: declared
+      paths:
+        - gui/rules/gaps.js
+      symbols:
+        - KNOWN_GAPS
+      tests:
+        - npm test
+
+  - message: claim-crown-command
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Claim Crown
+      summary: A claimant puts a crown to the shires that answer to it, opening an election.
+    architecture:
+      authority: request
+      producer:
+        - client-command-gateway
+      consumer:
+        - command-admission
+      validator:
+        - command-admission
+      trust_boundary: client-to-host
+      payload: crown-identifier
+
+  - message: cast-vote-command
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Cast Vote
+      summary: One elector's voice, weighted by the ground behind it, refused outright if their liege is standing and they voted elsewhere.
+    architecture:
+      authority: request
+      producer:
+        - client-command-gateway
+      consumer:
+        - command-admission
+      validator:
+        - command-admission
+      trust_boundary: client-to-host
+      payload: vote-and-candidate
+
+  - message: rebel-command
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Rebel
+      summary: A vassal breaks with their liege, paying a shire and two soldiers less whatever the facilitator has forgiven.
+    architecture:
+      authority: request
+      producer:
+        - client-command-gateway
+      consumer:
+        - command-admission
+      validator:
+        - command-admission
+      trust_boundary: client-to-host
+      payload: shire-identifier

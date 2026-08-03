@@ -53,6 +53,19 @@ export const KNOWN_DISCREPANCIES = {
       'mark unaccounted for in the printed tracker rather than a transcription ' +
       'error. Needs the game author to settle.',
   },
+  unsupportedShires: {
+    published: 3,
+    extracted: 7,
+    note:
+      'The Aftermath tracker starts Disorder at 3, but the support examples in '
+      + 'the Players Guide say Abbess Wenyld has no support in South Mercia — '
+      + 'and by the same reasoning neither would Uchtred in Middle Anglia or '
+      + 'Lundenwic, nor Wenyld in Hwicce. Read strictly as "you or your liege '
+      + 'must have a claim listed in the box", turn zero has seven unsupported '
+      + 'shires rather than three. The app follows the tracker: while a kingdom '
+      + 'has no king, everyone in it speaks for it, which gives exactly the '
+      + 'printed three. Needs the game author to settle.',
+  },
 };
 
 /** The archetypes whose holders are Danish, and pagan until baptised. */
@@ -210,7 +223,7 @@ async function main() {
   }
   const findings = await validateData();
   for (const [what, d] of Object.entries(KNOWN_DISCREPANCIES)) {
-    console.log(`known discrepancy — ${what}: artwork ${d.extracted}, printed ${d.published}`);
+    console.log(`known discrepancy — ${what}: ${d.extracted} by the sources, ${d.published} on the printed tracker`);
   }
   // Not findings. Places the printed rules say nothing and the app had to
   // decide, listed so a facilitator can see what was decided for them.

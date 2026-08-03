@@ -46,7 +46,7 @@ export function createInitialState({ joinCode, seed, data, roleIds }) {
       liegeId: inPlay.includes(role.liege) ? role.liege : null,
       teamId: role.team,
       factionId: role.team,
-      crowns: [...role.claims],
+      claims: [...role.claims],
       baptised: false,
       // Shires a baptised Dane gained a de jure claim on: the Danish ones the
       // church had already reached with a cross when they converted.
@@ -107,10 +107,17 @@ export function createInitialState({ joinCode, seed, data, roleIds }) {
       spare: {}, scouts: {},
       pairingComplete: false,
     },
-    // Requests waiting on other people's agreement. Settling a shire is the
-    // only one so far, and the first thing in the game that makes one player
-    // wait on several others.
+    // Requests waiting on other people's agreement — settling a shire, and
+    // swearing homage to somebody who has to accept it. The first things in
+    // the game that make one player wait on another.
     consents: {},
+    // Who wears which crown. Empty at the start: "Mercia starts the game
+    // without a king", and every other crown is a claim rather than a
+    // coronation until an election settles it.
+    crownHolders: {},
+    // What a rebellion costs this vassal, where the facilitator has ruled that
+    // their liege has lost the favour of God and it should cost them less.
+    rebellionRelief: {},
     // Trade contracts, offered and signed. Three cards, one per named shire,
     // each carrying a status rather than being removed when it ends — a
     // cancelled deal is part of the story of the game.

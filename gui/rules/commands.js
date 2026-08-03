@@ -18,7 +18,7 @@
 import { PHASES, seatHolding } from './state.js';
 import {
   incomeFor, isDanish, isPagan, isChristian, isDanishHeld, momentumGain,
-  reachableFrom, factionReach, churchesHeld,
+  reachableFrom, factionReach, churchesHeld, electorate,
 } from './derive.js';
 import {
   advanceClash, amendLead, confirmLead, sidesOf, resolveClash, MAX_REINFORCEMENT,
@@ -101,7 +101,13 @@ export function resolveConsent(draft, data, request) {
 
   request.resolved = true;
   request.outcome = refused ? 'refused' : 'granted';
-  if (refused || request.kind !== 'settle') return;
+  if (refused) return;
+
+  if (request.kind === 'allegiance') {
+    swearTo(draft, request.roleId, request.liegeId);
+    return;
+  }
+  if (request.kind !== 'settle') return;
 
   // Carried: now it costs something.
   const role = draft.roles[request.roleId];
@@ -120,6 +126,77 @@ export function resolveConsent(draft, data, request) {
     settlement.defended = true;
     toDefend -= 1;
   }
+}
+
+/** The crowns this role actually wears. */
+const crownsHeldBy = (state, roleId) =>
+  Object.keys(state.crownHolders).filter((crown) => state.crownHolders[crown] === roleId);
+
+/**
+ * Why this homage cannot be sworn, or null.
+ *
+ * The cycle check is the substantive one: two people each owing the other
+ * would make the support rule walk forever, and the paper game has no notion
+ * of it.
+ */
+function homageReason(state, roleId, to) {
+  if (to !== null && to !== undefined && !state.roles[to]) return no('no such liege');
+  if (to === roleId) return no('you cannot be your own liege');
+  let at = to;
+  const seen = new Set([roleId]);
+  while (at) {
+    if (seen.has(at)) return no('that would make the chain of homage a circle');
+    seen.add(at);
+    at = state.roles[at]?.liegeId ?? null;
+  }
+  return null;
+}
+
+/** Take a lord, and his faction with him. */
+function swearTo(draft, roleId, liegeId) {
+  const role = draft.roles[roleId];
+  role.liegeId = liegeId ?? null;
+  // A vassal's lands are controlled by their liege's faction, which is what
+  // makes a faction's adjacency reach through the people who follow it.
+  role.factionId = liegeId ? draft.roles[liegeId].factionId : roleId;
+  for (const shire of Object.values(draft.shires)) {
+    if (shire.stewardRoleId === roleId) shire.factionId = role.factionId;
+  }
+}
+
+/** What a rebellion costs this vassal, after any relief the umpire has granted. */
+export function rebellionCost(state, roleId) {
+  const relief = state.rebellionRelief?.[roleId];
+  return { shires: relief?.shires ?? 1, soldiers: relief?.soldiers ?? 2 };
+}
+
+/**
+ * Count an election, if it can be counted yet.
+ *
+ * Most votes wins and a tie fails, leaving the crown unworn to be contested
+ * again. An app breaking a tie would be an app deciding who rules England on a
+ * rule nobody wrote down.
+ */
+export function resolveVote(draft, vote, force = false) {
+  const everyone = Object.keys(vote.electorate);
+  if (!force && !everyone.every((who) => vote.cast[who])) return;
+
+  const tally = {};
+  for (const [who, forRoleId] of Object.entries(vote.cast)) {
+    tally[forRoleId] = (tally[forRoleId] ?? 0) + vote.electorate[who];
+  }
+  const best = Math.max(0, ...Object.values(tally));
+  const leaders = Object.keys(tally).filter((who) => tally[who] === best);
+
+  vote.resolved = true;
+  vote.tally = tally;
+  if (best === 0 || leaders.length !== 1) {
+    vote.outcome = 'failed';
+    return;
+  }
+  vote.outcome = 'crowned';
+  vote.winner = leaders[0];
+  draft.crownHolders[vote.crown] = leaders[0];
 }
 
 /** The three shires with a contract card, in the order they are printed. */
@@ -265,8 +342,9 @@ export const COMMANDS = {
    *
    * A Dane may do this freely in the Team Phase — their sheets say so plainly,
    * and a warband that follows whoever is winning is the point. A Saxon's
-   * homage is a feudal matter that needs the other party's agreement, so it
-   * goes through a facilitator, who is the one who heard them agree.
+   * homage needs the other party's agreement, so theirs goes through
+   * `request-allegiance` and a consent round, or through a facilitator, who is
+   * the one who heard them agree in the room.
    */
   'swear-allegiance': {
     phases: ['team'],
@@ -278,22 +356,266 @@ export const COMMANDS = {
       if (ctx.actor.kind !== 'facilitator' && !isDanish(ctx.state, ctx.data, roleId)) {
         return no('a Saxon swears homage in front of a facilitator');
       }
+      return homageReason(ctx.state, roleId, ctx.cmd.payload?.liegeId) ?? ok();
+    },
+    effects(draft, ctx) {
+      swearTo(draft, subjectOf(ctx), ctx.cmd.payload.liegeId);
+    },
+  },
+
+  /**
+   * A Saxon asks to become somebody's man.
+   *
+   * "Target: The holder of a Saxon crown, or a Dane. Effect: With their consent
+   * you become their vassal, joining their faction. You cannot be in an
+   * existing faction when you swear allegiance."
+   *
+   * All three clauses bite. A crownless Saxon cannot take vassals at all,
+   * which is what makes an election worth winning; and a Saxon who already has
+   * a liege has to rebel first, which is what makes changing sides cost
+   * something.
+   */
+  'request-allegiance': {
+    phases: ['team'],
+    actor: 'player',
+    probe: (state, data) => ({
+      liegeId: Object.keys(state.roles).find((id) => isDanish(state, data, id)),
+    }),
+    admit(ctx) {
+      const roleId = subjectOf(ctx);
+      if (isDanish(ctx.state, ctx.data, roleId)) {
+        return no('a Dane simply chooses, and needs nobody\'s leave');
+      }
+      if (ctx.state.roles[roleId]?.liegeId) {
+        return no('you are already somebody\'s man — rebel first');
+      }
       const to = ctx.cmd.payload?.liegeId;
-      if (to !== null && !ctx.state.roles[to]) return no('no such liege');
-      if (to === roleId) return no('you cannot be your own liege');
-      // A cycle would make the support rule walk forever, and the paper game
-      // has no notion of two people each owing the other.
-      let at = to;
-      const seen = new Set([roleId]);
-      while (at) {
-        if (seen.has(at)) return no('that would make the chain of homage a circle');
-        seen.add(at);
-        at = ctx.state.roles[at]?.liegeId ?? null;
+      const reason = homageReason(ctx.state, roleId, to);
+      if (reason) return reason;
+      if (!to) return no('say whom you would follow');
+      if (!isDanish(ctx.state, ctx.data, to) && crownsHeldBy(ctx.state, to).length === 0) {
+        return no('they wear no crown, so they have no vassals to take');
+      }
+      if (Object.values(ctx.state.consents).some(
+        (c) => !c.resolved && c.kind === 'allegiance' && c.roleId === roleId)) {
+        return no('you are already asking somebody');
       }
       return ok();
     },
     effects(draft, ctx) {
-      draft.roles[subjectOf(ctx)].liegeId = ctx.cmd.payload.liegeId;
+      const roleId = subjectOf(ctx);
+      const liegeId = ctx.cmd.payload.liegeId;
+      const id = `allegiance:${roleId}:${Object.keys(draft.consents).length + 1}`;
+      draft.consents[id] = {
+        id,
+        kind: 'allegiance',
+        roleId,
+        liegeId,
+        asked: [liegeId],
+        granted: {},
+        resolved: false,
+        outcome: null,
+      };
+    },
+  },
+
+  // --- crowns --------------------------------------------------------------
+  /**
+   * Put a crown to the shires that answer to it.
+   *
+   * "All saxon stewards of shires that have support for this crown (regardless
+   * of who their liege is) can vote for who has the right to the crown."
+   *
+   * The electorate is made of ground rather than of people, so a king cannot
+   * pack it by taking vassals — he has to hold shires whose peasants would
+   * accept him. A vassal whose liege wants the same crown is compelled to vote
+   * for them and barred from standing, which is the whole of Ceowulf and
+   * Gainbeald's problem: same team, same crown, and only one of them can have
+   * it.
+   *
+   * Most votes wins. A tie fails and the crown stays unworn, to be contested
+   * again — the alternative is an app breaking a tie nobody agreed it should.
+   */
+  'claim-crown': {
+    phases: ['team'],
+    actor: 'player',
+    probe: (state, data, roleId) => ({ crown: state.roles[roleId]?.claims?.[0] }),
+    admit(ctx) {
+      const roleId = subjectOf(ctx);
+      const { crown } = ctx.cmd.payload ?? {};
+      const role = ctx.state.roles[roleId];
+      if (!role?.claims.includes(crown)) return no('you have no claim on that crown');
+      if (ctx.state.crownHolders[crown]) {
+        return no(`${pretty(crown)} already has a king`);
+      }
+      const liege = role.liegeId;
+      if (liege && ctx.state.roles[liege]?.claims.includes(crown)) {
+        return no('you cannot claim a crown your liege claims');
+      }
+      if (Object.values(ctx.state.votes).some((v) => !v.resolved && v.crown === crown)) {
+        return no('that election is already being held');
+      }
+      if (Object.keys(electorate(ctx.state, ctx.data, crown)).length === 0) {
+        return no('no shire that supports it has a Saxon steward to vote');
+      }
+      return ok();
+    },
+    effects(draft, ctx, { data }) {
+      const roleId = subjectOf(ctx);
+      const { crown } = ctx.cmd.payload;
+      const id = `crown:${crown}:${Object.keys(draft.votes).length + 1}`;
+      // Everybody with a claim stands, minus anyone whose own liege claims it
+      // — they are barred from claiming, so they cannot be crowned either.
+      const candidates = Object.values(draft.roles)
+        .filter((role) => role.claims.includes(crown))
+        .filter((role) => !(role.liegeId && draft.roles[role.liegeId]?.claims.includes(crown)))
+        .map((role) => role.id).sort();
+      draft.votes[id] = {
+        id,
+        kind: 'crown',
+        crown,
+        openedBy: roleId,
+        candidates,
+        // Fixed when the election opens. A shire changing hands halfway
+        // through would otherwise silently change who was voting.
+        electorate: electorate(draft, data, crown),
+        cast: {},
+        resolved: false,
+        outcome: null,
+        winner: null,
+      };
+    },
+  },
+
+  /** One elector's voice, weighted by the ground they hold. */
+  'cast-vote': {
+    phases: '*',
+    actor: 'player',
+    admit(ctx) {
+      const roleId = subjectOf(ctx);
+      const vote = ctx.state.votes[ctx.cmd.payload?.voteId];
+      if (!vote) return no('no such election');
+      if (vote.resolved) return no('that election is over');
+      if (!vote.electorate[roleId]) return no('you have no vote in this');
+      if (vote.cast[roleId]) return no('you have voted');
+      const forRoleId = ctx.cmd.payload?.forRoleId;
+      if (!vote.candidates.includes(forRoleId)) return no('they are not standing');
+      // "If your liege has a claim you must vote for them."
+      const liege = ctx.state.roles[roleId]?.liegeId;
+      if (liege && vote.candidates.includes(liege) && forRoleId !== liege) {
+        return no('your liege stands — you are sworn to vote for them');
+      }
+      return ok();
+    },
+    effects(draft, ctx) {
+      const vote = draft.votes[ctx.cmd.payload.voteId];
+      vote.cast[subjectOf(ctx)] = ctx.cmd.payload.forRoleId;
+      resolveVote(draft, vote);
+    },
+  },
+
+  /**
+   * The facilitator calls the count.
+   *
+   * An election that waits for an elector who has gone home never ends, and a
+   * megagame runs on a clock. Counting what is in the room is what an umpire
+   * does.
+   */
+  'facilitator:close-vote': {
+    phases: '*',
+    actor: 'facilitator',
+    admit(ctx) {
+      const vote = ctx.state.votes[ctx.cmd.payload?.voteId];
+      if (!vote) return no('no such election');
+      return vote.resolved ? no('that election is over') : ok();
+    },
+    effects(draft, ctx) {
+      resolveVote(draft, draft.votes[ctx.cmd.payload.voteId], true);
+    },
+  },
+
+  /**
+   * Break with your liege.
+   *
+   * "Cost: Transfer one shire and two soldiers to your liege. This cost will be
+   * reduced (potentially down to zero) by the organisers if the liege has lost
+   * the favour of God."
+   *
+   * So the price is a facilitator's judgement as much as a rule, and the relief
+   * is set separately and in the open — a vassal should be able to see what
+   * rebelling would cost before deciding to do it.
+   */
+  rebel: {
+    phases: ['team'],
+    actor: 'player',
+    probe: (state, data, roleId) => ({
+      shireId: Object.keys(state.shires).find((id) => state.shires[id].stewardRoleId === roleId),
+    }),
+    admit(ctx) {
+      const roleId = subjectOf(ctx);
+      const liege = ctx.state.roles[roleId]?.liegeId;
+      if (!liege) return no('you answer to nobody already');
+      const cost = rebellionCost(ctx.state, roleId);
+      const reason = affordable(ctx.state.roles[roleId], { soldiers: cost.soldiers });
+      if (reason) return no(reason);
+      if (cost.shires === 0) return ok();
+      const shire = ctx.state.shires[ctx.cmd.payload?.shireId];
+      const held = Object.values(ctx.state.shires).filter((s) => s.stewardRoleId === roleId);
+      // A landless vassal cannot hand over a shire, and the paper rule does not
+      // ask them to. They pay the soldiers and go.
+      if (held.length === 0) return ok();
+      if (!shire) return no('name the shire you are giving up');
+      if (shire.stewardRoleId !== roleId) return no('that is not yours to give');
+      return ok();
+    },
+    effects(draft, ctx) {
+      const roleId = subjectOf(ctx);
+      const role = draft.roles[roleId];
+      const liegeId = role.liegeId;
+      const cost = rebellionCost(draft, roleId);
+
+      role.soldiers -= cost.soldiers;
+      draft.roles[liegeId].soldiers += cost.soldiers;
+      const shireId = ctx.cmd.payload?.shireId;
+      if (cost.shires > 0 && shireId && draft.shires[shireId]?.stewardRoleId === roleId) {
+        draft.shires[shireId].stewardRoleId = liegeId;
+        draft.shires[shireId].factionId = draft.roles[liegeId].factionId;
+      }
+
+      // "You leave your faction, which means you are free to swear a new
+      // allegiance, claim a crown or remain independent." A faction of one is
+      // still a faction, and it is his.
+      role.liegeId = null;
+      role.factionId = roleId;
+      for (const shire of Object.values(draft.shires)) {
+        if (shire.stewardRoleId === roleId) shire.factionId = roleId;
+      }
+      // The relief was a ruling about one rebellion, not a standing rate.
+      delete draft.rebellionRelief[roleId];
+    },
+  },
+
+  /**
+   * What this rebellion will cost, if the umpire has heard enough to lower it.
+   *
+   * Set in the open and before the fact, because a price a vassal cannot see
+   * is not a price they can weigh.
+   */
+  'facilitator:set-rebellion-relief': {
+    phases: '*',
+    actor: 'facilitator',
+    admit(ctx) {
+      const { roleId, shires, soldiers } = ctx.cmd.payload ?? {};
+      if (!ctx.state.roles[roleId]) return no('no such character');
+      if (![0, 1].includes(shires)) return no('a rebellion costs one shire or none');
+      if (!Number.isInteger(soldiers) || soldiers < 0 || soldiers > 2) {
+        return no('a rebellion costs between none and two soldiers');
+      }
+      return ok();
+    },
+    effects(draft, ctx) {
+      const { roleId, shires, soldiers, note } = ctx.cmd.payload;
+      draft.rebellionRelief[roleId] = { shires, soldiers, note: note ?? '' };
     },
   },
 

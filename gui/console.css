@@ -835,6 +835,37 @@ rb-clash-panel { display: block; }
 .rb-gaps dt { font-weight: 600; margin-top: 0.6rem; }
 .rb-gaps dd { margin: 0.15rem 0 0; color: var(--rb-muted); }
 
+/* --- elections ------------------------------------------------------------ */
+
+.rb-crown-panel { margin-bottom: 1.5rem; }
+.rb-crowns h3 { margin: 0.9rem 0 0.2rem; font-size: 0.95rem; }
+
+.rb-ballots { list-style: none; margin: 0 0 0.9rem; padding: 0; display: grid; gap: 0.6rem; }
+
+.rb-ballot {
+  background: var(--rb-parchment);
+  border: 1px solid var(--rb-rule);
+  border-left: 3px solid var(--rb-rule);
+  border-radius: 3px;
+  padding: 0.7rem 0.9rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.rb-ballot[data-asking="true"] { border-left-color: var(--rb-blood); }
+.rb-ballot[data-resolved="true"] { opacity: 0.6; }
+.rb-ballot-head, .rb-ballot-outcome { margin: 0; font-family: var(--rb-serif); }
+.rb-ballot-buttons { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+
+.rb-relief { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
+.rb-relief label { display: grid; gap: 0.15rem; font-size: 0.85rem; }
+.rb-relief select {
+  font: inherit;
+  padding: 0.3rem;
+  border: 1px solid var(--rb-rule);
+  border-radius: 3px;
+}
+
 /* --- consent: the one place you wait on other people ---------------------- */
 
 .rb-consents { list-style: none; margin: 0 0 0.9rem; padding: 0; display: grid; gap: 0.6rem; }

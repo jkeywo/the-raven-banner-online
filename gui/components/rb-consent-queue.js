@@ -42,8 +42,10 @@ export class RbConsentQueue extends HTMLElement {
       return `
         <li class="rb-consent" data-resolved="false">
           <p class="rb-consent-ask">
-            <strong>${escape(nameOf(request.roleId))}</strong> wants to settle
-            <strong>${escape(shireOf(request.shireId))}</strong>.
+            <strong>${escape(nameOf(request.roleId))}</strong>
+            ${request.kind === 'allegiance'
+    ? `would follow <strong>${escape(nameOf(request.liegeId))}</strong>.`
+    : `wants to settle <strong>${escape(shireOf(request.shireId))}</strong>.`}
           </p>
           <ul class="rb-consent-who">${request.asked.map((who) => `
             <li data-answer="${request.granted[who] ?? 'silent'}">

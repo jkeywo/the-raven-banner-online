@@ -55,12 +55,17 @@ export class RbConsentPanel extends HTMLElement {
         <li class="rb-consent" data-asking="${asking}" data-resolved="${request.resolved}">
           <p class="rb-consent-ask">
             <strong>${escape(yours ? 'You' : nameOf(request.roleId))}</strong>
-            ${yours ? 'want' : 'wants'} to settle
-            <strong>${escape(shireOf(request.shireId))}</strong>.
+            ${request.kind === 'allegiance'
+    ? `${yours ? 'would' : 'would'} follow
+              <strong>${escape(nameOf(request.liegeId))}</strong>.`
+    : `${yours ? 'want' : 'wants'} to settle
+              <strong>${escape(shireOf(request.shireId))}</strong>.`}
           </p>
           ${request.resolved
     ? `<p class="rb-consent-outcome">${request.outcome === 'granted'
-      ? 'The neighbours agreed.' : 'Somebody refused. Nothing was spent.'}</p>`
+      ? (request.kind === 'allegiance' ? 'He took the homage.' : 'The neighbours agreed.')
+      : (request.kind === 'allegiance' ? 'He would not have him.'
+        : 'Somebody refused. Nothing was spent.')}</p>`
     : `<ul class="rb-consent-who">${request.asked.map((who) => `
               <li data-answer="${request.granted[who] ?? 'silent'}">
                 ${escape(nameOf(who))} — ${request.granted[who] === true ? 'agreed'

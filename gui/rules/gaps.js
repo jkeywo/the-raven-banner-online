@@ -49,6 +49,43 @@ export const KNOWN_GAPS = [
       + 'before it existed.',
   },
   {
+    id: 'crownless-kingdom-support',
+    about: 'Support in a kingdom with no king',
+    silent:
+      'The Aftermath tracker starts Disorder at three, but the Players Guide\'s '
+      + 'own support examples imply seven — Wenyld has no claim on Mercia and so '
+      + 'no support in South Mercia, and the same is true of three more shires.',
+    ruling:
+      'While a crown is unworn, everyone in that kingdom speaks for it. Once it '
+      + 'has a king, only he and his vassals do.',
+    because:
+      'It reproduces the printed tracker exactly, which is the number the game '
+      + 'is scored from. It also makes an election worth holding: the moment '
+      + 'Ceowulf is crowned, Gainbeald is a lord with land he cannot tax until '
+      + 'he swears to the man who beat him. The alternative readings either '
+      + 'contradict the tracker or make Claim Crown change nothing.',
+  },
+  {
+    id: 'crown-vote-tie',
+    about: 'A tied election',
+    silent: 'The Facilitators Guide gives the electorate and the weights, but not how to break a tie.',
+    ruling: 'A tie fails. The crown stays unworn and may be contested again.',
+    because:
+      'Any tiebreaker the app invented would be the app deciding who rules '
+      + 'England on a rule nobody wrote down. Failing leaves it with the room, '
+      + 'which is where it belongs.',
+  },
+  {
+    id: 'claim-crown-phase',
+    about: 'When a crown may be claimed',
+    silent: 'The feudal actions are printed without a phase.',
+    ruling: 'The Team Phase, though voting stays open until it is counted.',
+    because:
+      'Every other change to who follows whom happens in the Team Phase. The '
+      + 'vote itself outlives the phase because a negotiation that the clock '
+      + 'interrupts should not be lost.',
+  },
+  {
     id: 'contract-offer-timing',
     about: 'Making a trade contract',
     silent:

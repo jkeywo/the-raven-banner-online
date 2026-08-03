@@ -69,7 +69,7 @@ describe('support', () => {
   it('covers a role holding no crown at all, through their team', () => {
     // Abbess Wenyld claims nothing and answers to nobody, but she is Mercian
     // and both her shires list Mercia.
-    expect(state.roles.abbess_wenyld.crowns).toEqual([]);
+    expect(state.roles.abbess_wenyld.claims).toEqual([]);
     expect(state.roles.abbess_wenyld.liegeId).toBe(null);
     expect(hasSupport(state, data, 'hwicce')).toBe(true);
     expect(hasSupport(state, data, 'south_mercia')).toBe(true);
@@ -101,7 +101,7 @@ describe('income', () => {
 
     // Strip Alfred of Wessex and put him on the wrong side of the war. The
     // defended town now pays him nothing; the undefended ones still pay.
-    state.roles.king_alfred.crowns = [];
+    state.roles.king_alfred.claims = [];
     state.roles.king_alfred.teamId = 'great_summer_army';
     expect(hasSupport(state, data, 'wiltshire')).toBe(false);
     expect(incomeFor(state, data, 'king_alfred').silver).toBe(supported - 2);

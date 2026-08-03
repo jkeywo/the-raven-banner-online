@@ -65,7 +65,7 @@ export const FIELD_VISIBILITY = [
   { path: 'roles.*.liegeId', audience: PUBLIC },
   { path: 'roles.*.teamId', audience: PUBLIC },
   { path: 'roles.*.factionId', audience: PUBLIC },
-  { path: 'roles.*.crowns', audience: PUBLIC },
+  { path: 'roles.*.claims', audience: PUBLIC },
   { path: 'roles.*.baptised', audience: PUBLIC },
   // A conversion is a public event and its consequences are read off the
   // board, so both of these are everybody's business.
@@ -148,6 +148,11 @@ export const FIELD_VISIBILITY = [
   { path: 'consents.**', audience: PUBLIC },
   { path: 'contracts.**', audience: PUBLIC },
   { path: 'votes.**', audience: PUBLIC },
+  // A coronation is the most public thing in the game, and what a rebellion
+  // was let off is a ruling the facilitator makes in the open rather than in
+  // a corner.
+  { path: 'crownHolders.**', audience: PUBLIC },
+  { path: 'rebellionRelief.**', audience: PUBLIC },
   // An envoy thread is a private line to the facilitator, one per role.
   {
     path: 'envoys.**',
