@@ -19,6 +19,18 @@ entities:
       replicas:
         - projected-player-view
         - projected-facilitator-view
+    implementation:
+      status: declared
+      paths:
+        - gui/rules/state.js
+        - gui/rules/derive.js
+      symbols:
+        - createInitialState
+        - deriveAll
+        - hasSupport
+        - aftermath
+      tests:
+        - npm test
 
   - component: game-host
     core:
@@ -63,10 +75,27 @@ entities:
         - player-command-message
       reads:
         - authoritative-game-state
+      depends_on:
+        - authoritative-game-state
       must_not_depend_on:
         - client-connection-manager
         - host-peer-listener
         - view-projector
+    implementation:
+      status: declared
+      paths:
+        - gui/rules/admission.js
+        - gui/rules/commands.js
+        - gui/rules/reducer.js
+        - gui/rules/command-log.js
+        - gui/rules/rng.js
+      symbols:
+        - admit
+        - availableTo
+        - apply
+        - replay
+      tests:
+        - npm test
 
   - component: view-projector
     core:
@@ -85,10 +114,24 @@ entities:
       authority: authoritative
       reads:
         - authoritative-game-state
+      depends_on:
+        - authoritative-game-state
       produces:
         - projected-player-view
         - projected-facilitator-view
         - projected-view-message
+    implementation:
+      status: declared
+      paths:
+        - gui/rules/views.js
+        - gui/rules/visibility.js
+      symbols:
+        - projectView
+        - unclassifiedPaths
+        - auditProjection
+        - FIELD_VISIBILITY
+      tests:
+        - npm test
 
   - state: projected-player-view
     core:

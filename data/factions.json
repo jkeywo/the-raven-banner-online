@@ -1,0 +1,43 @@
+{
+ "_generated": "raven_banner gamespec @ analogue-projects 34b77cb via tools/export_web_data.py",
+ "_doNotEdit": true,
+ "starting": {
+  "D": "Danish Invasion",
+  "M": "Mercia",
+  "W": "Wessex"
+ },
+ "potential": {
+  "Be": "Bernicia",
+  "Br": "Britons",
+  "Ea": "East Anglia",
+  "Ex": "Essex",
+  "F": "Franks",
+  "K": "Kent",
+  "L": "Lindsey",
+  "N": "Northumbria",
+  "Sx": "Sussex"
+ },
+ "crownLetter": {
+  "wessex": "W",
+  "mercia": "M",
+  "bernicia": "Be",
+  "britons": "Br",
+  "east_anglia": "Ea",
+  "essex": "Ex",
+  "franks": "F",
+  "kent": "K",
+  "lindsey": "L",
+  "northumbria": "N",
+  "sussex": "Sx"
+ },
+ "teamLetter": {
+  "wessex": "W",
+  "mercia": "M",
+  "great_heathen_army": "D",
+  "great_summer_army": "D"
+ },
+ "danishArchetypes": [
+  "danish_warrior",
+  "danish_trader"
+ ]
+}
