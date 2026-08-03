@@ -208,7 +208,7 @@ describe('a trade contract pays both signatories', () => {
     // asked for a soldier — which is the half that has to be persuaded.
     const { state } = playing('king_alfred');
     state.contracts = [{
-      id: 'c1', shireId: 'west_country', traderRoleId: 'frida_anundottir', active: true,
+      id: 'c1', shireId: 'west_country', traderRoleId: 'frida_anundottir', status: 'active',
     }];
     const alfred = { seatId: 's1', kind: 'player', roleId: 'king_alfred' };
     const before = state.roles.king_alfred.silver;

@@ -827,6 +827,14 @@ rb-clash-panel { display: block; }
 .rb-envoy-buttons { display: flex; gap: 0.4rem; }
 .rb-envoy-panel, .rb-inspector-panel, .rb-consent-panel { margin-bottom: 1.5rem; }
 
+/* --- what the app decided where the rules said nothing -------------------- */
+
+.rb-gaps-panel { margin-bottom: 1.5rem; }
+.rb-gaps-panel summary { font-family: var(--rb-serif); cursor: pointer; }
+.rb-gaps { margin: 0.6rem 0 0; font-size: 0.85rem; }
+.rb-gaps dt { font-weight: 600; margin-top: 0.6rem; }
+.rb-gaps dd { margin: 0.15rem 0 0; color: var(--rb-muted); }
+
 /* --- consent: the one place you wait on other people ---------------------- */
 
 .rb-consents { list-style: none; margin: 0 0 0.9rem; padding: 0; display: grid; gap: 0.6rem; }

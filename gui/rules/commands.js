@@ -122,6 +122,39 @@ export function resolveConsent(draft, data, request) {
   }
 }
 
+/** The three shires with a contract card, in the order they are printed. */
+const contractShires = (data) => data.meta.tradeContractShires;
+
+const findContract = (state, id) => state.contracts.find((c) => c.id === id) ?? null;
+
+/** The live or offered contract on a shire, if there is one. */
+export function contractOn(state, shireId) {
+  return state.contracts.find(
+    (c) => c.shireId === shireId && (c.status === 'active' || c.status === 'offered')) ?? null;
+}
+
+/**
+ * Sign a contract: a soldier from each side, and the port opens up.
+ *
+ * The ship value drops by two for everybody, not just for the signatories.
+ * That is the cost of the bargain and the reason a steward might refuse one:
+ * the same jetties that let a trader in let a fleet in.
+ */
+export function activateContract(draft, data, contract, stewardRoleId) {
+  contract.status = 'active';
+  contract.stewardRoleId = stewardRoleId;
+  draft.roles[stewardRoleId].soldiers -= 1;
+  draft.roles[contract.traderRoleId].soldiers -= 1;
+  draft.shires[contract.shireId].shipCostDelta -= 2;
+}
+
+/** Tear one up. The soldiers do not come back; the ship value does. */
+export function cancelContract(draft, data, contract, byRoleId) {
+  contract.status = 'cancelled';
+  contract.cancelledBy = byRoleId;
+  draft.shires[contract.shireId].shipCostDelta += 2;
+}
+
 /**
  * When the phase now beginning should end.
  *
@@ -388,7 +421,7 @@ export const COMMANDS = {
       // the trader would make the deal worthless to the person being asked
       // for a soldier, which is the half that has to be persuaded.
       for (const contract of draft.contracts) {
-        if (!contract.active) continue;
+        if (contract.status !== 'active') continue;
         if (contract.traderRoleId === roleId
             || draft.shires[contract.shireId]?.stewardRoleId === roleId) {
           role.silver += 2;
@@ -695,7 +728,12 @@ export const COMMANDS = {
     },
   },
 
-  /** Take the cross back out again. */
+  /**
+   * Take the cross back out again.
+   *
+   * On the Danish sheets only. A Saxon steward with a missionary in his own
+   * shire has no reason to want him gone, and no printed way to do it.
+   */
   'drive-out-missionaries': {
     phases: ['encounter'],
     actor: 'player',
@@ -705,6 +743,7 @@ export const COMMANDS = {
     }),
     admit(ctx) {
       const roleId = subjectOf(ctx);
+      if (!isDanish(ctx.state, ctx.data, roleId)) return no('only Danes drive out missionaries');
       const reason = affordable(ctx.state.roles[roleId], { momentum: 1 });
       if (reason) return no(reason);
       const shire = ctx.state.shires[ctx.cmd.payload?.shireId];
@@ -716,6 +755,140 @@ export const COMMANDS = {
     effects(draft, ctx) {
       spend(draft.roles[subjectOf(ctx)], { momentum: 1 });
       draft.shires[ctx.cmd.payload.shireId].missionaryCross = false;
+    },
+  },
+
+  // --- trade contracts -----------------------------------------------------
+  /**
+   * The trader proposes a contract on one of the three named shires.
+   *
+   * There are exactly three cards — Wrekinsets, Kent and the West Country —
+   * and the trader holds all of them. The deal costs a soldier from each side
+   * and pays each of them two silver every maintenance phase thereafter, so it
+   * is the one arrangement in the game that is plainly good for both parties
+   * and still has to be negotiated, because the steward is usually a Saxon
+   * being asked to garrison a Danish trade route.
+   *
+   * Offering costs nothing. The soldiers are handed over on acceptance, which
+   * is when the deal exists.
+   */
+  'offer-contract': {
+    phases: TRADEABLE_PHASES,
+    actor: 'player',
+    probe: (state, data) => ({ shireId: contractShires(data, state)[0] }),
+    admit(ctx) {
+      const roleId = subjectOf(ctx);
+      if (ctx.data.roles.roles[roleId]?.archetype !== 'danish_trader') {
+        return no('only the Danish Trader holds the contracts');
+      }
+      const { shireId } = ctx.cmd.payload ?? {};
+      if (!ctx.data.meta.tradeContractShires.includes(shireId)) {
+        return no(`there is no contract for ${pretty(shireId ?? 'that')}`);
+      }
+      const steward = ctx.state.shires[shireId]?.stewardRoleId;
+      if (!steward) return no('nobody stewards it, so there is nobody to sign');
+      if (steward === roleId) return no('you cannot contract with yourself');
+      const existing = contractOn(ctx.state, shireId);
+      if (existing?.status === 'active') return no('that contract is already running');
+      if (existing?.status === 'offered') return no('you have already offered that one');
+      const reason = affordable(ctx.state.roles[roleId], { soldiers: 1 });
+      return reason ? no(reason) : ok();
+    },
+    effects(draft, ctx) {
+      const roleId = subjectOf(ctx);
+      const { shireId } = ctx.cmd.payload;
+      // A re-offer after a cancellation is a new deal, so the old record stays
+      // where it is and this one goes on the end.
+      draft.contracts.push({
+        id: `contract:${shireId}:${draft.contracts.length + 1}`,
+        shireId,
+        traderRoleId: roleId,
+        stewardRoleId: draft.shires[shireId].stewardRoleId,
+        status: 'offered',
+      });
+    },
+  },
+
+  /**
+   * The steward signs, or does not.
+   *
+   * Both soldiers are taken here and the shire's ship value drops by two,
+   * which is the part everybody else notices: a contracted port is cheaper to
+   * reach by sea, for the enemy as much as for the trader.
+   */
+  'answer-contract': {
+    phases: TRADEABLE_PHASES,
+    actor: 'player',
+    // An offer on a shire this player stewards, so the action does not appear
+    // on everybody's list refused for a reason about somebody else's deal.
+    probe: (state, data, roleId) => ({
+      contractId: state.contracts.find((c) => c.status === 'offered'
+        && state.shires[c.shireId]?.stewardRoleId === roleId)?.id,
+      accept: true,
+    }),
+    admit(ctx) {
+      const roleId = subjectOf(ctx);
+      const contract = findContract(ctx.state, ctx.cmd.payload?.contractId);
+      if (!contract) return no('no such contract');
+      if (contract.status !== 'offered') return no('that offer is no longer open');
+      if (ctx.state.shires[contract.shireId]?.stewardRoleId !== roleId) {
+        return no('it is not yours to sign');
+      }
+      if (typeof ctx.cmd.payload?.accept !== 'boolean') return no('sign it or do not');
+      if (!ctx.cmd.payload.accept) return ok();
+      // Both sides pay a soldier, so a trader who has spent his since offering
+      // cannot sign either.
+      for (const who of [roleId, contract.traderRoleId]) {
+        const reason = affordable(ctx.state.roles[who], { soldiers: 1 });
+        if (reason) {
+          return no(who === roleId ? reason
+            : `${pretty(ctx.data.roles.roles[contract.traderRoleId]?.name ?? 'the trader')}`
+              + ' has no soldier left to send');
+        }
+      }
+      return ok();
+    },
+    effects(draft, ctx, { data }) {
+      const roleId = subjectOf(ctx);
+      const contract = findContract(draft, ctx.cmd.payload.contractId);
+      if (!ctx.cmd.payload.accept) { contract.status = 'declined'; return; }
+      activateContract(draft, data, contract, roleId);
+    },
+  },
+
+  /**
+   * Either party tears it up.
+   *
+   * "Either party can cancel this contract at any time during the Team Phase
+   * by handing this contract to an organiser" — so the window is printed, and
+   * the ship value goes back up when it closes.
+   *
+   * Cancellation rights follow the current steward rather than whoever signed.
+   * A shire that changes hands takes its contract with it, which is also how
+   * the income works.
+   */
+  'cancel-contract': {
+    phases: ['team'],
+    actor: 'player',
+    probe: (state, data, roleId) => ({
+      contractId: state.contracts.find((c) => c.status === 'active'
+        && (c.traderRoleId === roleId
+          || state.shires[c.shireId]?.stewardRoleId === roleId))?.id,
+    }),
+    admit(ctx) {
+      const roleId = subjectOf(ctx);
+      const contract = findContract(ctx.state, ctx.cmd.payload?.contractId);
+      if (!contract) return no('no such contract');
+      if (contract.status !== 'active') return no('that contract is not running');
+      const steward = ctx.state.shires[contract.shireId]?.stewardRoleId;
+      if (roleId !== contract.traderRoleId && roleId !== steward) {
+        return no('you are not party to it');
+      }
+      return ok();
+    },
+    effects(draft, ctx, { data }) {
+      cancelContract(draft, data, findContract(draft, ctx.cmd.payload.contractId),
+        subjectOf(ctx));
     },
   },
 

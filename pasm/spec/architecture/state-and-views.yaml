@@ -49,6 +49,7 @@ entities:
         - authoritative-game-state
         - clash-machine-state
         - consent-request-state
+        - trade-contract-record
       coordinates:
         - command-admission
         - view-projector
@@ -67,6 +68,7 @@ entities:
         - clash-resolution
         - envoy-negotiation
         - facilitator-override-inspector
+        - contract-timing-gap
     implementation:
       status: declared
       paths:

@@ -111,6 +111,9 @@ export function createInitialState({ joinCode, seed, data, roleIds }) {
     // only one so far, and the first thing in the game that makes one player
     // wait on several others.
     consents: {},
+    // Trade contracts, offered and signed. Three cards, one per named shire,
+    // each carrying a status rather than being removed when it ends — a
+    // cancelled deal is part of the story of the game.
     contracts: [],
     votes: {},
     envoys: {},

@@ -1,0 +1,141 @@
+entities:
+  - mechanic: trade-contract
+    core:
+      status: implemented
+      confidence: confirmed
+      title: Trade Contract
+      summary: >-
+        One of three printed cards — Wrekinsets, Kent and the West Country —
+        offered by the Danish Trader and signed by that shire's steward. A
+        soldier from each, then two silver each every maintenance phase, and the
+        shire's ship value drops by two.
+      rationale:
+        - The terms are printed on the card rather than in any guide, which is why they were read off Deluxe Components/Raven Banner Cards (Front) v1.1.pdf — one card per page with real text — instead of the flattened home-printing sheet.
+        - The only arrangement in the game that is plainly good for both parties and still has to be negotiated, because the steward is usually a Saxon being asked to garrison a Danish trade route.
+        - "The ship value drops for everybody, not just the signatories. That is the price of the bargain and the reason a steward might refuse: the same jetties that let a trader in let a fleet in."
+        - Income and cancellation rights both follow the current steward rather than whoever signed, because the card sits next to the shire. A shire that changes hands takes its contract with it.
+      assumptions:
+        - Offering costs nothing; the soldiers change hands on acceptance, which is when the deal exists.
+        - A cancelled contract does not refund the soldiers. They were handed over.
+      references:
+        - contract-timing-gap
+    game_design:
+      participating_roles:
+        - danish-trader
+        - adjacent-steward
+    implementation:
+      status: declared
+      paths:
+        - gui/rules/commands.js
+      symbols:
+        - contractOn
+        - activateContract
+        - cancelContract
+      tests:
+        - npm test
+    evidence:
+      - kind: source-document
+        reference: Deluxe Components/Raven Banner Cards (Front) v1.1.pdf, pages 81-83
+        summary: >-
+          "Cost: 1 soldier from the Steward of Wrekinsets, 1 soldier from the
+          Danish Trader making the deal … both gain 2 silver every Maintenance
+          Phase. Reduce the ship value of Wrekinsets by 2. Either party can
+          cancel this contract at any time during the Team Phase."
+      - kind: test
+        reference: tests/rules/contracts.test.js
+        summary: >-
+          A contract is offered, signed, pays both sides through a maintenance
+          phase, and is cancelled — the ship value falling by two and coming
+          back, and the soldiers staying spent.
+
+  - decision: contract-timing-gap
+    core:
+      status: implemented
+      confidence: inferred
+      title: A Contract May Be Made In Any Phase But The Battle
+      summary: >-
+        The card prints when a contract may be cancelled and not when it may be
+        made, so the app allows offering and signing in the team, maintenance
+        and encounter phases.
+      rationale:
+        - A contract appears in no action box on any archetype sheet. It is a bargain rather than an action, and bargains happen whenever people are talking.
+        - The battle is excluded because a soldier changing hands mid-fight would move a clash that is already being rolled.
+        - Recorded in the gaps table rather than left implicit, so the facilitator can see what was decided for them and overrule it.
+    implementation:
+      status: declared
+      paths:
+        - gui/rules/gaps.js
+      symbols:
+        - KNOWN_GAPS
+      tests:
+        - npm test
+
+  - state: trade-contract-record
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Trade Contract Record
+      summary: >-
+        One contract's shire, trader, signing steward and status — offered,
+        active, declined or cancelled.
+      rationale:
+        - Records are kept rather than removed when a deal ends. A refused offer and a torn-up contract are both part of the story of the game, and the epilogue has to be able to tell it.
+        - Public in the visibility manifest. A contract is placed on the table beside the shire, and its effect on the ship value is visible to everybody whether they were told about it or not.
+    architecture:
+      classification: authoritative
+      owner: game-host
+      writers:
+        - game-host
+
+  - message: offer-contract-command
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Offer Contract
+      summary: The Danish Trader puts one of her three cards on the table for a named shire.
+    architecture:
+      authority: request
+      producer:
+        - client-command-gateway
+      consumer:
+        - command-admission
+      validator:
+        - command-admission
+      trust_boundary: client-to-host
+      payload: shire-identifier
+
+  - message: answer-contract-command
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Answer Contract
+      summary: The steward signs or declines. Signing takes a soldier from each side and opens the port.
+      rationale:
+        - Admission checks the trader can still pay her soldier as well as the steward, because she may have spent it since offering.
+    architecture:
+      authority: request
+      producer:
+        - client-command-gateway
+      consumer:
+        - command-admission
+      validator:
+        - command-admission
+      trust_boundary: client-to-host
+      payload: contract-and-answer
+
+  - message: cancel-contract-command
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Cancel Contract
+      summary: Either party tears it up during a Team Phase, and the shire's ship value goes back up.
+    architecture:
+      authority: request
+      producer:
+        - client-command-gateway
+      consumer:
+        - command-admission
+      validator:
+        - command-admission
+      trust_boundary: client-to-host
+      payload: contract-identifier

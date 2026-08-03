@@ -69,6 +69,15 @@ entities:
         A Danish player asking to put down roots in a shire he already holds by
         force, which is the only way a Dane gains support anywhere.
 
+  - role: danish-trader
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Danish Trader
+      summary: >-
+        The one player holding the three trade contract cards, and the only one
+        who can offer them.
+
   - role: adjacent-steward
     core:
       status: proposed

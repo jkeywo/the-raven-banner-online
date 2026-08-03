@@ -116,6 +116,9 @@ export async function startPlayerApp({ location = window.location } = {}) {
       ? data.roles.roles[live.stewardRoleId]?.name ?? live.stewardRoleId
       : 'nobody';
     const standing = Object.values(live.settlements ?? {}).filter((s) => !s.destroyed);
+    // Why the port is two cheaper to reach than the map says.
+    const contract = Object.values(client.view?.contracts ?? {})
+      .find((c) => c.shireId === shireId && c.status === 'active');
     const tally = ['farm', 'town', 'church'].map((kind) => {
       const of = standing.filter((s) => s.type === kind);
       const defended = of.filter((s) => s.defended).length;
@@ -135,6 +138,8 @@ export async function startPlayerApp({ location = window.location } = {}) {
     ? 'landlocked' : `${derived.shipCost} ships`}</dd>
         <dt>Settlements</dt><dd>${tally.join(', ') || 'none left'}</dd>
         ${live.missionaryCross ? '<dt>Missionaries</dt><dd>a cross stands here</dd>' : ''}
+        ${contract ? `<dt>Trade contract</dt><dd>with ${
+  data.roles.roles[contract.traderRoleId]?.name ?? 'the Danish Trader'}</dd>` : ''}
       </dl>`;
   }
 

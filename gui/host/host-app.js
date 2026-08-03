@@ -17,6 +17,7 @@ import { Persistence, saveFilename, downloadSave, parseSave } from './persistenc
 import { HostPeer } from '../net/host-peer.js';
 import { mintJoinCode, mintFacilitatorPin, playerLink } from '../net/join-code.js';
 import { mintSeed } from '../rules/rng.js';
+import { KNOWN_GAPS } from '../rules/gaps.js';
 import '../components/rb-connection-dot.js';
 import '../components/rb-seat-roster.js';
 import '../components/rb-phase-clock.js';
@@ -38,6 +39,12 @@ export async function startHostApp({ location = window.location } = {}) {
   let host = null;
   let peer = null;
   let pin = null;
+
+  // Fixed for the whole game, so it is written once rather than on every
+  // projection.
+  $('rules-gaps').innerHTML = KNOWN_GAPS.map((gap) => `
+    <dt>${gap.about} — ${gap.ruling}</dt>
+    <dd><em>${gap.silent}</em> ${gap.because}</dd>`).join('');
 
   const screens = { start: $('screen-start'), running: $('screen-running') };
   const show = (which) => {

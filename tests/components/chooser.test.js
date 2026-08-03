@@ -105,6 +105,48 @@ describe('what the chooser sends', () => {
   });
 });
 
+describe('trade contracts', () => {
+  const TRADER = 'frida_anundottir';
+  const seenBy = (state, roleId) => projectView(state, data, {
+    kind: 'player', seatId: 's1', roleId, teamId: state.roles[roleId].teamId,
+  });
+
+  it('offers the trader the three printed shires and their stewards', () => {
+    const [field] = fieldsFor('offer-contract', view(TRADER, 'team').view, data);
+    expect(field.options.map((o) => o.value))
+      .toEqual(['wrekinsets', 'kent', 'west_country']);
+    // Named, because who you are dealing with is the whole decision.
+    expect(field.options[0].label).toContain('—');
+  });
+
+  it('drops a shire once a contract is running on it', () => {
+    const { state } = view(TRADER, 'team');
+    state.contracts = [{
+      id: 'c1', shireId: 'kent', traderRoleId: TRADER, status: 'active',
+    }];
+    const [field] = fieldsFor('offer-contract', seenBy(state, TRADER), data);
+    expect(field.options.map((o) => o.value)).toEqual(['wrekinsets', 'west_country']);
+  });
+
+  it('shows a steward only the offers made to them', () => {
+    const { state } = view('king_alfred', 'team');
+    const steward = state.shires.west_country.stewardRoleId;
+    state.contracts = [
+      { id: 'c1', shireId: 'west_country', traderRoleId: TRADER, status: 'offered' },
+      { id: 'c2', shireId: 'kent', traderRoleId: TRADER, status: 'offered' },
+    ];
+    const [which] = fieldsFor('answer-contract', seenBy(state, steward), data);
+    expect(which.options.map((o) => o.value)).toEqual(['c1']);
+  });
+
+  it('turns the answer into the boolean the command wants', () => {
+    expect(payloadFrom('answer-contract', { contractId: 'c1', accept: 'yes' }))
+      .toEqual({ contractId: 'c1', accept: true });
+    expect(payloadFrom('answer-contract', { contractId: 'c1', accept: '' }))
+      .toEqual({ contractId: 'c1', accept: false });
+  });
+});
+
 describe('the form', () => {
   it('builds nothing for an action that needs nothing', () => {
     expect(renderChooser('recruit-soldiers', view('king_alfred').view, data)).toBe(null);

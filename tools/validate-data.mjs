@@ -20,6 +20,7 @@
 import { readFile, access } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { KNOWN_GAPS } from '../gui/rules/gaps.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const DATA_DIR = join(HERE, '..', 'data');
@@ -211,6 +212,9 @@ async function main() {
   for (const [what, d] of Object.entries(KNOWN_DISCREPANCIES)) {
     console.log(`known discrepancy — ${what}: artwork ${d.extracted}, printed ${d.published}`);
   }
+  // Not findings. Places the printed rules say nothing and the app had to
+  // decide, listed so a facilitator can see what was decided for them.
+  for (const gap of KNOWN_GAPS) console.log(`rules gap — ${gap.about}: ${gap.ruling}`);
   if (findings.length === 0) {
     console.log('data/ is sound.');
     return 0;

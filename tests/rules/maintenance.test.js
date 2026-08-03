@@ -148,9 +148,9 @@ describe('the Danish Trader', () => {
     const { state, actor } = playing('frida_anundottir');
     const trader = 'frida_anundottir';
     state.contracts = [
-      { id: 'c1', shireId: 'kent', traderRoleId: trader, active: true },
-      { id: 'c2', shireId: 'west_country', traderRoleId: trader, active: true },
-      { id: 'c3', shireId: 'wrekinsets', traderRoleId: trader, active: false },
+      { id: 'c1', shireId: 'kent', traderRoleId: trader, status: 'active' },
+      { id: 'c2', shireId: 'west_country', traderRoleId: trader, status: 'active' },
+      { id: 'c3', shireId: 'wrekinsets', traderRoleId: trader, status: 'cancelled' },
     ];
     const before = state.roles.frida_anundottir.silver;
     // Landless, so no income of her own — just the contracts.

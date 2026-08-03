@@ -223,6 +223,63 @@ export function fieldsFor(verb, view, data) {
         options: held().filter(({ value }) => view.shires[value]?.missionaryCross),
       }];
 
+    case 'offer-contract': {
+      const taken = new Set(Object.values(view.contracts ?? {})
+        .filter((c) => c.status === 'active' || c.status === 'offered')
+        .map((c) => c.shireId));
+      return [{
+        name: 'shireId',
+        label: 'Contract for',
+        kind: 'select',
+        options: (data.meta.tradeContractShires ?? [])
+          .filter((id) => !taken.has(id) && view.shires?.[id]?.stewardRoleId)
+          .map((id) => ({
+            value: id,
+            label: `${data.shires.shires[id]?.name ?? id} — ${
+              data.roles.roles[view.shires[id].stewardRoleId]?.name ?? 'its steward'}`,
+          })),
+      }];
+    }
+
+    case 'answer-contract':
+      return [
+        {
+          name: 'contractId',
+          label: 'Their offer',
+          kind: 'select',
+          options: Object.values(view.contracts ?? {})
+            .filter((c) => c.status === 'offered' && view.shires?.[c.shireId]?.stewardRoleId === me)
+            .map((c) => ({
+              value: c.id,
+              label: `${data.shires.shires[c.shireId]?.name ?? c.shireId} — from ${
+                data.roles.roles[c.traderRoleId]?.name ?? 'the trader'}`,
+            })),
+        },
+        {
+          name: 'accept',
+          label: 'Well?',
+          kind: 'select',
+          options: [
+            { value: 'yes', label: 'sign it — a soldier each' },
+            { value: '', label: 'no thank you' },
+          ],
+        },
+      ];
+
+    case 'cancel-contract':
+      return [{
+        name: 'contractId',
+        label: 'Tear up',
+        kind: 'select',
+        options: Object.values(view.contracts ?? {})
+          .filter((c) => c.status === 'active'
+            && (c.traderRoleId === me || view.shires?.[c.shireId]?.stewardRoleId === me))
+          .map((c) => ({
+            value: c.id,
+            label: data.shires.shires[c.shireId]?.name ?? c.shireId,
+          })),
+      }];
+
     case 'collect-income':
       // Only a pagan Dane is asked; everyone else just collects.
       return view.derived?.roles?.[me]?.pagan
@@ -255,6 +312,7 @@ export function payloadFrom(verb, values) {
   if (verb === 'give') return { ...values, amount: Number(values.amount) };
   if (verb === 'swear-allegiance') return { liegeId: values.liegeId || null };
   if (verb === 'baptise') return { ...values, willing: values.willing === 'yes' };
+  if (verb === 'answer-contract') return { ...values, accept: values.accept === 'yes' };
   return values;
 }
 

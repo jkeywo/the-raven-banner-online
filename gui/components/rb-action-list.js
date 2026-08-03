@@ -36,6 +36,9 @@ const LABELS = {
   baptise: 'Baptise a pagan',
   'request-settle': 'Settle a shire',
   'drive-out-missionaries': 'Drive out the missionaries',
+  'offer-contract': 'Offer a trade contract',
+  'answer-contract': 'Answer a trade offer',
+  'cancel-contract': 'Cancel a trade contract',
 };
 
 const NOTES = {
@@ -58,6 +61,9 @@ const NOTES = {
   baptise: 'Free, but they must agree. Ends their upkeep.',
   'request-settle': 'Every neighbouring steward has to agree first.',
   'drive-out-missionaries': 'One momentum. The cross comes down.',
+  'offer-contract': 'A soldier each. Then two silver each, every turn.',
+  'answer-contract': 'It costs you a soldier, and opens your port.',
+  'cancel-contract': 'Team Phase only. The ship value goes back up.',
 };
 
 /** Verbs that need the player to say more before they mean anything. */
@@ -67,6 +73,7 @@ export const NEEDS_CHOICE = new Set([
   'raid-settlement', 'defensive-fleet', 'rebuild-settlement', 'send-envoy',
   'missionary-expedition', 'rousing-sermon', 'baptise',
   'request-settle', 'drive-out-missionaries',
+  'offer-contract', 'answer-contract', 'cancel-contract',
 ]);
 
 export class RbActionList extends HTMLElement {
