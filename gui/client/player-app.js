@@ -18,6 +18,7 @@ import { identify } from '../net/wire.js';
 import { sendCommand } from '../net/command-gateway.js';
 import { ClientState } from './client-state.js';
 import { loadData } from './load-data.js';
+import { renderChooser, valuesFrom, payloadFrom } from './action-chooser.js';
 import '../components/rb-connection-dot.js';
 import '../components/rb-seat-roster.js';
 import '../components/rb-map.js';
@@ -172,6 +173,7 @@ export async function startPlayerApp({ location = window.location } = {}) {
     $('clock').phase = view.phase;
     $('actions').data = data;
     $('actions').view = view;
+    $('action-error').textContent = client.lastRefusal?.reason ?? '';
 
     $('map').data = data;
     $('map').view = view;
@@ -208,18 +210,39 @@ export async function startPlayerApp({ location = window.location } = {}) {
   });
 
   // An action is a request like any other: sent, and then whatever the host
-  // says is what happened.
+  // says is what happened. Some need a question answered first.
   document.addEventListener('click', (event) => {
     const button = event.target.closest('#actions [data-verb]');
     if (!button) return;
-    const { envelope, sent } = sendCommand(button.dataset.verb, payloadFor(button.dataset.verb));
-    if (sent) client.awaiting(envelope.data.seq, button.dataset.verb);
+    const verb = button.dataset.verb;
+    const chooser = renderChooser(verb, client.view, data);
+    if (chooser) { openChooser(chooser); return; }
+    dispatch(verb, {});
   });
 
-  /** The few verbs that need more than "do it". Fuller choosers land with M7. */
-  function payloadFor(verb) {
-    if (verb === 'trade') return { give: 'food' };
-    return {};
+  function openChooser(form) {
+    const panel = $('chooser');
+    panel.replaceChildren(form);
+    panel.hidden = false;
+    form.querySelector('select, input')?.focus();
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      dispatch(form.dataset.verb, payloadFrom(form.dataset.verb, valuesFrom(form)));
+      closeChooser();
+    });
+    form.querySelector('[data-cancel]').addEventListener('click', closeChooser);
+  }
+
+  function closeChooser() {
+    $('chooser').hidden = true;
+    $('chooser').replaceChildren();
+  }
+
+  function dispatch(verb, payload) {
+    $('action-error').textContent = '';
+    const { envelope, sent } = sendCommand(verb, payload);
+    if (sent) client.awaiting(envelope.data.seq, verb);
+    else $('action-error').textContent = 'Not connected — try again in a moment.';
   }
 
   // A link with the code already in it skips the first screen.

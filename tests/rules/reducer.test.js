@@ -108,13 +108,49 @@ describe('commands', () => {
     expect(admit(state, data, { verb: 'trade', payload: { give: 'food' } }, frida).ok).toBe(false);
   });
 
+  it('lets someone arriving mid-game take a vacant character', () => {
+    // A game that can only be joined before it starts is not one that
+    // survives a real evening: people turn up late, drop out, and get put
+    // onto a character whose player has gone home.
+    const state = seated();
+    state.phase.name = 'maintenance';
+    state.seats.s3 = { id: 's3', token: 't3', name: 'Latecomer', roleId: null, kind: 'player', connected: true, lastSeen: 0 };
+    const latecomer = { seatId: 's3', kind: 'player', roleId: null };
+    const after = run(state, [[latecomer, 'claim-role', { roleId: 'godric' }]]);
+    expect(after.seats.s3.roleId).toBe('godric');
+  });
+
+  it('lets a Dane change liege freely in the team phase', () => {
+    // Their sheets say so plainly: a warband follows whoever is winning.
+    const state = seated();
+    state.phase.name = 'team';
+    state.seats.s1.roleId = 'ubba_ragnarsson';
+    const ubba = { seatId: 's1', kind: 'player', roleId: 'ubba_ragnarsson' };
+    const after = run(state, [[ubba, 'swear-allegiance', { liegeId: 'guthrum_the_old' }]]);
+    expect(after.roles.ubba_ragnarsson.liegeId).toBe('guthrum_the_old');
+  });
+
+  it('sends a Saxon’s homage through a facilitator', () => {
+    // Homage needs the other party to agree, and the facilitator is the one
+    // who heard them agree.
+    const state = seated();
+    state.phase.name = 'team';
+    expect(admit(state, data, { verb: 'swear-allegiance', payload: { liegeId: 'cenred' } }, PLAYER))
+      .toMatchObject({ ok: false, reason: 'a Saxon swears homage in front of a facilitator' });
+    const after = run(state, [[FACILITATOR, 'swear-allegiance',
+      { roleId: 'archbishop_aethelred', liegeId: 'cenred' }]]);
+    expect(after.roles.archbishop_aethelred.liegeId).toBe('cenred');
+  });
+
   it('refuses homage that would close a circle', () => {
     const state = seated();
     state.phase.name = 'team';
-    // Alfred is Cenred's liege already, so Alfred swearing to Cenred would
-    // make each of them the other's lord and the support rule walk forever.
+    // Halfdan is already Ubba's liege, so Halfdan swearing to Ubba would make
+    // each of them the other's lord and the support rule walk forever.
+    state.seats.s1.roleId = 'halfdan_ragnarsson';
+    const halfdan = { seatId: 's1', kind: 'player', roleId: 'halfdan_ragnarsson' };
     const verdict = admit(state, data,
-      { verb: 'swear-allegiance', payload: { liegeId: 'cenred' } }, PLAYER);
+      { verb: 'swear-allegiance', payload: { liegeId: 'ubba_ragnarsson' } }, halfdan);
     expect(verdict).toMatchObject({ ok: false });
     expect(verdict.reason).toContain('circle');
   });
@@ -166,7 +202,7 @@ describe('replay', () => {
     state = run(state, [
       [FACILITATOR, 'facilitator:advance-phase', {}],
       [halfdan, 'declare-initiative-target', { shireId: 'lindsey' }],
-      [PLAYER, 'swear-allegiance', { liegeId: null }],
+      [halfdan, 'swear-allegiance', { liegeId: 'guthrum_the_old' }],
       [FACILITATOR, 'facilitator:advance-phase', {}],
       [FACILITATOR, 'facilitator:advance-phase', {}],
       [PLAYER, 'collect-income', {}],

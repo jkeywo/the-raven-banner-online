@@ -103,18 +103,32 @@ export function reachableFrom(state, data, roleId) {
 }
 
 /**
+ * What a role with no land collects instead, by archetype.
+ *
+ * Enough to stay in the game and not enough to stay out of it. A priest with
+ * nothing gets silver rather than a soldier, which is the sheets being precise
+ * about what a churchman is for.
+ */
+const LANDLESS = {
+  saxon_warrior: { silver: 0, food: 2, soldiers: 1 },
+  saxon_priest: { silver: 3, food: 2, soldiers: 0 },
+  danish_warrior: { silver: 0, food: 2, soldiers: 1 },
+  danish_trader: { silver: 0, food: 2, soldiers: 1 },
+};
+
+/**
  * What a role collects in the maintenance phase.
  *
  * A farm pays one food and a town pays two silver, but only where the holder
  * has support — without it, defended settlements pay nothing at all. Churches
  * never pay; they buy momentum for priests and legitimacy for everyone.
- *
- * A role holding no land gets a flat two food and one soldier instead, which
- * is enough to stay in the game and not enough to stay out of it.
  */
 export function incomeFor(state, data, roleId) {
   const held = Object.values(state.shires).filter((s) => s.stewardRoleId === roleId);
-  if (held.length === 0) return { silver: 0, food: 2, soldiers: 1, landless: true };
+  if (held.length === 0) {
+    const archetype = data.roles.roles[roleId]?.archetype ?? 'saxon_warrior';
+    return { ...LANDLESS[archetype] ?? LANDLESS.saxon_warrior, landless: true };
+  }
 
   let silver = 0;
   let food = 0;
@@ -130,12 +144,35 @@ export function incomeFor(state, data, roleId) {
   return { silver, food, soldiers: 0, landless: false };
 }
 
-/** Churches a role holds, which gate Raise Christian Banners and priest momentum. */
+/** Churches a role holds, which gate Raise Christian Banners. */
 export function churchesHeld(state, roleId) {
   return Object.values(state.shires)
     .filter((s) => s.stewardRoleId === roleId)
     .flatMap((s) => Object.values(s.settlements))
     .filter((x) => x.type === 'church' && !x.destroyed).length;
+}
+
+/**
+ * Churches held by everyone in a role's faction.
+ *
+ * A priest gains an extra momentum where their faction holds ten or more, so
+ * the count that matters is the faction's rather than the priest's own — the
+ * bonus is for belonging to a strong church, not for personally owning one.
+ */
+export function factionChurches(state, roleId) {
+  const faction = state.roles[roleId]?.factionId;
+  if (!faction) return 0;
+  const members = Object.values(state.roles)
+    .filter((r) => r.factionId === faction).map((r) => r.id);
+  return members.reduce((total, id) => total + churchesHeld(state, id), 0);
+}
+
+/** How much momentum this role gains in a maintenance phase, before the cap. */
+export function momentumGain(state, data, roleId) {
+  const base = 2;
+  const archetype = data.roles.roles[roleId]?.archetype;
+  if (archetype !== 'saxon_priest') return base;
+  return base + (factionChurches(state, roleId) >= 10 ? 1 : 0);
 }
 
 /** Settlements still standing, across the whole board. */
@@ -197,6 +234,8 @@ export function deriveAll(state, data) {
     roles[id] = {
       income: incomeFor(state, data, id),
       churches: churchesHeld(state, id),
+      factionChurches: factionChurches(state, id),
+      momentumGain: momentumGain(state, data, id),
       danish: isDanish(state, data, id),
       pagan: isPagan(state, data, id),
       factions: factionsOf(state, data, id),

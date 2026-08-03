@@ -16,10 +16,40 @@
  */
 
 import { PHASES, seatHolding } from './state.js';
-import { incomeFor } from './derive.js';
+import { incomeFor, isDanish, isPagan, momentumGain } from './derive.js';
 
 /** Phases in which resources may change hands. Not during a battle. */
 const TRADEABLE_PHASES = ['team', 'maintenance', 'encounter'];
+
+/** What can pass between players. Momentum and soldiers are yours alone. */
+const TRADEABLE = ['silver', 'food', 'ships'];
+
+/** The three shires with a yard. Named on every archetype's sheet. */
+const SHIPYARDS = ['wiltshire', 'lundenwic', 'jorvik'];
+
+const pretty = (id) => id.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+
+const holdsShipyard = (state, roleId) =>
+  SHIPYARDS.some((id) => state.shires[id]?.stewardRoleId === roleId);
+
+/**
+ * Whether this role must feed its followers this maintenance phase.
+ *
+ * Pagan Danes only. Baptism ends it, which is a large part of why anyone
+ * would consider being baptised.
+ */
+const owesUpkeep = (state, data, roleId) => isPagan(state, data, roleId);
+
+/**
+ * Where a role may circle a settlement.
+ *
+ * A steward may do it in their own shires. A priest may also do it anywhere a
+ * missionary cross stands, which is the reward for having sent one.
+ */
+function canReinforceIn(state, data, roleId, shire) {
+  if (shire.stewardRoleId === roleId) return true;
+  return data.roles.roles[roleId]?.archetype === 'saxon_priest' && shire.missionaryCross;
+}
 
 /**
  * When the phase now beginning should end.
@@ -71,7 +101,10 @@ function spend(role, costs) {
 export const COMMANDS = {
   // --- lobby ---------------------------------------------------------------
   'claim-role': {
-    phases: ['lobby'],
+    // Any phase, not just the lobby. People arrive late, drop out, and get
+    // reseated onto a character whose player has gone home — a game that can
+    // only be joined before it starts is not one that survives a real evening.
+    phases: '*',
     actor: 'player',
     // The one command a seat issues before it has a role, so it is exempt
     // from the check that a player command must have one.
@@ -104,6 +137,7 @@ export const COMMANDS = {
   'declare-initiative-target': {
     phases: ['team'],
     actor: 'player',
+    probe: (state) => ({ shireId: Object.keys(state.shires)[0] }),
     admit(ctx) {
       const { state, cmd } = ctx;
       const roleId = subjectOf(ctx);
@@ -122,11 +156,24 @@ export const COMMANDS = {
     },
   },
 
+  /**
+   * Change who you answer to.
+   *
+   * A Dane may do this freely in the Team Phase — their sheets say so plainly,
+   * and a warband that follows whoever is winning is the point. A Saxon's
+   * homage is a feudal matter that needs the other party's agreement, so it
+   * goes through a facilitator, who is the one who heard them agree.
+   */
   'swear-allegiance': {
     phases: ['team'],
     actor: 'player',
+    // Standing alone is always an option, so it answers the question.
+    probe: { liegeId: null },
     admit(ctx) {
       const roleId = subjectOf(ctx);
+      if (ctx.actor.kind !== 'facilitator' && !isDanish(ctx.state, ctx.data, roleId)) {
+        return no('a Saxon swears homage in front of a facilitator');
+      }
       const to = ctx.cmd.payload?.liegeId;
       if (to !== null && !ctx.state.roles[to]) return no('no such liege');
       if (to === roleId) return no('you cannot be your own liege');
@@ -146,22 +193,134 @@ export const COMMANDS = {
     },
   },
 
+  /**
+   * Hand a shire to somebody else.
+   *
+   * Team-phase business in the paper game, and a real move: stewardship is
+   * what pays you, what you must defend, and — through the support box — what
+   * makes you legitimate. Giving one away is how a faction consolidates behind
+   * whoever can actually hold the border.
+   */
+  'transfer-stewardship': {
+    phases: ['team'],
+    actor: 'player',
+    // "Do I hold a shire, and is there anyone to hand it to?"
+    probe: (state, data, roleId) => ({
+      shireId: Object.keys(state.shires).find((id) => state.shires[id].stewardRoleId === roleId),
+      toRoleId: Object.keys(state.roles).find((id) => id !== roleId),
+    }),
+    admit(ctx) {
+      const roleId = subjectOf(ctx);
+      const shire = ctx.state.shires[ctx.cmd.payload?.shireId];
+      if (!shire) return no('no such shire');
+      if (shire.stewardRoleId !== roleId && ctx.actor.kind !== 'facilitator') {
+        return no('you are not the steward of that shire');
+      }
+      const to = ctx.cmd.payload?.toRoleId;
+      if (!ctx.state.roles[to]) return no('no such character');
+      if (to === shire.stewardRoleId) return no('they already hold it');
+      return ok();
+    },
+    effects(draft, ctx) {
+      const shire = draft.shires[ctx.cmd.payload.shireId];
+      shire.stewardRoleId = ctx.cmd.payload.toRoleId;
+      // The shire's faction follows its steward, which is what moves it on the
+      // Danelaw and Disorder counters.
+      shire.factionId = draft.roles[ctx.cmd.payload.toRoleId].factionId;
+    },
+  },
+
+  /**
+   * Give silver, food or ships to another player.
+   *
+   * Freely, and at any time except during a battle — the printed rules are
+   * emphatic that this is a negotiating game and the currency of a promise is
+   * being able to keep it on the spot. Momentum and soldiers are yours alone
+   * and never move.
+   */
+  give: {
+    phases: TRADEABLE_PHASES,
+    actor: 'player',
+    // "Is there anyone to give anything to, and anything to give?"
+    probe: (state, data, roleId) => {
+      const to = Object.keys(state.roles).find((id) => id !== roleId);
+      const what = TRADEABLE.find((kind) => (state.roles[roleId]?.[kind] ?? 0) > 0);
+      return { toRoleId: to, what, amount: 1 };
+    },
+    admit(ctx) {
+      const roleId = subjectOf(ctx);
+      const { toRoleId, what, amount } = ctx.cmd.payload ?? {};
+      if (!ctx.state.roles[toRoleId]) return no('no such character');
+      if (toRoleId === roleId) return no('you already have it');
+      if (!TRADEABLE.includes(what)) {
+        return no(`${what ?? 'that'} cannot change hands — only ${TRADEABLE.join(', ')}`);
+      }
+      if (!Number.isInteger(amount) || amount <= 0) return no('say how much');
+      const reason = affordable(ctx.state.roles[roleId], { [what]: amount });
+      return reason ? no(reason) : ok();
+    },
+    effects(draft, ctx) {
+      const { toRoleId, what, amount } = ctx.cmd.payload;
+      draft.roles[subjectOf(ctx)][what] -= amount;
+      draft.roles[toRoleId][what] += amount;
+    },
+  },
+
   // --- maintenance phase ---------------------------------------------------
+  /**
+   * The one thing everybody does every maintenance phase: momentum, then
+   * income, and for a pagan Dane the upkeep their followers demand.
+   *
+   * The upkeep is a choice the sheets make mandatory — pay five silver for two
+   * soldiers, or lose one — so it is a payload rather than something the app
+   * picks. A Dane with neither the silver nor a soldier to lose is simply
+   * poorer than the rule anticipated, and gets on with it.
+   */
   'collect-income': {
     phases: ['maintenance'],
     actor: 'player',
+    probe: { upkeep: 'lose' },
     admit(ctx) {
-      return ctx.state.roles[subjectOf(ctx)].perTurn.collected
-        ? no('you have already collected this turn') : ok();
+      const roleId = subjectOf(ctx);
+      if (ctx.state.roles[roleId].perTurn.collected) {
+        return no('you have already collected this turn');
+      }
+      if (owesUpkeep(ctx.state, ctx.data, roleId)) {
+        const choice = ctx.cmd.payload?.upkeep;
+        if (choice !== 'pay' && choice !== 'lose') {
+          return no('your followers want feeding — pay five silver for two soldiers, or lose one');
+        }
+        if (choice === 'pay' && ctx.state.roles[roleId].silver < 5) {
+          return no('not enough silver to pay your followers — you must lose a soldier');
+        }
+      }
+      return ok();
     },
     effects(draft, ctx, { data }) {
       const roleId = subjectOf(ctx);
       const role = draft.roles[roleId];
+
+      role.momentum = Math.min(
+        Number(data.meta.momentumCap), role.momentum + momentumGain(draft, data, roleId));
+
+      if (owesUpkeep(draft, data, roleId)) {
+        if (ctx.cmd.payload.upkeep === 'pay') {
+          role.silver -= 5;
+          role.soldiers += 2;
+        } else {
+          role.soldiers = Math.max(0, role.soldiers - 1);   // "if able"
+        }
+      }
+
+      // The Danish Trader is paid for every contract that is in use.
+      if (data.roles.roles[roleId]?.archetype === 'danish_trader') {
+        role.silver += 2 * draft.contracts.filter((c) => c.active).length;
+      }
+
       const income = incomeFor(draft, data, roleId);
       role.silver += income.silver;
       role.food += income.food;
       role.soldiers += income.soldiers;
-      role.momentum = Math.min(data.meta.momentumCap, role.momentum + 2);
       role.perTurn.collected = true;
     },
   },
@@ -170,6 +329,10 @@ export const COMMANDS = {
     phases: ['maintenance'],
     actor: 'player',
     admit(ctx) {
+      // Not on the Danish Warrior sheet: their soldiers come from upkeep and
+      // from home, not from a purse.
+      const archetype = ctx.data.roles.roles[subjectOf(ctx)]?.archetype;
+      if (archetype === 'danish_warrior') return no('your archetype cannot recruit');
       const reason = affordable(ctx.state.roles[subjectOf(ctx)], { silver: 5 });
       return reason ? no(reason) : ok();
     },
@@ -184,8 +347,14 @@ export const COMMANDS = {
     phases: ['maintenance'],
     actor: 'player',
     admit(ctx) {
-      const role = ctx.state.roles[subjectOf(ctx)];
-      const reason = affordable(role, { silver: shipPrice(ctx.state, ctx.data, subjectOf(ctx)) });
+      const roleId = subjectOf(ctx);
+      // Saxons can only build where there is a yard to build in. Danes brought
+      // their own shipwrights and can build anywhere, for more.
+      if (!isDanish(ctx.state, ctx.data, roleId) && !holdsShipyard(ctx.state, roleId)) {
+        return no(`only the steward of ${SHIPYARDS.map(pretty).join(', ')} can build ships`);
+      }
+      const reason = affordable(ctx.state.roles[roleId],
+        { silver: shipPrice(ctx.state, ctx.data, roleId) });
       return reason ? no(reason) : ok();
     },
     effects(draft, ctx, { data }) {
@@ -194,6 +363,44 @@ export const COMMANDS = {
       spend(role, { silver: shipPrice(draft, data, roleId) });
       role.ships += 1;
       role.perTurn.shipsBuilt += 1;
+    },
+  },
+
+  /** Circle a settlement's letter: it now needs storming rather than walking into. */
+  reinforce: {
+    phases: ['maintenance'],
+    actor: 'player',
+    // "Is there a settlement anywhere I could circle?"
+    probe: (state, data, roleId) => {
+      for (const [shireId, shire] of Object.entries(state.shires)) {
+        if (!canReinforceIn(state, data, roleId, shire)) continue;
+        const open = Object.values(shire.settlements)
+          .find((x) => !x.defended && !x.destroyed);
+        if (open) return { shireId, settlementId: open.id };
+      }
+      return {};
+    },
+    admit(ctx) {
+      const roleId = subjectOf(ctx);
+      const reason = affordable(ctx.state.roles[roleId], { momentum: 1 });
+      if (reason) return no(reason);
+
+      const shire = ctx.state.shires[ctx.cmd.payload?.shireId];
+      if (!shire) return no('no such shire');
+      if (!canReinforceIn(ctx.state, ctx.data, roleId, shire)) {
+        return no('you can only reinforce a shire you steward');
+      }
+      const settlement = shire.settlements[ctx.cmd.payload?.settlementId];
+      if (!settlement) return no('no such settlement');
+      if (settlement.destroyed) return no('that settlement has been destroyed');
+      if (settlement.defended) return no('that settlement is already defended');
+      return ok();
+    },
+    effects(draft, ctx) {
+      const role = draft.roles[subjectOf(ctx)];
+      spend(role, { momentum: 1 });
+      draft.shires[ctx.cmd.payload.shireId]
+        .settlements[ctx.cmd.payload.settlementId].defended = true;
     },
   },
 
@@ -327,16 +534,19 @@ export const COMMANDS = {
 };
 
 /**
- * What the next ship costs. Two silver for the first of the turn, four after,
- * and the discount belongs to the stewards of the three shipbuilding shires.
+ * What the next ship costs.
+ *
+ * The two archetypes price it differently, and the difference is the story:
+ * a Saxon can only build in one of the three yards, cheaply for the first each
+ * turn and dearly after. A Dane arrived by sea with his own shipwrights and
+ * can build anywhere for three — or for two, once a turn, if he has taken a
+ * yard from a Saxon.
  */
 export function shipPrice(state, data, roleId) {
-  const yards = ['wiltshire', 'lundenwic', 'jorvik'];
-  const isShipwright = yards.some((id) => state.shires[id]?.stewardRoleId === roleId);
-  const danish = data.factions.danishArchetypes.includes(data.roles.roles[roleId].archetype);
-  const first = danish ? (isShipwright ? 2 : 3) : 2;
-  if (danish) return first;
-  return state.roles[roleId].perTurn.shipsBuilt === 0 && isShipwright ? first : 4;
+  const yard = holdsShipyard(state, roleId);
+  const built = state.roles[roleId].perTurn.shipsBuilt;
+  if (isDanish(state, data, roleId)) return yard && built === 0 ? 2 : 3;
+  return built === 0 ? 2 : 4;
 }
 
 /** Commands a role could issue in this phase, whether or not they can afford them. */

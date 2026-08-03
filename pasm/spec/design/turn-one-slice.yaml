@@ -131,6 +131,53 @@ entities:
       enforcement_links:
         - command-admission
 
+  - verb: transfer-stewardship
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Transfer Stewardship
+      summary: A steward hands a shire to another character during the team phase.
+      rationale:
+        - A real move rather than bookkeeping. Stewardship is what pays you, what you must defend, and -- through the support box -- what makes you legitimate, so giving one away is how a faction consolidates behind whoever can hold the border.
+        - The shire's faction follows its steward, which is what moves it on the Danelaw and Disorder counters.
+    game_design:
+      owner_role: owning-player
+      architecture_links:
+        - player-command-message
+      enforcement_links:
+        - command-admission
+
+  - verb: give-resources
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Give Resources
+      summary: Silver, food or ships pass from one character to another, at any time except during a battle.
+      rationale:
+        - This is a negotiating game, and the currency of a promise is being able to keep it on the spot.
+        - Momentum and soldiers never move. They are what a character is rather than what they have.
+    game_design:
+      owner_role: owning-player
+      architecture_links:
+        - player-command-message
+      enforcement_links:
+        - command-admission
+
+  - verb: reinforce-settlement
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Reinforce Settlement
+      summary: A momentum circles an undefended settlement, so it must be stormed rather than walked into.
+      rationale:
+        - "A priest may reinforce wherever a missionary cross stands, not only in shires they steward: it is the reward for having sent one."
+    game_design:
+      owner_role: owning-player
+      architecture_links:
+        - player-command-message
+      enforcement_links:
+        - command-admission
+
   - verb: facilitator-override
     core:
       status: proposed

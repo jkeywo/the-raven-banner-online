@@ -55,6 +55,7 @@ export function admit(state, data, cmd, actor) {
  * @returns {{verb: string, ok: boolean, reason?: string, hostOnly: boolean}[]}
  */
 export function availableTo(state, data, actor) {
+  const subject = actor.kind === 'facilitator' ? actor.roleId : actor.roleId;
   return Object.entries(COMMANDS)
     .filter(([, spec]) => spec.actor === actor.kind || actor.kind === 'facilitator')
     .filter(([, spec]) => spec.phases === '*' || spec.phases.includes(state.phase.name))
@@ -67,10 +68,15 @@ export function availableTo(state, data, actor) {
       let verdict;
       try {
         // Some commands are meaningless without a choice — trading needs a
-        // direction. Probing with an empty payload would report those as
-        // refused for a reason about the message rather than about the game,
-        // which reads to a player as "you can't" when the answer is "which?".
-        verdict = admit(state, data, { verb, payload: spec.probe ?? {} }, actor);
+        // direction, giving needs somebody to give to. Probing those with an
+        // empty payload reports them refused for a reason about the message
+        // rather than about the game, which reads to a player as "you can't"
+        // when the answer is "which?". So a command can describe a
+        // representative legal instance of itself, and the question this
+        // answers becomes "is there any way to do this at all?".
+        const probe = typeof spec.probe === 'function'
+          ? spec.probe(state, data, subject) : spec.probe;
+        verdict = admit(state, data, { verb, payload: probe ?? {} }, actor);
       } catch {
         return { verb, ok: false, reason: 'cannot tell from here', hostOnly: true };
       }

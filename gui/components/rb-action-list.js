@@ -19,19 +19,32 @@ const LABELS = {
   'claim-role': 'Take a character',
   'declare-initiative-target': 'Declare your target',
   'swear-allegiance': 'Swear allegiance',
+  'transfer-stewardship': 'Hand over a shire',
   'collect-income': 'Collect income',
   'recruit-soldiers': 'Recruit soldiers',
   'build-ship': 'Build a ship',
-  trade: 'Trade',
+  reinforce: 'Reinforce a settlement',
+  trade: 'Trade at market',
+  give: 'Give to another player',
 };
 
 const NOTES = {
-  'collect-income': 'Income from your lands, and two momentum.',
+  'collect-income': 'Momentum, then whatever your lands pay.',
   'recruit-soldiers': 'Five silver for one soldier.',
-  'build-ship': 'Two silver for the first each turn, four after.',
+  'build-ship': 'Only where there is a yard, if you are a Saxon.',
+  reinforce: 'One momentum. Circles a settlement so it must be stormed.',
   trade: 'Three silver buys a food; a food sells for two silver.',
+  give: 'Silver, food and ships only. Soldiers are yours alone.',
   'declare-initiative-target': 'Only if you hold an initiative token.',
+  'transfer-stewardship': 'They collect its income, and must hold it.',
+  'swear-allegiance': 'Their crowns then count as support for you.',
 };
+
+/** Verbs that need the player to say more before they mean anything. */
+export const NEEDS_CHOICE = new Set([
+  'trade', 'give', 'reinforce', 'transfer-stewardship',
+  'swear-allegiance', 'declare-initiative-target',
+]);
 
 export class RbActionList extends HTMLElement {
   set data(value) { this._data = value; this._render(); }
@@ -62,7 +75,7 @@ export class RbActionList extends HTMLElement {
     this.innerHTML = `<ul class="rb-actions">${actions.map((action) => `
       <li class="rb-action" data-ok="${action.ok}">
         <button type="button" data-verb="${action.verb}" ${action.ok ? '' : 'disabled'}>
-          ${LABELS[action.verb] ?? action.verb}
+          ${LABELS[action.verb] ?? action.verb}${NEEDS_CHOICE.has(action.verb) ? '…' : ''}
         </button>
         <span class="rb-action-note">${
   action.ok ? (NOTES[action.verb] ?? '') : escape(action.reason ?? '')}</span>
