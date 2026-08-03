@@ -1495,6 +1495,55 @@ export const COMMANDS = {
     },
   },
 
+  /**
+   * Write down what was promised, and by whom.
+   *
+   * Foreign Influence is the one Aftermath counter with no number behind it —
+   * it is the facilitator's account of what England sold to the Franks, the
+   * Britons, the Danish Kings and Rome. Trying to remember four courts' worth
+   * of bargains at the debrief is how that line ends up blank, so each is
+   * written as it is struck.
+   *
+   * Promises are kept even when they are broken. A concession that was made
+   * and then reneged on is struck through rather than deleted, because the
+   * epilogue is about what England did, not about what is still true.
+   */
+  'facilitator:record-concession': {
+    phases: '*',
+    actor: 'facilitator',
+    admit(ctx) {
+      const { npcFaction, roleId, text } = ctx.cmd.payload ?? {};
+      if (!ctx.data.factions.npc[npcFaction]) return no('no such court');
+      if (roleId && !ctx.state.roles[roleId]) return no('no such character');
+      return String(text ?? '').trim() ? ok() : no('what was promised?');
+    },
+    effects(draft, ctx) {
+      const { npcFaction, roleId, text } = ctx.cmd.payload;
+      const id = `concession:${Object.keys(draft.concessions).length + 1}`;
+      draft.concessions[id] = {
+        id,
+        npcFaction,
+        roleId: roleId ?? null,
+        text: String(text).trim(),
+        turn: draft.phase.turn,
+        at: ctx.now,
+        kept: true,
+      };
+    },
+  },
+
+  /** Mark a promise broken, without pretending it was never made. */
+  'facilitator:strike-concession': {
+    phases: '*',
+    actor: 'facilitator',
+    admit(ctx) {
+      return ctx.state.concessions[ctx.cmd.payload?.concessionId] ? ok() : no('no such promise');
+    },
+    effects(draft, ctx) {
+      draft.concessions[ctx.cmd.payload.concessionId].kept = false;
+    },
+  },
+
   // --- battle phase --------------------------------------------------------
   /** Throw in with an attack, or stand against one. */
   'join-battle': {

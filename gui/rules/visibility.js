@@ -159,6 +159,14 @@ export const FIELD_VISIBILITY = [
     audience: OWNER,
     owner: (segments, state) => state.envoys[segments[1]]?.roleId ?? null,
   },
+  // What Wessex promised Rome is exactly what another player would pay to
+  // know, so a concession is visible only to whoever made it — until the
+  // epilogue, which is the facilitator reading the whole ledger out.
+  {
+    path: 'concessions.**',
+    audience: OWNER,
+    owner: (segments, state) => state.concessions[segments[1]]?.roleId ?? null,
+  },
   { path: 'aftermath.**', audience: PUBLIC },
 ];
 

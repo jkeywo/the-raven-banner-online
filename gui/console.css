@@ -835,6 +835,36 @@ rb-clash-panel { display: block; }
 .rb-gaps dt { font-weight: 600; margin-top: 0.6rem; }
 .rb-gaps dd { margin: 0.15rem 0 0; color: var(--rb-muted); }
 
+/* --- the courts, and what was promised them ------------------------------- */
+
+.rb-court-brief { margin: 0.4rem 0; font-size: 0.85rem; }
+.rb-court-brief summary { cursor: pointer; font-family: var(--rb-serif); }
+.rb-court-brief p { margin: 0.35rem 0; }
+
+.rb-openings { display: grid; gap: 0.25rem; margin-top: 0.4rem; }
+.rb-openings button {
+  text-align: left;
+  font-style: italic;
+  font-size: 0.8rem;
+  padding: 0.3rem 0.5rem;
+}
+
+.rb-concede { display: flex; align-items: flex-end; gap: 0.4rem; }
+.rb-concede label { display: grid; gap: 0.15rem; flex: 1; font-size: 0.8rem; }
+.rb-concede input {
+  font: inherit;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--rb-rule);
+  border-radius: 3px;
+  background: #fff;
+  width: 100%;
+}
+
+.rb-ledger { list-style: none; margin: 0.5rem 0 0; padding: 0; display: grid; gap: 0.2rem; }
+.rb-ledger li { display: flex; align-items: baseline; gap: 0.4rem; font-size: 0.8rem; }
+.rb-ledger li[data-kept="false"] { color: var(--rb-muted); }
+.rb-ledger button { font-size: 0.7rem; padding: 0.1rem 0.4rem; }
+
 /* --- elections ------------------------------------------------------------ */
 
 .rb-crown-panel { margin-bottom: 1.5rem; }

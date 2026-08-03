@@ -54,8 +54,7 @@ export class RbEnvoyQueue extends HTMLElement {
             ${waiting ? '<span class="rb-waiting">waiting on you</span>' : ''}
             ${thread.open ? '' : '<span class="rb-meta">closed</span>'}
           </header>
-          ${npc.wants ? `<p class="rb-meta">They want ${escape(npc.wants)}.
-            They can offer ${escape(npc.offers ?? 'little')}.</p>` : ''}
+          ${this._court(npc)}
           <ol class="rb-messages">${thread.messages.map((m) => `
             <li class="rb-message" data-mine="${m.from !== thread.roleId}">
               <span class="rb-message-who">${m.from === thread.roleId
@@ -71,13 +70,83 @@ export class RbEnvoyQueue extends HTMLElement {
               ${thread.open ? `<button type="button" data-close="${thread.id}">Close it</button>` : ''}
             </div>
           </form>
+
+          <form class="rb-envoy-form rb-concede" data-concede="${thread.id}">
+            <label>What did they promise?
+              <input name="text" maxlength="300"
+                placeholder="e.g. Sussex, held of the Franks">
+            </label>
+            <button type="submit">Write it down</button>
+          </form>
+          ${this._ledgerFor(thread.npcFaction, thread.roleId)}
         </section>`;
     }).join('')}</div>`;
 
     this._wire();
   }
 
+  /**
+   * The briefing for one court.
+   *
+   * Enough to be played cold, because the facilitator is four foreign powers
+   * at once while also running a clock. The openings are buttons rather than
+   * prose: pressing one drops it into the reply box, where it can be edited
+   * before it is sent, which is faster than remembering the line and typing it.
+   */
+  _court(npc) {
+    return `
+      <details class="rb-court-brief">
+        <summary>${escape(npc.name)} — what they want</summary>
+        ${npc.who ? `<p>${escape(npc.who)}</p>` : ''}
+        <p class="rb-meta">They want ${escape(npc.wants ?? 'little')}.
+          They can offer ${escape(npc.offers ?? 'little')}.</p>
+        ${npc.note ? `<p class="rb-warn">${escape(npc.note)}</p>` : ''}
+        ${(npc.asks ?? []).length ? `<p class="rb-meta">Press for:
+          ${npc.asks.map(escape).join('; ')}.</p>` : ''}
+        ${(npc.openings ?? []).length ? `<div class="rb-openings">${npc.openings
+    .map((line) => `<button type="button" data-opening="${escape(line)}"
+            >${escape(line)}</button>`).join('')}</div>` : ''}
+      </details>`;
+  }
+
+  /** What this player has already promised this court. */
+  _ledgerFor(npcFaction, roleId) {
+    const promises = Object.values(this._state.concessions ?? {})
+      .filter((c) => c.npcFaction === npcFaction && c.roleId === roleId);
+    if (!promises.length) return '';
+    return `<ul class="rb-ledger">${promises.map((c) => `
+      <li data-kept="${c.kept}">
+        <span>${c.kept ? '' : '<s>'}${escape(c.text)}${c.kept ? '' : '</s>'}</span>
+        <span class="rb-meta">turn ${c.turn}</span>
+        ${c.kept ? `<button type="button" data-strike="${c.id}">broken</button>` : ''}
+      </li>`).join('')}</ul>`;
+  }
+
   _wire() {
+    // An opening goes into the box rather than out on the wire: the umpire
+    // should get the last word on what a king actually says.
+    for (const button of this.querySelectorAll('[data-opening]')) {
+      button.onclick = () => {
+        const box = button.closest('.rb-envoy-item').querySelector('textarea');
+        box.value = button.dataset.opening;
+        box.focus();
+      };
+    }
+    for (const form of this.querySelectorAll('[data-concede]')) {
+      form.onsubmit = (event) => {
+        event.preventDefault();
+        const text = form.elements.text.value.trim();
+        if (!text) return;
+        const thread = this._state.envoys[form.dataset.concede];
+        this._emit('facilitator:record-concession',
+          { npcFaction: thread.npcFaction, roleId: thread.roleId, text });
+        form.elements.text.value = '';
+      };
+    }
+    for (const button of this.querySelectorAll('[data-strike]')) {
+      button.onclick = () => this._emit('facilitator:strike-concession',
+        { concessionId: button.dataset.strike });
+    }
     for (const form of this.querySelectorAll('[data-reply]')) {
       form.onsubmit = (event) => {
         event.preventDefault();

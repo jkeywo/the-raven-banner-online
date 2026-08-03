@@ -49,6 +49,7 @@ entities:
         - consent-request-state
         - trade-contract-record
         - crown-holders
+        - concession-record
       coordinates:
         - command-admission
         - view-projector

@@ -66,6 +66,7 @@ export class RbPrivateSheet extends HTMLElement {
       ${this._income(derived.income)}
       ${this._lands(held)}
       ${this._claims(role.claims ?? [])}
+      ${this._promises()}
       ${this._brief(this._view.brief)}
     `;
   }
@@ -140,6 +141,27 @@ export class RbPrivateSheet extends HTMLElement {
       ${crowns.length ? `<h3>Claims</h3><p>${crowns.map((c) => (
     taken.includes(c) ? `<s>${title(c)}</s>` : title(c))).join(', ')}
         ${taken.length ? '<span class="rb-warn">crowned elsewhere</span>' : ''}</p>` : ''}`;
+  }
+
+  /**
+   * What you have promised foreign powers.
+   *
+   * Yours only — what Wessex offered Rome is exactly what another player would
+   * pay to know, and the projection never sends it to them. It is here because
+   * a bargain struck three turns ago is easy to forget and the epilogue will
+   * not have forgotten it.
+   */
+  _promises() {
+    const mine = Object.values(this._view.concessions ?? {});
+    if (!mine.length) return '';
+    return `
+      <h3>What you have promised</h3>
+      <ul class="rb-ledger">${mine.map((c) => `
+        <li data-kept="${c.kept}">
+          <span>${c.kept ? '' : '<s>'}${escape(c.text)}${c.kept ? '' : '</s>'}</span>
+          <span class="rb-meta">${escape(this._data.factions.npc[c.npcFaction]?.name
+    ?? c.npcFaction)}, turn ${c.turn}</span>
+        </li>`).join('')}</ul>`;
   }
 
   _brief(brief) {

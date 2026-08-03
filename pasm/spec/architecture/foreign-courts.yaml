@@ -1,0 +1,111 @@
+entities:
+  - mechanic: court-briefings
+    core:
+      status: implemented
+      confidence: confirmed
+      title: Court Briefings
+      summary: >-
+        Each of the four powers nobody plays carries who they are, what they
+        want, what they can offer, what to press for, and lines to open with —
+        enough to be played cold from the queue.
+      rationale:
+        - "The facilitator is the Franks, the Britons, the Danish Kings and Rome simultaneously, while also running a clock. \"Play them shrewdly\" is not a line you can say to a player who is waiting for an answer."
+        - Openings are buttons that fill the reply box rather than messages that send themselves. The umpire keeps the last word on what a king actually says.
+        - Rome's briefing carries the guide's own warning that none of its concessions have a game effect, so the facilitator plays the political control rather than fumbling for a price.
+        - The material lives in the gamespec exporter beside the rest of the printed game, not in the web app, because it is transcribed from the Facilitators Guide rather than invented.
+    game_design:
+      participating_roles:
+        - facilitator
+    implementation:
+      status: declared
+      paths:
+        - data/factions.json
+      tests:
+        - npm test
+    evidence:
+      - kind: source-document
+        reference: Raven Banner Facilitators Guide v1.1.pdf, pages 14-16
+        summary: >-
+          Four courts described at length, each with a "What they want" and
+          "What they can offer" paragraph, plus the note that Rome's
+          concessions have no in-game effect.
+      - kind: test
+        reference: tests/components/envoy-queue.test.js
+        summary: >-
+          Every court has a description, wants, offers, asks and at least two
+          openings, and an opening lands in the reply box without sending.
+
+  - mechanic: concessions-ledger
+    core:
+      status: implemented
+      confidence: confirmed
+      title: Concessions Ledger
+      summary: >-
+        What each player promised each foreign court, written down as it is
+        struck, and struck through rather than deleted when it is broken.
+      rationale:
+        - Foreign Influence is the only Aftermath counter with no number behind it. It is the facilitator's account of what England sold, and trying to remember four courts' worth of bargains at the debrief is how that line ends up blank.
+        - A broken promise stays on the ledger with a line through it, because the epilogue is about what England did rather than about what is still true at the end.
+        - Private to whoever made it. What Wessex offered Rome is exactly what another player would pay to know, and the projection never sends it to them — until the facilitator reads the whole ledger out.
+      references:
+        - concession-record
+    implementation:
+      status: declared
+      tests:
+        - npm test
+    evidence:
+      - kind: test
+        reference: tests/rules/concessions.test.js
+        summary: >-
+          A promise reaches the player who made it and no other player, reaches
+          the facilitator in full, survives replay, and stays on the record with
+          kept set false once it is broken.
+
+  - state: concession-record
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Concession Record
+      summary: One promise — which court, which player, what was promised, on which turn, and whether it was kept.
+      rationale:
+        - Keyed by id rather than held in a list, so the projector can walk into it and redact per promise. A list is one leaf to the manifest, and one leaf can only be all-public or all-private.
+        - A promise with no player attached is allowed. Some deals are struck by a faction rather than a person, and the epilogue still wants them.
+    architecture:
+      classification: authoritative
+      owner: game-host
+      writers:
+        - game-host
+
+  - message: record-concession-command
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Record Concession
+      summary: The facilitator writes down what a player promised a court.
+    architecture:
+      authority: request
+      producer:
+        - client-command-gateway
+      consumer:
+        - command-admission
+      validator:
+        - command-admission
+      trust_boundary: facilitator
+      payload: court-role-and-text
+
+  - message: strike-concession-command
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Strike Concession
+      summary: The facilitator marks a promise broken, without pretending it was never made.
+    architecture:
+      authority: request
+      producer:
+        - client-command-gateway
+      consumer:
+        - command-admission
+      validator:
+        - command-admission
+      trust_boundary: facilitator
+      payload: concession-identifier

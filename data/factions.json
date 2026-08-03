@@ -1,5 +1,5 @@
 {
- "_generated": "raven_banner gamespec @ analogue-projects f3d620a via tools/export_web_data.py",
+ "_generated": "raven_banner gamespec @ analogue-projects 2966f91 via tools/export_web_data.py",
  "_doNotEdit": true,
  "starting": {
   "D": "Danish Invasion",
@@ -44,22 +44,67 @@
   "britons": {
    "name": "the Britons",
    "wants": "silver, and the border shires they still remember holding",
-   "offers": "food, soldiers, and raids on whoever you name"
+   "offers": "food, soldiers, and raids on whoever you name",
+   "who": "Strathclyde, North Wales, South Wales and Cornwall, each with its own king and its own grievance. Strathclyde has been fighting the Dublin vikings and has least to give. The Welsh want the marches back. Kernow is short of soldiers but rich on tin, and has allied with vikings before.",
+   "openings": [
+    "We remember when Bernicia was ours. Perhaps it could be again.",
+    "Our tin buys soldiers. Whose fields would you like burned?",
+    "The Saxons built a dyke to keep us out. Why should we help them now?"
+   ],
+   "asks": [
+    "a border shire gifted back - Bernicia, the marches or the West Country",
+    "silver, in quantity",
+    "a promise not to march west"
+   ]
   },
   "franks": {
    "name": "the Franks",
    "wants": "English territory, or a vassal who answers to them",
-   "offers": "money, soldiers, infrastructure, a fleet, and refuge"
+   "offers": "money, soldiers, infrastructure, a fleet, and refuge",
+   "who": "West Francia under Charles the Bald, busy early with his brothers and his own rebels, and by the middle of the game crowned Emperor with time and money to spend.",
+   "openings": [
+    "Silver we can spare, for a small favour. Land is another matter.",
+    "Claim Sussex, and hold it of us. You would not be the first.",
+    "If England becomes untenable our ports are open - bring something worth carrying."
+   ],
+   "asks": [
+    "a minor noble claiming Sussex or Kent as a Frankish vassal",
+    "a port, or the promise of one",
+    "a hostage worth having"
+   ]
   },
   "danish_kings": {
    "name": "the Danish Kings",
    "wants": "silver, tribute, land and fealty",
-   "offers": "ships and soldiers"
+   "offers": "ships and soldiers",
+   "who": "Not a state but a crowd of petty kings and minor lords, from Denmark to the Black Sea. The expeditions to England were well provisioned already, so more men means more owed.",
+   "openings": [
+    "You were sent well supplied. What have you sent home?",
+    "Ships we have. What are they buying?",
+    "Favourable terms at an English port would interest us more than silver."
+   ],
+   "asks": [
+    "credible promises of favourable trade at English ports",
+    "tribute, now and every turn",
+    "fealty from a Danish player"
+   ]
   },
   "pope": {
    "name": "the Pope",
    "wants": "episcopal freedom, monastic reform, and conversions",
-   "offers": "silver, defended settlements, mercenaries and soldiers"
+   "offers": "silver, defended settlements, mercenaries and soldiers",
+   "who": "Rome, the most powerful institution in the world, looking at an English church that is neither unified nor orthodox - and at Mercia, whose teaching has taken on pagan colour.",
+   "openings": [
+    "Give your bishops their freedom, and Rome will remember it.",
+    "The Mercian church has strayed. Who will bring it back?",
+    "A heathen baptised is worth more to us than a heathen killed."
+   ],
+   "asks": [
+    "bishops freed from the king's appointment",
+    "the monasteries reformed",
+    "a named pagan brought to baptism"
+   ],
+   "note": "None of Rome's concessions have a game effect. Play the political control they hand Rome over the English faithful, and what that takes away from a king."
   }
  },
  "envoy": {

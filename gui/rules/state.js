@@ -124,6 +124,12 @@ export function createInitialState({ joinCode, seed, data, roleIds }) {
     contracts: [],
     votes: {},
     envoys: {},
+    // What was promised to the powers nobody plays. Written by the
+    // facilitator as each deal is struck, because the alternative is trying to
+    // remember four courts' worth of bargains at the debrief.
+    // Keyed rather than a list, so the projector can walk into it and show
+    // each promise only to whoever made it.
+    concessions: {},
     aftermath: { foreignInfluence: '' },
     facilitatorNotes: {},
     log: [],
