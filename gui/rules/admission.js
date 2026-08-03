@@ -59,7 +59,21 @@ export function availableTo(state, data, actor) {
     .filter(([, spec]) => spec.actor === actor.kind || actor.kind === 'facilitator')
     .filter(([, spec]) => spec.phases === '*' || spec.phases.includes(state.phase.name))
     .map(([verb, spec]) => {
-      const verdict = admit(state, data, { verb, payload: {} }, actor);
+      // A client calls this against a redacted projection, which is
+      // state-shaped but has holes where other people's secrets were. A rule
+      // that reaches into one gets treated as unanswerable-from-here rather
+      // than being allowed to take the whole console down — the host will
+      // answer it properly when the command actually arrives.
+      let verdict;
+      try {
+        // Some commands are meaningless without a choice — trading needs a
+        // direction. Probing with an empty payload would report those as
+        // refused for a reason about the message rather than about the game,
+        // which reads to a player as "you can't" when the answer is "which?".
+        verdict = admit(state, data, { verb, payload: spec.probe ?? {} }, actor);
+      } catch {
+        return { verb, ok: false, reason: 'cannot tell from here', hostOnly: true };
+      }
       return {
         verb,
         ok: verdict.ok,

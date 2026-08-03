@@ -21,6 +21,30 @@ import { incomeFor } from './derive.js';
 /** Phases in which resources may change hands. Not during a battle. */
 const TRADEABLE_PHASES = ['team', 'maintenance', 'encounter'];
 
+/**
+ * When the phase now beginning should end.
+ *
+ * A deadline rather than a countdown, so a client works out what is left from
+ * the clock on the wall. A browser that has been in a background tab has had
+ * its timers throttled to about once a second and would otherwise come back
+ * minutes adrift — which, in a game whose phases are five minutes long, is the
+ * difference between having time to act and not.
+ *
+ * The lobby and the epilogue have no deadline: neither is a phase anybody is
+ * waiting out.
+ */
+export function phaseEndsAt(state, data, payload, now) {
+  if (payload?.endsAt !== undefined) return payload.endsAt;
+  const printed = data.meta.phases.find((p) => p.id === state.phase.name);
+  return printed ? now + Number(printed.minutes) * 60_000 : null;
+}
+
+/** How long is left, or how far past time we are. Negative means overtime. */
+export function remainingMs(phase, now) {
+  if (phase.paused) return phase.pausedRemainingMs ?? 0;
+  return phase.endsAt === null ? null : phase.endsAt - now;
+}
+
 const ok = () => ({ ok: true });
 const no = (reason) => ({ ok: false, reason });
 
@@ -176,6 +200,10 @@ export const COMMANDS = {
   trade: {
     phases: TRADEABLE_PHASES,
     actor: 'player',
+    // What "could you trade at all?" means, for an action list asking without
+    // a player having chosen a direction yet. Selling food is the cheaper of
+    // the two, so it is the one that answers the question honestly.
+    probe: { give: 'food' },
     admit(ctx) {
       const role = ctx.state.roles[subjectOf(ctx)];
       const limit = ctx.data.roles.roles[subjectOf(ctx)].archetype === 'danish_trader' ? 2 : 1;
@@ -199,18 +227,24 @@ export const COMMANDS = {
   'facilitator:advance-phase': {
     phases: '*',
     actor: 'facilitator',
-    admit: ok,
-    effects(draft, ctx) {
+    admit(ctx) {
+      return ctx.state.phase.name === 'epilogue' ? no('the game is over') : ok();
+    },
+    effects(draft, ctx, { data }) {
       const at = PHASES.indexOf(draft.phase.name);
       if (draft.phase.name === 'lobby') {
         draft.phase.name = PHASES[0];
       } else if (at === PHASES.length - 1) {
-        draft.phase.turn += 1;
-        draft.phase.name = PHASES[0];
-        for (const role of Object.values(draft.roles)) {
-          role.perTurn = { shipsBuilt: 0, tradesUsed: 0 };
+        if (draft.phase.turn >= Number(data.meta.turns)) {
+          draft.phase.name = 'epilogue';
+        } else {
+          draft.phase.turn += 1;
+          draft.phase.name = PHASES[0];
+          for (const role of Object.values(draft.roles)) {
+            role.perTurn = { shipsBuilt: 0, tradesUsed: 0 };
+          }
+          draft.initiative.declared = {};
         }
-        draft.initiative.declared = {};
       } else {
         draft.phase.name = PHASES[at + 1];
       }
@@ -220,7 +254,56 @@ export const COMMANDS = {
           declaration.revealed = true;
         }
       }
-      draft.phase.endsAt = ctx.cmd.payload?.endsAt ?? null;
+      draft.phase.paused = false;
+      draft.phase.pausedRemainingMs = null;
+      draft.phase.endsAt = phaseEndsAt(draft, data, ctx.cmd.payload, ctx.now);
+    },
+  },
+
+  /**
+   * Stop and restart the clock.
+   *
+   * Paused, the deadline means nothing, so what is left is stored instead and
+   * a new deadline is worked out on the way back. Without that, a five-minute
+   * pause to sort out a rules argument would eat the phase it interrupted.
+   */
+  'facilitator:pause-clock': {
+    phases: '*',
+    actor: 'facilitator',
+    admit(ctx) {
+      return ctx.state.phase.endsAt === null && !ctx.state.phase.paused
+        ? no('there is no clock running') : ok();
+    },
+    effects(draft, ctx) {
+      if (draft.phase.paused) {
+        draft.phase.endsAt = ctx.now + (draft.phase.pausedRemainingMs ?? 0);
+        draft.phase.paused = false;
+        draft.phase.pausedRemainingMs = null;
+      } else {
+        draft.phase.pausedRemainingMs = Math.max(0, draft.phase.endsAt - ctx.now);
+        draft.phase.paused = true;
+        draft.phase.endsAt = null;
+      }
+    },
+  },
+
+  /** Give a phase more time, or take some back. Minutes, plus or minus. */
+  'facilitator:extend-clock': {
+    phases: '*',
+    actor: 'facilitator',
+    admit(ctx) {
+      const minutes = Number(ctx.cmd.payload?.minutes);
+      if (!Number.isFinite(minutes) || minutes === 0) return no('say how many minutes');
+      return ctx.state.phase.endsAt === null && !ctx.state.phase.paused
+        ? no('there is no clock running') : ok();
+    },
+    effects(draft, ctx) {
+      const by = Number(ctx.cmd.payload.minutes) * 60_000;
+      if (draft.phase.paused) {
+        draft.phase.pausedRemainingMs = Math.max(0, (draft.phase.pausedRemainingMs ?? 0) + by);
+      } else {
+        draft.phase.endsAt = Math.max(ctx.now, draft.phase.endsAt + by);
+      }
     },
   },
 

@@ -23,6 +23,8 @@ import '../components/rb-seat-roster.js';
 import '../components/rb-map.js';
 import '../components/rb-private-sheet.js';
 import '../components/rb-aftermath.js';
+import '../components/rb-phase-clock.js';
+import '../components/rb-action-list.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -167,8 +169,9 @@ export async function startPlayerApp({ location = window.location } = {}) {
       selectPane('map');
     }
     $('game-role').textContent = data.roles.roles[mine]?.name ?? mine;
-    $('game-phase').textContent = view.phase.name === 'lobby'
-      ? 'Waiting to begin' : `Turn ${view.phase.turn} · ${view.phase.name} phase`;
+    $('clock').phase = view.phase;
+    $('actions').data = data;
+    $('actions').view = view;
 
     $('map').data = data;
     $('map').view = view;
@@ -203,6 +206,21 @@ export async function startPlayerApp({ location = window.location } = {}) {
     if (sent) client.awaiting(envelope.data.seq, 'claim-role');
     else $('claim-error').textContent = 'Not connected yet — try again in a moment.';
   });
+
+  // An action is a request like any other: sent, and then whatever the host
+  // says is what happened.
+  document.addEventListener('click', (event) => {
+    const button = event.target.closest('#actions [data-verb]');
+    if (!button) return;
+    const { envelope, sent } = sendCommand(button.dataset.verb, payloadFor(button.dataset.verb));
+    if (sent) client.awaiting(envelope.data.seq, button.dataset.verb);
+  });
+
+  /** The few verbs that need more than "do it". Fuller choosers land with M7. */
+  function payloadFor(verb) {
+    if (verb === 'trade') return { give: 'food' };
+    return {};
+  }
 
   // A link with the code already in it skips the first screen.
   if (joinCode) {

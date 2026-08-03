@@ -35,7 +35,9 @@ export function apply(state, data, cmd, actor, meta = {}) {
 
   const spec = COMMANDS[cmd.verb];
   const draft = structuredClone(state);
-  const ctx = { state, data, cmd, actor };
+  // `now` comes in with the command rather than being read from the clock, so
+  // a replay reproduces the same deadlines it did the first time.
+  const ctx = { state, data, cmd, actor, now: meta.ts ?? 0 };
 
   // Dice are drawn through here so every roll advances the cursor stored in
   // state. An effect that reached for its own randomness would make the game

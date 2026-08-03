@@ -179,9 +179,25 @@ entities:
       rationale:
         - Derived from a wall-clock deadline rather than an accumulated tick count, so a backgrounded and throttled tab still shows the right remaining time.
         - The facilitator can pause, extend and advance, because a paper megagame's clock has always been a person with a watch and an opinion.
+        - It runs past zero into overtime rather than stopping, and never advances a phase by itself. A phase ends when the facilitator calls it, which is how the paper game works and how every negotiation that has ever overrun gets to finish its sentence.
+        - Pausing stores what was left rather than keeping the deadline, so five minutes spent settling a rules argument does not eat the phase it interrupted.
     game_design:
       participating_roles:
         - primary-facilitator
+      architecture_links:
+        - player-command-message
+      enforcement_links:
+        - command-admission
+    implementation:
+      status: declared
+      paths:
+        - gui/components/rb-phase-clock.js
+        - gui/components/rb-action-list.js
+      symbols:
+        - RbPhaseClock
+        - RbActionList
+      tests:
+        - npm test
 
   - resource: momentum
     core:

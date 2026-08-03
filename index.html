@@ -62,7 +62,7 @@
       <header class="rb-game-head">
         <div>
           <h1 id="game-role"></h1>
-          <p class="rb-meta" id="game-phase"></p>
+          <rb-phase-clock id="clock"></rb-phase-clock>
         </div>
         <nav id="game-tabs" class="rb-tabs" role="tablist">
           <button type="button" role="tab" data-pane="map" aria-selected="true">The board</button>
@@ -78,8 +78,12 @@
         </aside>
       </div>
 
-      <div data-pane-body="me" class="rb-pane" hidden>
+      <div data-pane-body="me" class="rb-pane rb-pane-me" hidden>
         <rb-private-sheet id="sheet"></rb-private-sheet>
+        <aside class="rb-actions-panel">
+          <h2>What you can do</h2>
+          <rb-action-list id="actions"></rb-action-list>
+        </aside>
       </div>
 
       <div data-pane-body="aftermath" class="rb-pane" hidden>

@@ -19,6 +19,7 @@ import { mintJoinCode, mintFacilitatorPin, playerLink } from '../net/join-code.j
 import { mintSeed } from '../rules/rng.js';
 import '../components/rb-connection-dot.js';
 import '../components/rb-seat-roster.js';
+import '../components/rb-phase-clock.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -137,6 +138,31 @@ export async function startHostApp({ location = window.location } = {}) {
     roster.seats = host.roster();
     const claimed = host.roster().filter((s) => s.roleId).length;
     $('seated-count').textContent = `${claimed} of ${Object.keys(host.state.roles).length} roles claimed`;
+
+    const phase = host.state.phase;
+    $('clock').phase = phase;
+    $('advance-phase').textContent = phase.name === 'lobby' ? 'Begin the game'
+      : phase.name === 'epilogue' ? 'The game is over' : 'Next phase';
+    $('advance-phase').disabled = phase.name === 'epilogue';
+    $('pause-clock').textContent = phase.paused ? 'Resume' : 'Pause';
+    // Nothing to pause or stretch before the game starts, or after it ends.
+    const running = phase.endsAt !== null || phase.paused;
+    for (const id of ['pause-clock', 'extend-clock', 'shorten-clock']) $(id).disabled = !running;
+  }
+
+  /** The facilitator acts as themselves — a seat of their own on this tab. */
+  function asFacilitator(verb, payload = {}) {
+    const seat = { id: 'host', kind: 'facilitator', roleId: null };
+    const result = host.submit(seat, { verb, payload });
+    if (!result.ok) appendLog(`[host] refused: ${result.reason}`);
+  }
+
+  $('advance-phase').addEventListener('click', () => asFacilitator('facilitator:advance-phase'));
+  $('pause-clock').addEventListener('click', () => asFacilitator('facilitator:pause-clock'));
+  for (const id of ['extend-clock', 'shorten-clock']) {
+    $(id).addEventListener('click', (event) => asFacilitator('facilitator:extend-clock', {
+      minutes: Number(event.currentTarget.dataset.minutes),
+    }));
   }
 
   $('copy-link').addEventListener('click', async () => {

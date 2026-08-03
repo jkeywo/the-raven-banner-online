@@ -62,6 +62,7 @@ entities:
         - host-peer-listener
         - room-addressing
         - shared-console-components
+        - phase-clock
     implementation:
       status: declared
       paths:
@@ -204,6 +205,7 @@ entities:
         - wire-protocol
         - room-addressing
         - shared-console-components
+        - phase-clock
     implementation:
       status: declared
       paths:

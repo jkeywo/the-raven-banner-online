@@ -39,6 +39,20 @@
 
     <!-- running ------------------------------------------------------------ -->
     <section id="screen-running" class="rb-panel rb-wide" hidden>
+      <section class="rb-run-control">
+        <rb-phase-clock id="clock"></rb-phase-clock>
+        <div class="rb-clock-buttons">
+          <button id="advance-phase" type="button" class="rb-primary">Next phase</button>
+          <button id="pause-clock" type="button">Pause</button>
+          <button id="extend-clock" type="button" data-minutes="1">+1 min</button>
+          <button id="shorten-clock" type="button" data-minutes="-1">−1 min</button>
+        </div>
+        <p class="rb-meta">
+          The clock runs past zero rather than stopping. A phase ends when you
+          say it does — every negotiation overruns a little.
+        </p>
+      </section>
+
       <div class="rb-columns">
         <div>
           <h1>Game <span id="join-code" class="rb-code"></span></h1>

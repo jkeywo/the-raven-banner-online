@@ -528,3 +528,76 @@ h3 { font-family: var(--rb-serif); font-size: 1rem; margin: 1.6rem 0 0.4rem; }
   .rb-detail { grid-template-columns: 1fr; gap: 0 0; }
   .rb-detail dd { margin-bottom: 0.5rem; }
 }
+
+/* --- the phase clock ----------------------------------------------------- */
+
+rb-phase-clock { display: block; }
+
+.rb-clock-turn {
+  font-family: var(--rb-serif);
+  font-size: 1.05rem;
+}
+
+.rb-clock-time time {
+  font-family: ui-monospace, 'Cascadia Mono', Menlo, monospace;
+  font-size: 2.4rem;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.rb-clock-note { color: var(--rb-muted); font-size: 0.82rem; }
+
+rb-phase-clock[data-state="soon"] time { color: var(--rb-amber); }
+rb-phase-clock[data-state="over"] time { color: var(--rb-blood); }
+rb-phase-clock[data-state="paused"] time { color: var(--rb-muted); }
+rb-phase-clock[data-state="paused"] .rb-clock-time::after { content: ' paused'; font-size: 0.8rem; color: var(--rb-muted); }
+
+.rb-run-control {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.4rem 1.5rem;
+  align-items: center;
+  background: var(--rb-parchment);
+  border: 1px solid var(--rb-rule);
+  border-radius: 3px;
+  padding: 1rem 1.2rem;
+  margin-bottom: 1.5rem;
+}
+
+.rb-run-control .rb-meta { grid-column: 1 / -1; margin: 0; }
+.rb-clock-buttons { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+
+/* --- the action list ----------------------------------------------------- */
+
+.rb-pane-me {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(15rem, 1fr);
+  gap: 2rem;
+  align-items: start;
+}
+
+@media (max-width: 60rem) {
+  .rb-pane-me { grid-template-columns: 1fr; }
+}
+
+.rb-actions-panel {
+  background: var(--rb-parchment);
+  border: 1px solid var(--rb-rule);
+  border-radius: 3px;
+  padding: 0.4rem 1.1rem 1.1rem;
+  position: sticky;
+  top: 1rem;
+}
+
+.rb-actions { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.7rem; }
+.rb-action button { width: 100%; text-align: left; }
+.rb-action[data-ok="false"] button { border-style: dashed; }
+
+.rb-action-note {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--rb-muted);
+  margin-top: 0.15rem;
+}
+
+.rb-action[data-ok="false"] .rb-action-note { color: var(--rb-blood); }
