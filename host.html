@@ -43,6 +43,19 @@
         <ul id="resume-list" class="rb-resumes"></ul>
       </div>
 
+      <h2>Or help run somebody else's</h2>
+      <p class="rb-meta">
+        The other facilitator holds the game. You get the same console over the
+        wire, and a full copy of the game on this machine — so if their laptop
+        dies, you can pick it up without anybody re-entering anything.
+      </p>
+      <form id="join-as-co" class="rb-co-form">
+        <label>Game code <input id="co-code" maxlength="8" autocomplete="off"></label>
+        <label>Facilitator PIN <input id="co-pin" maxlength="8" autocomplete="off"></label>
+        <label>Your name <input id="co-name" maxlength="40" autocomplete="off"></label>
+        <button type="submit">Join as co-facilitator</button>
+      </form>
+
       <h2>Or open a saved game</h2>
       <p class="rb-meta">
         A downloaded save can be opened on any machine — this is how a game
@@ -53,6 +66,15 @@
 
     <!-- running ------------------------------------------------------------ -->
     <section id="screen-running" class="rb-panel rb-wide" hidden>
+      <section id="co-banner" class="rb-co-banner" hidden>
+        <p>
+          <strong>You are the co-facilitator.</strong>
+          The game is on the other machine and mirrored here.
+          <span id="co-mirror" class="rb-meta"></span>
+        </p>
+        <button id="take-over" type="button">Take over hosting</button>
+      </section>
+
       <section class="rb-run-control">
         <rb-phase-clock id="clock"></rb-phase-clock>
         <div class="rb-clock-buttons">

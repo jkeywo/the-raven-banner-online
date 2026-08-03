@@ -37,9 +37,10 @@ entities:
       title: Game Host
       summary: >-
         Owns authoritative state and the pipeline that changes it — admit,
-        reduce, log, persist, reproject, broadcast.
+        reduce, log, persist, reproject.
       rationale:
         - Facilitator overrides travel this same pipeline rather than mutating state directly, which keeps the game replayable from its seed and log and keeps "what did the umpire change?" answerable.
+        - Knows nothing about the console that drives it or the transport that reaches it. That is what lets a co-facilitator build one from a mirrored log and carry on hosting.
     architecture:
       kind: host-coordinator
       authority: authoritative
@@ -61,8 +62,42 @@ entities:
         - authoritative-game-state
         - command-admission
         - view-projector
-        - host-peer-listener
-        - room-addressing
+    implementation:
+      status: declared
+      paths:
+        - gui/host/game-host.js
+        - gui/host/persistence.js
+      symbols:
+        - GameHost
+        - Persistence
+        - parseSave
+      tests:
+        - npm test
+
+  - component: facilitator-console
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Facilitator Console
+      summary: >-
+        The umpire's page: start or resume a game, hold it, run the clock,
+        speak for four foreign courts, override anything, and read the debrief.
+      rationale:
+        - Split from the host it drives, because the co-facilitator runs the same console without owning the game. Holding both in one entity made the console and the coordinator look like one thing and put them in a dependency cycle.
+        - The PIN is shown here and nowhere else. The code gets shouted across a room; without a second secret anyone holding it could claim to be an umpire.
+    architecture:
+      kind: client-interface
+      authority: authoritative
+      reads:
+        - authoritative-game-state
+      runs_in:
+        - facilitator-browser-runtime
+      depends_on:
+        - facilitator-session
+        - game-host
+        - authoritative-game-state
+        - command-admission
+        - client-connection-manager
         - shared-console-components
         - phase-clock
         - clash-resolution
@@ -70,16 +105,13 @@ entities:
         - facilitator-override-inspector
         - crown-election
         - debrief-report
+        - room-addressing
     implementation:
       status: declared
       paths:
-        - gui/host/game-host.js
-        - gui/host/persistence.js
         - gui/host/host-app.js
       symbols:
-        - GameHost
-        - Persistence
-        - parseSave
+        - startHostApp
       tests:
         - npm test
 

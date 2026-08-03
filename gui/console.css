@@ -835,6 +835,34 @@ rb-clash-panel { display: block; }
 .rb-gaps dt { font-weight: 600; margin-top: 0.6rem; }
 .rb-gaps dd { margin: 0.15rem 0 0; color: var(--rb-muted); }
 
+/* --- the second facilitator ----------------------------------------------- */
+
+.rb-co-form { display: grid; gap: 0.4rem; margin-bottom: 1rem; max-width: 22rem; }
+.rb-co-form label { display: grid; gap: 0.15rem; font-size: 0.85rem; }
+.rb-co-form input {
+  font: inherit;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--rb-rule);
+  border-radius: 3px;
+  background: #fff;
+}
+
+.rb-co-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.6rem 0.9rem;
+  margin-bottom: 1rem;
+  background: var(--rb-parchment);
+  border: 1px solid var(--rb-rule);
+  border-left: 3px solid var(--rb-blood);
+  border-radius: 3px;
+}
+
+.rb-co-banner p { margin: 0; }
+
 /* --- the debrief ---------------------------------------------------------- */
 
 .rb-epilogue-panel { margin-bottom: 1.5rem; }

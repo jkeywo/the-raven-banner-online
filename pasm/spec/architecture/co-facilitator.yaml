@@ -1,0 +1,73 @@
+entities:
+  - component: facilitator-session
+    core:
+      status: implemented
+      confidence: confirmed
+      title: Facilitator Session
+      summary: >-
+        The seam between running the game and watching somebody else run it.
+        One console, two implementations: the primary owns the state and
+        applies commands here; the co-facilitator receives the state and sends
+        commands over the wire.
+      rationale:
+        - "There are two facilitators at a Raven Banner table and only one is hosting, but they need the same console — the same clock, the same envoy queue, the same inspector. Putting the difference in one object means the console never asks which it has."
+        - "Both expose the same four things — state, roster, submit, save — so the takeover is a swap of one object rather than a second copy of every control."
+    architecture:
+      kind: host-coordinator
+      authority: authoritative
+      reads:
+        - authoritative-game-state
+      depends_on:
+        - game-host
+        - host-peer-listener
+        - client-connection-manager
+        - client-command-gateway
+        - wire-protocol
+        - room-addressing
+        - command-admission
+        - player-console
+      runs_in:
+        - facilitator-browser-runtime
+    implementation:
+      status: declared
+      paths:
+        - gui/host/session.js
+      symbols:
+        - PrimarySession
+        - CoFacilitatorSession
+      tests:
+        - npm test
+
+  - mechanic: co-facilitator-takeover
+    core:
+      status: implemented
+      confidence: confirmed
+      title: Co-Facilitator Takeover
+      summary: >-
+        The second facilitator connects with the PIN, receives the unredacted
+        projection, mirrors it to their own storage on every change, and can
+        become the host without anybody re-entering anything.
+      rationale:
+        - "The facilitator projection is the whole state, so it is already everything a save needs. The mirror is not an extra channel — it is the projection, written down."
+        - "Rebuilt from the mirrored log rather than adopted as a snapshot, so the game that carries on is one the rules could have reached. That is the same guarantee a crashed host gets when it comes back, and it is worth more than the seconds it costs."
+        - "The address is the guard: two peers cannot both hold peerIdForCode, so a takeover attempted while the original is alive waits on a code it will never get and says so. There is no way to end up running two copies of one game."
+        - The seats ride in the save, so nobody comes back a stranger — the takeover is invisible to the sixteen people playing, which is the only measure of it that matters.
+      assumptions:
+        - The co-facilitator has been connected long enough to receive one projection. Until then the takeover button is refused, and says why.
+    game_design:
+      participating_roles:
+        - primary-facilitator
+        - co-facilitator
+    implementation:
+      status: declared
+      tests:
+        - npm test
+    evidence:
+      - kind: test
+        reference: tests/host/takeover.test.js
+        summary: >-
+          A paired co-facilitator drives the game over the wire, holds a save
+          matching the host's seed, log and roster, rebuilds the identical
+          board when the primary dies, keeps the seats and the PIN, goes on
+          hosting from the new machine — and cannot claim the code while the
+          original still holds it.

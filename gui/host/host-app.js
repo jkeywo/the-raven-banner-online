@@ -16,8 +16,11 @@ import { GameHost } from './game-host.js';
 import {
   Persistence, saveFilename, downloadSave, downloadPage, epiloguePage, parseSave,
 } from './persistence.js';
-import { HostPeer } from '../net/host-peer.js';
-import { mintJoinCode, mintFacilitatorPin, playerLink } from '../net/join-code.js';
+import { PrimarySession, CoFacilitatorSession } from './session.js';
+import { installSessionToken } from '../net/session-token.js';
+import {
+  mintJoinCode, mintFacilitatorPin, playerLink, normaliseJoinCode, isValidJoinCode,
+} from '../net/join-code.js';
 import { mintSeed } from '../rules/rng.js';
 import { rosterFor } from '../rules/state.js';
 import { KNOWN_GAPS } from '../rules/gaps.js';
@@ -41,8 +44,9 @@ export async function startHostApp({ location = window.location } = {}) {
     },
   });
 
-  let host = null;
-  let peer = null;
+  // The one seam between hosting the game and watching somebody else host it.
+  // Everything below this line reads `session` and never asks which it has.
+  let session = null;
   let pin = null;
 
   // Fixed for the whole game, so it is written once rather than on every
@@ -67,6 +71,55 @@ export async function startHostApp({ location = window.location } = {}) {
       </button></li>`).join('');
     $('resume').hidden = false;
   }
+
+  $('join-as-co').addEventListener('submit', (event) => {
+    event.preventDefault();
+    const code = normaliseJoinCode($('co-code').value);
+    if (!isValidJoinCode(code)) {
+      // Not guessed at: a misheard letter that was silently corrected could be
+      // a different, valid game.
+      $('start-error').textContent = 'That code is not right. Ask them to read it again.';
+      return;
+    }
+    const enteredPin = $('co-pin').value.trim();
+    if (!enteredPin) {
+      $('start-error').textContent = 'The PIN is on the other facilitator's screen.';
+      return;
+    }
+    $('start-error').textContent = '';
+    take(new CoFacilitatorSession({
+      joinCode: code,
+      pin: enteredPin,
+      name: $('co-name').value.trim() || 'Co-facilitator',
+      token: installSessionToken(code),
+      data,
+      onChange,
+      onStatus: (status) => $('connection').setAttribute('status', status),
+      onLog: (line) => appendLog(line),
+    }));
+  });
+
+  $('take-over').addEventListener('click', () => {
+    // eslint-disable-next-line no-alert
+    const sure = globalThis.confirm?.(
+      'Take over hosting? Do this only when the other facilitator has stopped.');
+    if (sure === false) return;
+
+    const result = session.takeOver({
+      onChange,
+      onStatus: (status) => $('connection').setAttribute('status', status),
+      onLog: (line) => appendLog(line),
+    });
+    if (!result.ok) { appendLog(`[co] ${result.reason}`); return; }
+    if (result.refused?.length) {
+      $('replay-warning').hidden = false;
+      $('replay-warning').textContent =
+        `${result.refused.length} recorded action${result.refused.length === 1 ? '' : 's'} `
+        + 'could not be replayed and had no effect.';
+    }
+    appendLog('[co] taking the game over — claiming the code');
+    take(result.session);
+  });
 
   $('resume-list').addEventListener('click', (event) => {
     const button = event.target.closest('[data-code]');
@@ -111,33 +164,33 @@ export async function startHostApp({ location = window.location } = {}) {
   }
 
   function begin(started) {
-    host = started;
     // A save from before PINs were kept, or one hand-made: mint one rather
     // than leaving the co-facilitator with no way in at all.
-    host.facilitatorPin ??= mintFacilitatorPin();
-    pin = host.facilitatorPin;
-    host._onChange = onChange;
-
-    peer = new HostPeer({
-      joinCode: host.state.joinCode,
-      facilitatorPin: pin,
-      onIdentify: (args) => host.identify(args),
-      onCommand: (seat, cmd) => host.submit(seat, cmd),
-      viewFor: (seat) => host.viewFor(seat),
+    started.facilitatorPin ??= mintFacilitatorPin();
+    take(new PrimarySession({
+      host: started,
+      onChange,
       onStatus: (status) => $('connection').setAttribute('status', status),
       onLog: (line) => appendLog(line),
-    });
-    peer.start();
+    }));
+  }
 
-    $('join-code').textContent = host.state.joinCode;
-    $('facilitator-pin').textContent = pin;
-    $('player-link').value = playerLink(location, host.state.joinCode);
+  /** Adopt a session, whichever kind it is, and show the running console. */
+  function take(started) {
+    session = started;
+    pin = session.facilitatorPin;
+    session.start();
+
+    $('join-code').textContent = session.joinCode;
+    $('facilitator-pin').textContent = pin ?? '—';
+    $('player-link').value = playerLink(location, session.joinCode);
+    document.body.dataset.role = session.kind;
     show('running');
     render();
 
     // The tab may be closed, put to sleep, or crash. Write unconditionally on
     // the way out — there may be no next tick to debounce into.
-    const flush = () => persistence.write(host.save());
+    const flush = () => { const save = session.save(); if (save) persistence.write(save); };
     window.addEventListener('pagehide', flush);
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden') flush();
@@ -146,37 +199,51 @@ export async function startHostApp({ location = window.location } = {}) {
   }
 
   function onChange() {
-    persistence.schedule(host.save());
-    peer.broadcast();
+    // The co-facilitator writes the same save the primary does, which is the
+    // whole of the takeover: by the time it is needed, the game is already on
+    // this machine.
+    const save = session.save();
+    if (save) persistence.schedule(save);
     render();
   }
 
   function render() {
     const roster = $('roster');
     roster.roles = data.roles.roles;
-    roster.seats = host.roster();
-    const claimed = host.roster().filter((s) => s.roleId).length;
-    $('seated-count').textContent = `${claimed} of ${Object.keys(host.state.roles).length} roles claimed`;
+    roster.seats = session.roster();
+    const claimed = session.roster().filter((s) => s.roleId).length;
+    $('seated-count').textContent = `${claimed} of ${Object.keys(session.state.roles).length} roles claimed`;
 
-    const phase = host.state.phase;
+    const phase = session.state.phase;
     $('clock').phase = phase;
     $('battle-grid').data = data;
-    $('battle-grid').state = host.state;
+    $('battle-grid').state = session.state;
     $('envoy-queue').data = data;
-    $('envoy-queue').state = host.state;
+    $('envoy-queue').state = session.state;
     $('consent-queue').data = data;
-    $('consent-queue').state = host.state;
+    $('consent-queue').state = session.state;
     $('crowns').data = data;
-    $('crowns').state = host.state;
+    $('crowns').state = session.state;
     // Hidden until somebody asks: an empty panel above the envoys is a panel
     // the facilitator learns to scroll past.
-    $('consent-panel').hidden = !Object.values(host.state.consents ?? {})
+    $('consent-panel').hidden = !Object.values(session.state.consents ?? {})
       .some((r) => !r.resolved);
-    $('inspector').state = host.state;
-    const waiting = Object.values(host.state.envoys).filter((t) => t.open
+    $('inspector').state = session.state;
+    const waiting = Object.values(session.state.envoys).filter((t) => t.open
       && t.messages.at(-1)?.from === t.roleId).length;
     $('envoy-count').textContent = waiting
       ? `${waiting} waiting on you` : 'nothing waiting';
+    // The co-facilitator's banner, and whether there is enough mirrored to
+    // take the game over with.
+    $('co-banner').hidden = session.kind !== 'co';
+    if (session.kind === 'co') {
+      const ready = session.canTakeOver;
+      $('take-over').disabled = !ready;
+      $('co-mirror').textContent = ready
+        ? `${session.state.log.length} action${session.state.log.length === 1 ? '' : 's'} mirrored`
+        : 'nothing has arrived yet';
+    }
+
     $('battle-panel').hidden = phase.name !== 'battle';
     // The debrief appears when the game ends and not before: a half-played
     // epilogue is a thing to be misread out loud.
@@ -184,7 +251,7 @@ export async function startHostApp({ location = window.location } = {}) {
     $('end-game').disabled = phase.name === 'epilogue' || phase.name === 'lobby';
     if (phase.name === 'epilogue') {
       $('epilogue').data = data;
-      $('epilogue').state = host.state;
+      $('epilogue').state = session.state;
     }
     $('advance-phase').textContent = phase.name === 'lobby' ? 'Begin the game'
       : phase.name === 'epilogue' ? 'The game is over' : 'Next phase';
@@ -197,9 +264,8 @@ export async function startHostApp({ location = window.location } = {}) {
 
   /** The facilitator acts as themselves — a seat of their own on this tab. */
   function asFacilitator(verb, payload = {}) {
-    const seat = { id: 'host', kind: 'facilitator', roleId: null };
-    const result = host.submit(seat, { verb, payload });
-    if (!result.ok) appendLog(`[host] refused: ${result.reason}`);
+    const result = session.submit(verb, payload);
+    if (result && !result.ok) appendLog(`[host] refused: ${result.reason}`);
   }
 
   document.addEventListener('rb-facilitate', (event) =>
@@ -228,8 +294,8 @@ export async function startHostApp({ location = window.location } = {}) {
   $('save-epilogue').addEventListener('click', () => {
     // A self-contained page, so a debrief can be sent round afterwards
     // without needing the app or the game still to exist.
-    downloadPage(epiloguePage($('epilogue').innerHTML, host.state.joinCode),
-      `raven-banner-${host.state.joinCode}-debrief.html`);
+    downloadPage(epiloguePage($('epilogue').innerHTML, session.joinCode),
+      `raven-banner-${session.state.joinCode}-debrief.html`);
   });
 
   $('copy-link').addEventListener('click', async () => {
@@ -239,7 +305,7 @@ export async function startHostApp({ location = window.location } = {}) {
   });
 
   $('download-save').addEventListener('click', () => {
-    downloadSave(host.save(), saveFilename(host.state));
+    downloadSave(session.save(), saveFilename(session.state));
   });
 
   function appendLog(line) {
