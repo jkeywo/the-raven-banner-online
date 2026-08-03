@@ -26,6 +26,7 @@ import '../components/rb-private-sheet.js';
 import '../components/rb-aftermath.js';
 import '../components/rb-phase-clock.js';
 import '../components/rb-action-list.js';
+import '../components/rb-clash-panel.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -101,6 +102,7 @@ export async function startPlayerApp({ location = window.location } = {}) {
   }
 
   document.addEventListener('rb-shire', (event) => showShire(event.detail.shireId));
+  document.addEventListener('rb-command', (event) => dispatch(event.detail.verb, event.detail.payload));
 
   function showShire(shireId) {
     const printed = data.shires.shires[shireId];
@@ -174,6 +176,12 @@ export async function startPlayerApp({ location = window.location } = {}) {
     $('actions').data = data;
     $('actions').view = view;
     $('action-error').textContent = client.lastRefusal?.reason ?? '';
+
+    $('clash').data = data;
+    $('clash').view = view;
+    // The battle tab announces itself, because a phase you can miss is a
+    // phase you will miss.
+    $('tab-battle').dataset.live = String(view.phase.name === 'battle');
 
     $('map').data = data;
     $('map').view = view;

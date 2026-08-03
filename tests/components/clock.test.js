@@ -126,13 +126,15 @@ describe('<rb-action-list>', () => {
     expect(recruit.textContent).toContain('not enough silver');
   });
 
-  it('says a talking phase is for talking', () => {
+  it('offers the battle actions in the battle phase', () => {
     const list = mount('rb-action-list');
     list.data = data;
     list.view = seated('battle');
-    // Nothing a player does alone in the battle phase yet — that lands with
-    // the clash machine.
-    expect(list.textContent).toMatch(/this one is for talking|Declare your target/);
+    const verbs = [...list.querySelectorAll('[data-verb]')].map((b) => b.dataset.verb);
+    expect(verbs).toContain('join-battle');
+    // Nothing may change hands while blades are out.
+    expect(verbs).not.toContain('give');
+    expect(verbs).not.toContain('trade');
   });
 
   it('offers trading as available rather than as refused for want of a choice', () => {

@@ -102,6 +102,8 @@ export const FIELD_VISIBILITY = [
   // --- battle --------------------------------------------------------------
   { path: 'battle.targets.**', audience: PUBLIC },
   { path: 'battle.sides.**', audience: PUBLIC },
+  { path: 'battle.spare.**', audience: PUBLIC },
+  { path: 'battle.scouts.**', audience: PUBLIC },
   { path: 'battle.pairingComplete', audience: PUBLIC },
   { path: 'battle.clashes.*.id', audience: PUBLIC },
   { path: 'battle.clashes.*.shireId', audience: PUBLIC },
@@ -109,6 +111,9 @@ export const FIELD_VISIBILITY = [
   { path: 'battle.clashes.*.attacker', audience: PUBLIC },
   { path: 'battle.clashes.*.defender', audience: PUBLIC },
   { path: 'battle.clashes.*.auto', audience: PUBLIC },
+  { path: 'battle.clashes.*.scouts', audience: PUBLIC },
+  // Whether a side has finished deciding is public; what they decided is not.
+  { path: 'battle.clashes.*.confirmed.*', audience: PUBLIC },
   { path: 'battle.clashes.*.reinforcements.**', audience: PUBLIC },
   { path: 'battle.clashes.*.rolls.**', audience: PUBLIC },
   { path: 'battle.clashes.*.result.**', audience: PUBLIC },

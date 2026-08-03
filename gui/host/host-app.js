@@ -20,6 +20,7 @@ import { mintSeed } from '../rules/rng.js';
 import '../components/rb-connection-dot.js';
 import '../components/rb-seat-roster.js';
 import '../components/rb-phase-clock.js';
+import '../components/rb-facilitator-grid.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -141,6 +142,9 @@ export async function startHostApp({ location = window.location } = {}) {
 
     const phase = host.state.phase;
     $('clock').phase = phase;
+    $('battle-grid').data = data;
+    $('battle-grid').state = host.state;
+    $('battle-panel').hidden = phase.name !== 'battle';
     $('advance-phase').textContent = phase.name === 'lobby' ? 'Begin the game'
       : phase.name === 'epilogue' ? 'The game is over' : 'Next phase';
     $('advance-phase').disabled = phase.name === 'epilogue';
@@ -156,6 +160,9 @@ export async function startHostApp({ location = window.location } = {}) {
     const result = host.submit(seat, { verb, payload });
     if (!result.ok) appendLog(`[host] refused: ${result.reason}`);
   }
+
+  document.addEventListener('rb-facilitate', (event) =>
+    asFacilitator(event.detail.verb, event.detail.payload));
 
   $('advance-phase').addEventListener('click', () => asFacilitator('facilitator:advance-phase'));
   $('pause-clock').addEventListener('click', () => asFacilitator('facilitator:pause-clock'));

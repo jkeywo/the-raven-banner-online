@@ -1,7 +1,7 @@
 entities:
   - mechanic: clash-resolution
     core:
-      status: proposed
+      status: implemented
       confidence: confirmed
       title: Clash Resolution
       summary: >-
@@ -19,6 +19,29 @@ entities:
         - attacking-combatant
         - defending-combatant
         - facilitator
+    implementation:
+      status: declared
+      paths:
+        - gui/rules/clash.js
+        - gui/rules/battle.js
+        - gui/components/rb-clash-panel.js
+        - gui/components/rb-facilitator-grid.js
+      symbols:
+        - createClash
+        - advanceClash
+        - amendLead
+        - resolveClash
+        - tally
+        - settleBattle
+      tests:
+        - npm test
+    evidence:
+      - kind: test
+        reference: tests/rules/clash.test.js
+        summary: >-
+          The worked example printed in the Players Guide, reproduced exactly --
+          six all, the attacker taking it on the tie, Alfred wounded by the six,
+          and Guthrum starving one of the four he could not feed.
 
   - state: clash-machine-state
     core:
@@ -36,7 +59,7 @@ entities:
 
   - decision: lead-the-charge-ratchet
     core:
-      status: accepted
+      status: implemented
       confidence: confirmed
       title: Lead The Charge Is A Ratchet
       summary: >-
@@ -49,6 +72,23 @@ entities:
         - The countdown on the amendment window is therefore a courtesy to a player who has walked away, not a correctness requirement.
       assumptions:
         - Each side changes its declaration at most once, so the stage closes after at most two amendment rounds.
+    implementation:
+      status: declared
+      paths:
+        - gui/rules/clash.js
+      symbols:
+        - amendLead
+      tests:
+        - npm test
+    evidence:
+      - kind: test
+        reference: tests/rules/clash.test.js
+        summary: A downward amendment is refused, and the exchange reaches rolling after at most two upward ones.
+      - kind: manual-review
+        reference: two browsers over WebRTC
+        summary: >-
+          One fighter hung back, the other led, and the first was offered
+          "join the charge" with no way back out.
 
   - message: submit-tactic-command
     core:

@@ -16,7 +16,11 @@
  */
 
 import { PHASES, seatHolding } from './state.js';
-import { incomeFor, isDanish, isPagan, momentumGain } from './derive.js';
+import { incomeFor, isDanish, isPagan, momentumGain, reachableFrom } from './derive.js';
+import {
+  advanceClash, amendLead, confirmLead, sidesOf, resolveClash, MAX_REINFORCEMENT,
+} from './clash.js';
+import { pairSides, defendedSettlements, settleBattle, seizeInitiative } from './battle.js';
 
 /** Phases in which resources may change hands. Not during a battle. */
 const TRADEABLE_PHASES = ['team', 'maintenance', 'encounter'];
@@ -430,6 +434,120 @@ export const COMMANDS = {
     },
   },
 
+  // --- battle phase --------------------------------------------------------
+  /** Throw in with an attack, or stand against one. */
+  'join-battle': {
+    phases: ['battle'],
+    actor: 'player',
+    probe: (state) => ({ shireId: state.battle.targets[0], side: 'attackers' }),
+    admit(ctx) {
+      const roleId = subjectOf(ctx);
+      const { shireId, side } = ctx.cmd.payload ?? {};
+      if (!ctx.state.battle.targets.includes(shireId)) return no('no battle is being fought there');
+      if (side !== 'attackers' && side !== 'defenders') return no('attack or defend?');
+      if (ctx.state.battle.pairingComplete) return no('the fighters are already paired');
+      if (side === 'attackers' && !reachableFrom(ctx.state, ctx.data, roleId).includes(shireId)) {
+        return no('you cannot reach that shire');
+      }
+      return ok();
+    },
+    effects(draft, ctx) {
+      const roleId = subjectOf(ctx);
+      const { shireId, side } = ctx.cmd.payload;
+      const sides = draft.battle.sides[shireId] ??= { attackers: [], defenders: [] };
+      // Joining one side leaves the other, so nobody fights themselves.
+      sides.attackers = sides.attackers.filter((id) => id !== roleId);
+      sides.defenders = sides.defenders.filter((id) => id !== roleId);
+      sides[side].push(roleId);
+    },
+  },
+
+  /**
+   * Choose a card, in secret.
+   *
+   * Freely changeable until the other side has chosen too — the commitment is
+   * the reveal, not the click.
+   */
+  'submit-tactic': {
+    phases: ['battle'],
+    actor: 'player',
+    admit(ctx) {
+      const roleId = subjectOf(ctx);
+      const clash = ctx.state.battle.clashes[ctx.cmd.payload?.clashId];
+      if (!clash) return no('no such clash');
+      if (!sidesOf(clash).includes(roleId)) return no('you are not fighting in that clash');
+      if (clash.stage !== 'awaiting_tactics') return no('the cards are already down');
+
+      const card = ctx.cmd.payload?.card;
+      const printed = ctx.data.tactics.tactics[card];
+      if (!printed) return no('no such card');
+      // A card commits soldiers you must actually have.
+      if (printed.score > ctx.state.roles[roleId].soldiers) {
+        return no(`you have only ${ctx.state.roles[roleId].soldiers} soldiers `
+          + `and that card commits ${printed.score}`);
+      }
+      return ok();
+    },
+    effects(draft, ctx) {
+      const clash = draft.battle.clashes[ctx.cmd.payload.clashId];
+      clash.tactic[subjectOf(ctx)] = ctx.cmd.payload.card;
+      advanceClash(clash);
+    },
+  },
+
+  /**
+   * Say whether you are in the front rank, and change your mind once.
+   *
+   * Before the reveal this is a plain declaration. After it, the ratchet: you
+   * may join a charge you did not expect, but you cannot step back out of one.
+   */
+  'declare-lead': {
+    phases: ['battle'],
+    actor: 'player',
+    admit(ctx) {
+      const roleId = subjectOf(ctx);
+      const clash = ctx.state.battle.clashes[ctx.cmd.payload?.clashId];
+      if (!clash) return no('no such clash');
+      if (!sidesOf(clash).includes(roleId)) return no('you are not fighting in that clash');
+      if (typeof ctx.cmd.payload?.lead !== 'boolean') return no('lead the charge, or do not');
+
+      if (clash.stage === 'awaiting_lead') return ok();
+      if (clash.stage === 'lead_revealed') {
+        if (!ctx.cmd.payload.lead) {
+          return no('you can join the charge, but you cannot leave it');
+        }
+        if (clash.lead[roleId]) return no('you are already leading');
+        return ok();
+      }
+      return no('too late to change your mind');
+    },
+    effects(draft, ctx) {
+      const clash = draft.battle.clashes[ctx.cmd.payload.clashId];
+      const roleId = subjectOf(ctx);
+      if (clash.stage === 'awaiting_lead') clash.lead[roleId] = ctx.cmd.payload.lead;
+      else amendLead(clash, roleId, ctx.cmd.payload.lead);
+      advanceClash(clash);
+    },
+  },
+
+  /** Stand pat once both declarations are up. */
+  'confirm-lead': {
+    phases: ['battle'],
+    actor: 'player',
+    admit(ctx) {
+      const clash = ctx.state.battle.clashes[ctx.cmd.payload?.clashId];
+      if (!clash) return no('no such clash');
+      if (!sidesOf(clash).includes(subjectOf(ctx))) return no('you are not fighting in that clash');
+      if (clash.stage !== 'lead_revealed') return no('there is nothing to confirm');
+      return ok();
+    },
+    effects(draft, ctx) {
+      const clash = draft.battle.clashes[ctx.cmd.payload.clashId];
+      confirmLead(clash, subjectOf(ctx));
+      advanceClash(clash);
+    },
+  },
+
   // --- facilitator ---------------------------------------------------------
   'facilitator:advance-phase': {
     phases: '*',
@@ -511,6 +629,196 @@ export const COMMANDS = {
       } else {
         draft.phase.endsAt = Math.max(ctx.now, draft.phase.endsAt + by);
       }
+    },
+  },
+
+  /**
+   * Announce the targets, so everyone can pick a side.
+   *
+   * Separate from declaring one, because a declaration is team business until
+   * the phase opens and a target is everybody's.
+   */
+  'facilitator:announce-targets': {
+    phases: ['battle'],
+    actor: 'facilitator',
+    admit: ok,
+    effects(draft) {
+      for (const declaration of Object.values(draft.initiative.declared)) {
+        declaration.revealed = true;
+        if (!draft.battle.targets.includes(declaration.shireId)) {
+          draft.battle.targets.push(declaration.shireId);
+        }
+      }
+    },
+  },
+
+  /**
+   * Put the fighters in pairs.
+   *
+   * The facilitator does this by hand in the room, honouring rivalries people
+   * have announced, so an explicit pairing is accepted and a sensible default
+   * offered when none is given.
+   */
+  'facilitator:pair-clashes': {
+    phases: ['battle'],
+    actor: 'facilitator',
+    admit(ctx) {
+      const shireId = ctx.cmd.payload?.shireId;
+      if (!ctx.state.battle.targets.includes(shireId)) return no('nobody is attacking there');
+      const sides = ctx.state.battle.sides[shireId];
+      if (!sides?.attackers.length) return no('nobody has joined the attack');
+      return ok();
+    },
+    effects(draft, ctx) {
+      const { shireId, pairs } = ctx.cmd.payload;
+      const sides = draft.battle.sides[shireId];
+      const { clashes, spareDefenders } = pairSides({
+        attackers: sides.attackers, defenders: sides.defenders, shireId, pairs,
+      });
+      for (const clash of clashes) draft.battle.clashes[clash.id] = clash;
+      draft.battle.spare ??= {};
+      draft.battle.spare[shireId] = spareDefenders;
+      draft.battle.pairingComplete = true;
+    },
+  },
+
+  /**
+   * An extra defender throws soldiers into someone else's clash.
+   *
+   * Worth a point of battle score each, and it costs them the chance to scout
+   * — the printed rules make it one or the other.
+   */
+  reinforce_clash: {
+    phases: ['battle'],
+    actor: 'player',
+    admit(ctx) {
+      const roleId = subjectOf(ctx);
+      const clash = ctx.state.battle.clashes[ctx.cmd.payload?.clashId];
+      if (!clash) return no('no such clash');
+      if (sidesOf(clash).includes(roleId)) return no('you are busy fighting your own clash');
+      if (!(ctx.state.battle.spare?.[clash.shireId] ?? []).includes(roleId)) {
+        return no('only a defender without a clash of their own may reinforce');
+      }
+      if (clash.stage !== 'awaiting_tactics') return no('the cards are already down');
+      if ((ctx.state.battle.scouts?.[clash.shireId] ?? []).includes(roleId)) {
+        return no('you are already scouting');
+      }
+      const soldiers = Number(ctx.cmd.payload?.soldiers);
+      if (!Number.isInteger(soldiers) || soldiers < 1 || soldiers > MAX_REINFORCEMENT) {
+        return no(`commit one or ${MAX_REINFORCEMENT} soldiers`);
+      }
+      const reason = affordable(ctx.state.roles[roleId], { soldiers });
+      return reason ? no(reason) : ok();
+    },
+    effects(draft, ctx) {
+      const clash = draft.battle.clashes[ctx.cmd.payload.clashId];
+      clash.reinforcements[subjectOf(ctx)] = Number(ctx.cmd.payload.soldiers);
+    },
+  },
+
+  /** Be useful without being in the line: a scout counts toward the token. */
+  scout: {
+    phases: ['battle'],
+    actor: 'player',
+    admit(ctx) {
+      const roleId = subjectOf(ctx);
+      const shireId = ctx.cmd.payload?.shireId;
+      if (!(ctx.state.battle.spare?.[shireId] ?? []).includes(roleId)) {
+        return no('only a defender without a clash of their own may scout');
+      }
+      const reinforcing = Object.values(ctx.state.battle.clashes)
+        .some((c) => c.shireId === shireId && c.reinforcements[roleId]);
+      if (reinforcing) return no('you have already committed soldiers to a clash');
+      if ((ctx.state.battle.scouts?.[shireId] ?? []).includes(roleId)) {
+        return no('you are already scouting');
+      }
+      return ok();
+    },
+    effects(draft, ctx) {
+      const { shireId } = ctx.cmd.payload;
+      draft.battle.scouts ??= {};
+      (draft.battle.scouts[shireId] ??= []).push(subjectOf(ctx));
+    },
+  },
+
+  /**
+   * Roll a clash and apply what it costs.
+   *
+   * Facilitator-driven so the dice happen when the room is ready for them, and
+   * so a clash whose fighter has walked away can still be finished.
+   */
+  'facilitator:resolve-clash': {
+    phases: ['battle'],
+    actor: 'facilitator',
+    admit(ctx) {
+      const clash = ctx.state.battle.clashes[ctx.cmd.payload?.clashId];
+      if (!clash) return no('no such clash');
+      if (clash.stage === 'resolved') return no('that clash is already settled');
+      return ok();
+    },
+    effects(draft, ctx, { data, roll }) {
+      const clash = draft.battle.clashes[ctx.cmd.payload.clashId];
+
+      // A fighter who never chose gets the least they could have committed,
+      // rather than the clash stalling on somebody who has gone to make tea.
+      for (const roleId of sidesOf(clash)) {
+        clash.tactic[roleId] ??= 'A';
+        clash.lead[roleId] ??= false;
+      }
+      clash.stage = 'rolling';
+      for (const roleId of sidesOf(clash)) clash.rolls[roleId] = roll(6);
+
+      const outcome = resolveClash(clash, data, {
+        defendedSettlements: defendedSettlements(draft, clash.shireId),
+        food: Object.fromEntries(sidesOf(clash).map((id) => [id, draft.roles[id].food])),
+      });
+
+      for (const roleId of sidesOf(clash)) {
+        const role = draft.roles[roleId];
+        role.soldiers = Math.max(0, role.soldiers - outcome.casualties[roleId]);
+        role.food -= outcome.feeding[roleId].foodSpent;
+        role.soldiers = Math.max(0, role.soldiers - outcome.feeding[roleId].starved);
+        role.wounds += outcome.wounds[roleId];
+        if (role.wounds >= Number(data.meta.woundsFatal)) role.dead = true;
+        // Reinforcing soldiers are spent whatever happens.
+        const committed = clash.reinforcements[roleId];
+        if (committed) draft.roles[roleId].soldiers = Math.max(0, role.soldiers - committed);
+      }
+      // A reinforcing player is not in the clash, so their soldiers are taken
+      // here rather than in the loop above.
+      for (const [roleId, soldiers] of Object.entries(clash.reinforcements)) {
+        if (sidesOf(clash).includes(roleId)) continue;
+        draft.roles[roleId].soldiers = Math.max(0, draft.roles[roleId].soldiers - soldiers);
+      }
+
+      clash.result = outcome;
+      clash.stage = 'resolved';
+    },
+  },
+
+  /** Count the clashes and move the board. */
+  'facilitator:settle-battle': {
+    phases: ['battle'],
+    actor: 'facilitator',
+    admit(ctx) {
+      const shireId = ctx.cmd.payload?.shireId;
+      if (!ctx.state.battle.targets.includes(shireId)) return no('no battle was fought there');
+      return ok();
+    },
+    effects(draft, ctx) {
+      settleBattle(draft, ctx.data, ctx.cmd.payload.shireId,
+        { newSteward: ctx.cmd.payload.newSteward ?? null });
+    },
+  },
+
+  /** Clear the board and hand out the temporary token. */
+  'facilitator:end-battles': {
+    phases: ['battle'],
+    actor: 'facilitator',
+    admit: ok,
+    effects(draft) {
+      seizeInitiative(draft);
+      draft.battle = { targets: [], sides: {}, clashes: {}, spare: {}, scouts: {}, pairingComplete: false };
     },
   },
 

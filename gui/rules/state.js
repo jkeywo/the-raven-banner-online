@@ -95,7 +95,13 @@ export function createInitialState({ joinCode, seed, data, roleIds }) {
       bonus: null,
       declared: {},
     },
-    battle: { targets: [], sides: {}, clashes: {}, pairingComplete: false },
+    battle: {
+      targets: [], sides: {}, clashes: {},
+      // Defenders with no clash of their own, who may reinforce someone
+      // else's or scout — one or the other, never both.
+      spare: {}, scouts: {},
+      pairingComplete: false,
+    },
     contracts: [],
     votes: {},
     envoys: {},

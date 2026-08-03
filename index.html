@@ -66,6 +66,7 @@
         </div>
         <nav id="game-tabs" class="rb-tabs" role="tablist">
           <button type="button" role="tab" data-pane="map" aria-selected="true">The board</button>
+          <button type="button" role="tab" data-pane="battle" id="tab-battle" aria-selected="false">Battle</button>
           <button type="button" role="tab" data-pane="me" aria-selected="false">Your sheet</button>
           <button type="button" role="tab" data-pane="aftermath" aria-selected="false">England</button>
         </nav>
@@ -76,6 +77,10 @@
         <aside id="shire-detail" class="rb-detail-panel">
           <p class="rb-empty">Choose a shire on the map.</p>
         </aside>
+      </div>
+
+      <div data-pane-body="battle" class="rb-pane" hidden>
+        <rb-clash-panel id="clash"></rb-clash-panel>
       </div>
 
       <div data-pane-body="me" class="rb-pane rb-pane-me" hidden>

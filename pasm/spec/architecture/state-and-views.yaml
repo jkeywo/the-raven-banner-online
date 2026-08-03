@@ -63,6 +63,7 @@ entities:
         - room-addressing
         - shared-console-components
         - phase-clock
+        - clash-resolution
     implementation:
       status: declared
       paths:
@@ -99,6 +100,7 @@ entities:
         - authoritative-game-state
       depends_on:
         - authoritative-game-state
+        - clash-resolution
       must_not_depend_on:
         - client-connection-manager
         - host-peer-listener
@@ -206,6 +208,7 @@ entities:
         - room-addressing
         - shared-console-components
         - phase-clock
+        - clash-resolution
     implementation:
       status: declared
       paths:
