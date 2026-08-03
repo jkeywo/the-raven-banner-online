@@ -1,0 +1,63 @@
+entities:
+  - mechanic: debrief-report
+    core:
+      status: implemented
+      confidence: confirmed
+      title: Debrief Report
+      summary: >-
+        The whole ending in one page: the four counters with the sentence
+        printed under each band, the Foreign Influence ledger, what every
+        player finished holding, the factions as they ended, and what the
+        umpire changed along the way.
+      rationale:
+        - "\"Give an overview of the state of the island, both the political and military situation as well as summarising the outcomes from England in the Aftermath\" is a great deal to assemble from memory after five turns of also being four foreign courts."
+        - Derived from the board rather than accumulated as the game runs, so the epilogue cannot disagree with the maps the players are looking at while it is read out.
+        - The band sentences come off the printed tracker rather than being written fresh. A table of numbers is not an ending, and those are the words the game itself ends on.
+        - Saved as a self-contained page with its styles inlined, because it is the only artefact of the evening anybody keeps and it should still render the week after with the app closed.
+      references:
+        - concessions-ledger
+    game_design:
+      participating_roles:
+        - facilitator
+    implementation:
+      status: declared
+      paths:
+        - gui/components/rb-epilogue.js
+      symbols:
+        - RbEpilogue
+      tests:
+        - npm test
+    evidence:
+      - kind: source-document
+        reference: Raven Banner Maps Aftermath v1.1.pdf
+        summary: >-
+          The five counters, their bands, and the sentence printed beneath each
+          one — from "No significant pagan influence." to "The war continues,
+          the land will be devastated."
+      - kind: test
+        reference: tests/rules/epilogue.test.js
+        summary: >-
+          Every counter carries its band's sentence, the ledger lists kept
+          promises before broken ones, factions group by where people ended
+          rather than where they began, and a replaced character is named as a
+          later generation.
+
+  - message: end-game-command
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Call Time
+      summary: The facilitator ends the game where it stands, freezing the board for the debrief.
+      rationale:
+        - The game normally ends by running out of turns, but a room runs out of evening at least as often.
+        - Freezing matters because the debrief is read off the board while sixteen people are still looking at it.
+    architecture:
+      authority: request
+      producer:
+        - client-command-gateway
+      consumer:
+        - command-admission
+      validator:
+        - command-admission
+      trust_boundary: facilitator
+      payload: none

@@ -13,7 +13,9 @@
  */
 
 import { GameHost } from './game-host.js';
-import { Persistence, saveFilename, downloadSave, parseSave } from './persistence.js';
+import {
+  Persistence, saveFilename, downloadSave, downloadPage, epiloguePage, parseSave,
+} from './persistence.js';
 import { HostPeer } from '../net/host-peer.js';
 import { mintJoinCode, mintFacilitatorPin, playerLink } from '../net/join-code.js';
 import { mintSeed } from '../rules/rng.js';
@@ -26,6 +28,7 @@ import '../components/rb-facilitator-grid.js';
 import '../components/rb-envoy-queue.js';
 import '../components/rb-consent-queue.js';
 import '../components/rb-crown-panel.js';
+import '../components/rb-epilogue.js';
 import '../components/rb-state-inspector.js';
 
 const $ = (id) => document.getElementById(id);
@@ -175,6 +178,14 @@ export async function startHostApp({ location = window.location } = {}) {
     $('envoy-count').textContent = waiting
       ? `${waiting} waiting on you` : 'nothing waiting';
     $('battle-panel').hidden = phase.name !== 'battle';
+    // The debrief appears when the game ends and not before: a half-played
+    // epilogue is a thing to be misread out loud.
+    $('epilogue-panel').hidden = phase.name !== 'epilogue';
+    $('end-game').disabled = phase.name === 'epilogue' || phase.name === 'lobby';
+    if (phase.name === 'epilogue') {
+      $('epilogue').data = data;
+      $('epilogue').state = host.state;
+    }
     $('advance-phase').textContent = phase.name === 'lobby' ? 'Begin the game'
       : phase.name === 'epilogue' ? 'The game is over' : 'Next phase';
     $('advance-phase').disabled = phase.name === 'epilogue';
@@ -201,6 +212,25 @@ export async function startHostApp({ location = window.location } = {}) {
       minutes: Number(event.currentTarget.dataset.minutes),
     }));
   }
+
+  $('end-game').addEventListener('click', () => {
+    // Irreversible in the fiction and awkward to undo in the room, so it is
+    // asked for rather than assumed. The inspector can still put the phase
+    // back if somebody hits it by accident.
+    // eslint-disable-next-line no-alert
+    if (globalThis.confirm?.('End the game and freeze the board for the debrief?') !== false) {
+      asFacilitator('facilitator:end-game');
+    }
+  });
+
+  $('print-epilogue').addEventListener('click', () => globalThis.print?.());
+
+  $('save-epilogue').addEventListener('click', () => {
+    // A self-contained page, so a debrief can be sent round afterwards
+    // without needing the app or the game still to exist.
+    downloadPage(epiloguePage($('epilogue').innerHTML, host.state.joinCode),
+      `raven-banner-${host.state.joinCode}-debrief.html`);
+  });
 
   $('copy-link').addEventListener('click', async () => {
     await navigator.clipboard?.writeText($('player-link').value);

@@ -1951,6 +1951,29 @@ export const COMMANDS = {
   },
 
   /**
+   * Call time.
+   *
+   * The game normally ends by running out of turns, but a room runs out of
+   * evening first about as often. Ending it explicitly freezes the board so
+   * the debrief is read off a position nobody can still be changing.
+   */
+  'facilitator:end-game': {
+    phases: '*',
+    actor: 'facilitator',
+    admit(ctx) {
+      return ctx.state.phase.name === 'epilogue' ? no('the game is already over') : ok();
+    },
+    effects(draft, ctx) {
+      draft.phase.name = 'epilogue';
+      draft.phase.endsAt = null;
+      draft.phase.paused = false;
+      draft.phase.pausedRemainingMs = null;
+      draft.aftermath.endedAt = ctx.now;
+      draft.aftermath.endedOnTurn = draft.phase.turn;
+    },
+  },
+
+  /**
    * The heir arrives.
    *
    * "If a character dies they return immediately with a replacement character

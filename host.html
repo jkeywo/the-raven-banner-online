@@ -60,6 +60,7 @@
           <button id="pause-clock" type="button">Pause</button>
           <button id="extend-clock" type="button" data-minutes="1">+1 min</button>
           <button id="shorten-clock" type="button" data-minutes="-1">−1 min</button>
+          <button id="end-game" type="button">Call time</button>
         </div>
         <p class="rb-meta">
           The clock runs past zero rather than stopping. A phase ends when you
@@ -70,6 +71,19 @@
       <section id="battle-panel" class="rb-battle-panel" hidden>
         <h2>The battle phase</h2>
         <rb-facilitator-grid id="battle-grid"></rb-facilitator-grid>
+      </section>
+
+      <section id="epilogue-panel" class="rb-epilogue-panel" hidden>
+        <h2>The debrief</h2>
+        <p class="rb-meta">
+          Read from this. Everything on it is worked out from the board, so it
+          cannot disagree with the maps the players are looking at.
+        </p>
+        <div class="rb-epilogue-buttons">
+          <button id="print-epilogue" type="button" class="rb-primary">Print it</button>
+          <button id="save-epilogue" type="button">Save as a page</button>
+        </div>
+        <rb-epilogue id="epilogue"></rb-epilogue>
       </section>
 
       <section class="rb-crown-panel">

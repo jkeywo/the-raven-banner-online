@@ -1,5 +1,5 @@
 {
- "_generated": "raven_banner gamespec @ analogue-projects 253491b via tools/export_web_data.py",
+ "_generated": "raven_banner gamespec @ analogue-projects 47effeb via tools/export_web_data.py",
  "_doNotEdit": true,
  "turns": 5,
  "phases": [
@@ -85,6 +85,12 @@
      9,
      null
     ]
+   ],
+   "sentences": [
+    "No significant pagan influence.",
+    "The church takes on some pagan influence.",
+    "The island becomes segregated between christian and pagan control.",
+    "Christianity once more leaves the shores of England."
    ]
   },
   "danelaw": {
@@ -110,6 +116,13 @@
      13,
      null
     ]
+   ],
+   "sentences": [
+    "Little to no impact.",
+    "Some Danish enclaves.",
+    "Significant influence.",
+    "Danish becomes the dominant culture.",
+    "Saxon culture is replaced."
    ]
   },
   "disorder": {
@@ -127,6 +140,11 @@
      5,
      null
     ]
+   ],
+   "sentences": [
+    "A generation or two of peace.",
+    "War is inevitable, but there is peace for the moment.",
+    "The war continues, the land will be devastated."
    ]
   },
   "prosperity": {
@@ -144,7 +162,15 @@
      70,
      null
     ]
+   ],
+   "sentences": [
+    "Famine and poverty hit all levels of society.",
+    "England will take decades to rebuild to its former strength.",
+    "All of England prospers."
    ]
+  },
+  "foreignInfluence": {
+   "note": "Should too many concessions be given for Frankish, Briton or Papal assistance this could have an effect on the country."
   }
  },
  "dropOrder": [

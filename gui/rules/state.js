@@ -230,7 +230,9 @@ export function createInitialState({ joinCode, seed, data, roleIds }) {
     // Keyed rather than a list, so the projector can walk into it and show
     // each promise only to whoever made it.
     concessions: {},
-    aftermath: { foreignInfluence: '' },
+    // Foreign Influence is prose because the printed counter is prose. The
+    // two stamps are set when the facilitator calls time.
+    aftermath: { foreignInfluence: '', endedAt: null, endedOnTurn: null },
     facilitatorNotes: {},
     log: [],
     lastSeq: {},

@@ -835,6 +835,35 @@ rb-clash-panel { display: block; }
 .rb-gaps dt { font-weight: 600; margin-top: 0.6rem; }
 .rb-gaps dd { margin: 0.15rem 0 0; color: var(--rb-muted); }
 
+/* --- the debrief ---------------------------------------------------------- */
+
+.rb-epilogue-panel { margin-bottom: 1.5rem; }
+.rb-epilogue-buttons { display: flex; gap: 0.4rem; margin-bottom: 0.8rem; }
+.rb-epilogue h3 { margin: 1rem 0 0.3rem; }
+
+.rb-verdicts dt { font-weight: 600; margin-top: 0.5rem; }
+.rb-verdicts dd { margin: 0 0 0.2rem; font-family: var(--rb-serif); }
+
+.rb-factions { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
+.rb-factions li { display: grid; gap: 0.1rem; }
+
+.rb-final { border-collapse: collapse; width: 100%; font-size: 0.85rem; }
+.rb-final th, .rb-final td {
+  text-align: left;
+  padding: 0.25rem 0.5rem;
+  border-bottom: 1px solid var(--rb-rule);
+  vertical-align: top;
+}
+
+/* Printing is what the debrief is for, so the page is the report and nothing
+   else — no controls, no console furniture. */
+@media print {
+  body * { visibility: hidden; }
+  .rb-epilogue, .rb-epilogue * { visibility: visible; }
+  .rb-epilogue { position: absolute; inset: 0; margin: 0; }
+  .rb-epilogue-buttons { display: none; }
+}
+
 /* --- the courts, and what was promised them ------------------------------- */
 
 .rb-court-brief { margin: 0.4rem 0; font-size: 0.85rem; }

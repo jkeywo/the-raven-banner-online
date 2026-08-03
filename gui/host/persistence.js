@@ -154,7 +154,41 @@ export function parseSave(text) {
  * click with no dependencies and nothing that can be blocked.
  */
 export function downloadSave(save, filename, doc = globalThis.document) {
-  const blob = new Blob([JSON.stringify(save, null, 1)], { type: 'application/json' });
+  offer(new Blob([JSON.stringify(save, null, 1)], { type: 'application/json' }), filename, doc);
+}
+
+/**
+ * The debrief as a page that stands on its own.
+ *
+ * Styles inlined and nothing fetched, so it can be mailed round the week after
+ * with the app long closed and the host tab long gone. This is the only
+ * artefact of the evening anybody keeps.
+ */
+export function epiloguePage(body, joinCode) {
+  return `<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>The Raven Banner — ${joinCode}</title>
+<style>
+  body { font: 16px/1.5 Georgia, serif; max-width: 46rem; margin: 2rem auto; padding: 0 1rem;
+         color: #2b2118; background: #f6f1e6; }
+  h1, h2, h3 { font-family: Georgia, serif; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { text-align: left; padding: 0.3rem 0.6rem; border-bottom: 1px solid #d8cdb8; }
+  ul { list-style: none; padding: 0; }
+  li { padding: 0.2rem 0; }
+  .rb-meta { color: #6b5c48; font-size: 0.85em; }
+  .rb-empty { color: #6b5c48; font-style: italic; }
+  dt { font-weight: 600; margin-top: 0.7rem; }
+  dd { margin: 0; }
+</style></head>
+<body><h1>The Raven Banner</h1>${body}</body></html>`;
+}
+
+export function downloadPage(html, filename, doc = globalThis.document) {
+  offer(new Blob([html], { type: 'text/html' }), filename, doc);
+}
+
+function offer(blob, filename, doc) {
   const url = URL.createObjectURL(blob);
   const link = doc.createElement('a');
   link.href = url;
