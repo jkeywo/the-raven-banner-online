@@ -1,4 +1,51 @@
 entities:
+  - component: wire-protocol
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Wire Protocol
+      summary: >-
+        The message shapes both ends agree on, and the only place they are
+        written down. Constructors that refuse to build a malformed message,
+        and a parser that returns nothing rather than throwing at a receiver.
+      rationale:
+        - Shared by the host and the clients, so it belongs to neither. Putting it inside the client gateway made every importer look like it depended on the client, which is how it came to be its own thing.
+        - Building a message through a constructor rather than an object literal means a missing sequence number is a loud error at the sender rather than a quiet mystery at the receiver.
+    architecture:
+      kind: protocol
+    implementation:
+      status: declared
+      paths:
+        - gui/net/wire.js
+      symbols:
+        - identify
+        - command
+        - view
+        - result
+        - parse
+      tests:
+        - npm test
+
+  - component: connection-backoff
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Connection Backoff
+      summary: The doubling retry schedule, used by the client redialling a host and by the host re-claiming its room code.
+      rationale:
+        - Both ends must back off identically. A host slower to return than its clients are to give up turns a refresh into what looks like a crash.
+        - Its own module because a host importing the client transport to borrow one function reads as a mistake even while it works.
+    architecture:
+      kind: policy
+    implementation:
+      status: declared
+      paths:
+        - gui/net/backoff.js
+      symbols:
+        - nextBackoffDelay
+      tests:
+        - npm test
+
   - component: host-peer-listener
     core:
       status: proposed
@@ -26,6 +73,20 @@ entities:
       runs_in:
         - facilitator-browser-runtime
       trust_boundary: facilitator
+      depends_on:
+        - wire-protocol
+        - connection-backoff
+    implementation:
+      status: declared
+      paths:
+        - gui/net/host-peer.js
+        - gui/net/join-code.js
+      symbols:
+        - HostPeer
+        - peerIdForCode
+        - mintJoinCode
+      tests:
+        - npm test
 
   - component: client-connection-manager
     core:
@@ -51,6 +112,19 @@ entities:
       runs_in:
         - player-browser-runtime
       trust_boundary: client-to-host
+      depends_on:
+        - wire-protocol
+        - connection-backoff
+    implementation:
+      status: declared
+      paths:
+        - gui/net/connection-manager.js
+        - gui/net/session-token.js
+      symbols:
+        - ConnectionManager
+        - decideToken
+      tests:
+        - npm test
 
   - component: client-command-gateway
     core:
@@ -70,6 +144,17 @@ entities:
         - player-command-message
       runs_in:
         - player-browser-runtime
+      depends_on:
+        - wire-protocol
+    implementation:
+      status: declared
+      paths:
+        - gui/net/command-gateway.js
+      symbols:
+        - sendCommand
+        - resolveTransport
+      tests:
+        - npm test
 
   - state: seat-registry
     core:
