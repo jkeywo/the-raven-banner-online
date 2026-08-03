@@ -29,6 +29,40 @@ export class RbCrownPanel extends HTMLElement {
     this.dispatchEvent(new CustomEvent('rb-facilitate', { bubbles: true, detail: { verb, payload } }));
   }
 
+  /**
+   * Whoever has been killed and is waiting on their heir.
+   *
+   * Death is not elimination: the player keeps the sheet, the lands and the
+   * silver, and comes back as somebody else. The guide asks the umpire to
+   * change at least one thing — a goal, a claim, or how the foreign courts
+   * feel about them — so the form asks for exactly that and records it.
+   */
+  _dead(nameOf, crownName) {
+    const fallen = Object.values(this._state.roles ?? {}).filter((role) => role.dead);
+    if (!fallen.length) return '';
+    const crowns = Object.keys(this._data.factions.crownLetter ?? {});
+    const options = (selected) => `<option value="">—</option>${crowns
+      .map((crown) => `<option value="${crown}"
+        ${crown === selected ? 'selected' : ''}>${crownName(crown)}</option>`).join('')}`;
+
+    return `
+      <h3>The fallen</h3>
+      <ul class="rb-relief">${fallen.map((role) => `
+        <li>
+          <form data-heir="${role.id}">
+            <p><strong>${nameOf(role.id)}</strong> is dead. Their heir takes the
+              same sheet, with the wounds wiped and any crown back on the table.</p>
+            <label>Change at least one thing
+              <input name="note" maxlength="200"
+                placeholder="e.g. his son wants peace with the Danes">
+            </label>
+            <label>Add a claim <select name="addClaim">${options()}</select></label>
+            <label>Drop a claim <select name="dropClaim">${options()}</select></label>
+            <button type="submit" class="rb-primary">The heir arrives</button>
+          </form>
+        </li>`).join('')}</ul>`;
+  }
+
   _render() {
     if (!this.isConnected || !this._state || !this._data) return;
     const nameOf = (id) => this._data.roles.roles[id]?.name ?? id;
@@ -63,6 +97,8 @@ export class RbCrownPanel extends HTMLElement {
             </li>`;
   }).join('')}</ul>` : '<p class="rb-empty">Nobody is standing for anything.</p>'}
 
+        ${this._dead(nameOf, crownName)}
+
         <h3>What a rebellion costs</h3>
         ${vassals.length ? `<ul class="rb-relief">${vassals.map((role) => {
     const relief = this._state.rebellionRelief?.[role.id];
@@ -81,6 +117,17 @@ export class RbCrownPanel extends HTMLElement {
   }).join('')}</ul>` : '<p class="rb-empty">Nobody answers to anybody.</p>'}
       </div>`;
 
+    for (const form of this.querySelectorAll('[data-heir]')) {
+      form.onsubmit = (event) => {
+        event.preventDefault();
+        this._emit('facilitator:heir-arrives', {
+          roleId: form.dataset.heir,
+          note: form.elements.note.value.trim() || undefined,
+          addClaim: form.elements.addClaim.value || undefined,
+          dropClaim: form.elements.dropClaim.value || undefined,
+        });
+      };
+    }
     for (const button of this.querySelectorAll('[data-close]')) {
       button.onclick = () => this._emit('facilitator:close-vote', { voteId: button.dataset.close });
     }

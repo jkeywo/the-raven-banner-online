@@ -18,6 +18,84 @@ export const SCHEMA_VERSION = 1;
 export const PHASES = ['team', 'battle', 'maintenance', 'encounter'];
 
 /**
+ * Which roles are in play at a given head count.
+ *
+ * "You can run the game with up to 4 fewer players than maximum. To do so drop
+ * roles in this order: Oscatel, Uchtred, Ecgbert, Godric." The order is not
+ * arbitrary — each drop is a role whose absence the guide's own table knows how
+ * to compensate for.
+ */
+export function rosterFor(data, players) {
+  const all = Object.keys(data.roles.roles);
+  const wanted = Math.min(Math.max(Number(players) || all.length, all.length - 4), all.length);
+  const dropped = new Set((data.meta.dropOrder ?? []).slice(0, all.length - wanted));
+  return all.filter((id) => !dropped.has(id));
+}
+
+/** The roles the guide drops at this head count, in the order it drops them. */
+const droppedRoles = (data, inPlay) =>
+  (data.meta.dropOrder ?? []).filter((id) => !inPlay.includes(id));
+
+/**
+ * Top the survivors up for everyone who is not at the table.
+ *
+ * The Facilitators Guide gives an exact table rather than a rule of thumb —
+ * Guthrum gains three soldiers, two food and four silver when Oscatel is out,
+ * and so on down the list. Applying it by hand is the sort of thing that gets
+ * done wrong at nine in the morning with sixteen people arriving.
+ *
+ * A mercenary card is not compensation for a missing player; it is
+ * compensation for an *uneven* table, so it is dealt by head count instead.
+ */
+function applyScaling(roles, data, inPlay) {
+  const scaling = data.scaling ?? {};
+  for (const gone of droppedRoles(data, inPlay)) {
+    for (const [roleId, grant] of Object.entries(scaling.onDrop?.[gone]?.grant ?? {})) {
+      if (!roles[roleId]) continue;
+      for (const [what, amount] of Object.entries(grant)) {
+        roles[roleId][what] = (roles[roleId][what] ?? 0) + Number(amount);
+      }
+    }
+  }
+  for (const roleId of scaling.mercenariesAt?.[String(inPlay.length)] ?? []) {
+    if (roles[roleId]) roles[roleId].mercenary = true;
+  }
+}
+
+/** Which shires change hands because their steward is not in the game. */
+function stewardshipTransfers(data, inPlay) {
+  const transfers = {};
+  for (const gone of droppedRoles(data, inPlay)) {
+    Object.assign(transfers, data.scaling?.onDrop?.[gone]?.stewardship ?? {});
+  }
+  return transfers;
+}
+
+/**
+ * The shire that loses a castle at twelve players.
+ *
+ * "Do not use mercenary cards, instead remove a castle from any shire that
+ * starts with four." Any will do, so the app takes the first in printed order
+ * and says which — an arbitrary choice made visibly beats one made silently,
+ * and the facilitator can move it with the inspector.
+ */
+export function castleRemovedAt(data, inPlay) {
+  if (inPlay.length !== Number(data.scaling?.castleRemovalAt)) return null;
+  return Object.keys(data.shires.shires)
+    .find((id) => data.shires.shires[id].castles === 4) ?? null;
+}
+
+/** Turn one's declarations, already made by the rules on the holders' behalf. */
+function fixedFirstTargets(data, holders) {
+  const declared = {};
+  for (const [roleId, shireId] of Object.entries(data.meta.fixedFirstTargets ?? {})) {
+    const token = Object.keys(holders).find((key) => holders[key] === roleId);
+    if (token) declared[token] = { roleId, shireId, revealed: false, fixed: true };
+  }
+  return declared;
+}
+
+/**
  * Build the opening position from the static data.
  *
  * @param {object} args
@@ -54,19 +132,30 @@ export function createInitialState({ joinCode, seed, data, roleIds }) {
       // A priest counts two extra churches for each of these.
       baptismsPerformed: 0,
       dead: false,
-      once: { christianBanners: false },
+      // How many times this character has been replaced by their heir. The
+      // player stays; the person in the chair is somebody else.
+      generation: 0,
+      once: { christianBanners: false, mercenary: false },
+      // A mercenary card, where the head count calls for one.
+      mercenary: false,
       perTurn: { shipsBuilt: 0, tradesUsed: 0 },
     };
   }
 
+  applyScaling(roles, data, inPlay);
+
   const shires = {};
+  const handedOn = stewardshipTransfers(data, inPlay);
   for (const [id, shire] of Object.entries(data.shires.shires)) {
-    const steward = inPlay.includes(shire.initialSteward) ? shire.initialSteward : null;
+    const printed = inPlay.includes(shire.initialSteward) ? shire.initialSteward : null;
+    // A dropped role's lands do not go unheld: the guide names who picks them
+    // up, and an empty shire would quietly change the support count.
+    const steward = printed ?? (inPlay.includes(handedOn[id]) ? handedOn[id] : null);
     shires[id] = {
       id,
       stewardRoleId: steward,
       factionId: steward ? roles[steward].factionId : null,
-      castles: shire.castles,
+      castles: shire.castles - (id === castleRemovedAt(data, inPlay) ? 1 : 0),
       missionaryCross: false,
       danishSupport: false,
       shipCostDelta: 0,
@@ -76,6 +165,12 @@ export function createInitialState({ joinCode, seed, data, roleIds }) {
       adjacencyBought: {},
     };
   }
+
+  const tokenHolders = {
+    white: inPlay.includes('halfdan_ragnarsson') ? 'halfdan_ragnarsson' : null,
+    black: inPlay.includes('guthrum_the_old') ? 'guthrum_the_old' : null,
+    bonus: null,
+  };
 
   return {
     schemaVersion: SCHEMA_VERSION,
@@ -95,16 +190,21 @@ export function createInitialState({ joinCode, seed, data, roleIds }) {
     // holders start already assigned and the first battle phase has somewhere
     // to go even if nobody has worked out what they are doing yet.
     initiative: {
-      white: inPlay.includes('halfdan_ragnarsson') ? 'halfdan_ragnarsson' : null,
-      black: inPlay.includes('guthrum_the_old') ? 'guthrum_the_old' : null,
-      bonus: null,
-      declared: {},
+      ...tokenHolders,
+      // "In turn 1 the targets are fixed: Halfdan will always attack Lindsey
+      // and Guthrum will always attack Essex." Seeded rather than declared, so
+      // the first battle has somewhere to go before anybody has worked out
+      // what they are doing.
+      declared: fixedFirstTargets(data, tokenHolders),
     },
     battle: {
       targets: [], sides: {}, clashes: {},
       // Defenders with no clash of their own, who may reinforce someone
       // else's or scout — one or the other, never both.
       spare: {}, scouts: {},
+      // Mercenary cards handed in, per shire and per side. They buy a clash
+      // nobody fought, so they live beside the battle rather than in it.
+      mercenaries: {},
       pairingComplete: false,
     },
     // Requests waiting on other people's agreement — settling a shire, and

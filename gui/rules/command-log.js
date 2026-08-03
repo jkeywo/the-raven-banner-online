@@ -62,6 +62,10 @@ export function toSave(state) {
     schemaVersion: state.schemaVersion,
     joinCode: state.joinCode,
     seed: state.seed,
+    // The roster rides along too. Which roles were dealt in is part of the
+    // opening position rather than something anybody did, so a short-handed
+    // game cannot be rebuilt from the log alone.
+    roleIds: Object.keys(state.roles),
     log: state.log,
     seats: state.seats,
     seatByToken: state.seatByToken,

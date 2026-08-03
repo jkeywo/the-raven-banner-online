@@ -21,6 +21,20 @@
         The game lives in this tab. Keep it open, keep the laptop plugged in,
         and turn off sleep.
       </p>
+      <label for="player-count">How many players?</label>
+      <select id="player-count">
+        <option value="16" selected>16 — the full game</option>
+        <option value="15">15 — no Oscatel</option>
+        <option value="14">14 — no Oscatel or Uchtred</option>
+        <option value="13">13 — no Oscatel, Uchtred or Ecgberht</option>
+        <option value="12">12 — no Oscatel, Uchtred, Ecgberht or Godric</option>
+      </select>
+      <p class="rb-meta">
+        The guide's table is applied for you: the remaining players are topped
+        up, a dropped steward's lands change hands, and mercenary cards are
+        dealt — or at twelve, a castle comes off a four-castle shire instead.
+      </p>
+
       <button id="new-game" type="button" class="rb-primary">Start a new game</button>
       <p id="start-error" class="rb-error" role="alert"></p>
 

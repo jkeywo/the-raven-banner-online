@@ -72,6 +72,13 @@ export const FIELD_VISIBILITY = [
   { path: 'roles.*.deJureShires', audience: PUBLIC },
   { path: 'roles.*.baptismsPerformed', audience: PUBLIC },
   { path: 'roles.*.dead', audience: PUBLIC },
+  // A man who is not the man he was three turns ago is not a secret. Everyone
+  // watched the heir arrive.
+  { path: 'roles.*.generation', audience: PUBLIC },
+
+  // Whether you are holding mercenaries is exactly what an opponent would pay
+  // to know before committing to a battle, so it stays yours until it is spent.
+  { path: 'roles.*.mercenary', audience: OWNER, owner: ownerAtIndex(1) },
 
   { path: 'roles.*.momentum', audience: OWNER, owner: ownerAtIndex(1) },
   { path: 'roles.*.silver', audience: OWNER, owner: ownerAtIndex(1) },

@@ -11,7 +11,7 @@
  */
 
 const CORE = ['shires', 'adjacency', 'roles', 'briefs', 'archetypes',
-  'tactics', 'factions', 'meta'];
+  'tactics', 'factions', 'meta', 'scaling'];
 
 /** Where things sit on the printed maps. Only the map view needs it. */
 const GEOMETRY = 'geometry';

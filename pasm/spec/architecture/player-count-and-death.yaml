@@ -1,0 +1,123 @@
+entities:
+  - mechanic: player-count-scaling
+    core:
+      status: implemented
+      confidence: confirmed
+      title: Player Count Scaling
+      summary: >-
+        Twelve to sixteen players. Roles are dropped in a printed order, the
+        survivors are topped up from the guide's own table, a dropped steward's
+        lands pass to a named heir, and mercenary cards are dealt by head count.
+      rationale:
+        - The whole table is printed, down to "Guthrum gains +3 soldiers, +2 food and +4 silver". Applying it by hand is exactly the sort of thing that gets done wrong at nine in the morning with sixteen people arriving.
+        - The lands of a dropped role are handed on rather than left unheld, because an empty shire would quietly change the support count and with it the tracker the game is scored from.
+        - "A mercenary card is not compensation for a missing player but for an *uneven* table, so it is dealt by head count and not by which roles are absent."
+        - Chosen at creation and stored in the save, because the roster is part of the opening position rather than something anybody did. A log alone cannot rebuild a short-handed game.
+    implementation:
+      status: declared
+      tests:
+        - npm test
+    evidence:
+      - kind: source-document
+        reference: Raven Banner Facilitators Guide v1.1.pdf, pages 9-10
+        summary: >-
+          "Drop roles in this order: Oscatel, Uchtred, Ecgbert, Godric", the
+          per-role compensation table, the mercenary distribution at 15, 14 and
+          13, and "if playing with 12 players do not use mercenary cards,
+          instead remove a castle from any shire that starts with four".
+      - kind: test
+        reference: tests/rules/scaling.test.js
+        summary: >-
+          Every head count from sixteen to twelve leaves no shire unheld, keeps
+          the turn-zero counters where the tracker prints them, and deals the
+          cards to the players the guide names.
+
+  - mechanic: mercenary-card
+    core:
+      status: implemented
+      confidence: confirmed
+      title: Mercenary Card
+      summary: >-
+        Once per game, handed in during a battle - "your side counts as
+        achieving victory in one additional clash".
+      rationale:
+        - "Playable after the sides are set and before the pairing. That is the one window where you commit knowing who joined and not knowing who you will face, which is the whole of the decision."
+        - Counted in the tally rather than as a fabricated clash, so nothing has to invent a fight that did not happen or a fighter who was not there.
+        - Whether you hold one is private. It is exactly what an opponent would pay to know before committing to a battle.
+      references:
+        - mercenary-timing
+    implementation:
+      status: declared
+      tests:
+        - npm test
+    evidence:
+      - kind: source-document
+        reference: Deluxe Components/Raven Banner Cards (Front) v1.1.pdf
+        summary: >-
+          "Your side counts as achieving victory in one additional clash during
+          the battle."
+
+  - decision: mercenary-timing
+    core:
+      status: implemented
+      confidence: inferred
+      title: Mercenaries Are Called In After Sides, Before Pairing
+      summary: The card says when it is used only as "before a battle", so the app fixes the window at the one point where the decision is interesting.
+      rationale:
+        - Before the sides are declared, you would be buying blind. After the pairing, you would be buying a known fight. Between them, you know the odds and not the matchups.
+    implementation:
+      status: declared
+      tests:
+        - npm test
+
+  - mechanic: character-death
+    core:
+      status: implemented
+      confidence: confirmed
+      title: Character Death
+      summary: >-
+        Three wounds kill a character; their heir arrives immediately on the
+        same sheet, with the wounds wiped, any crown back on the table, and at
+        least one thing about them changed by the facilitator.
+      rationale:
+        - Death is not elimination and never was. The player keeps the sheet, the lands, the silver and the seat, and comes back as somebody else — which is why the app never removes anybody from the game.
+        - The wounds go to zero because the new man has not been in a fight yet.
+        - "The crowns go because the guide says so: \"the new character will need to claim any crowns they want to hold, even if their previous character already held them\". An election won by a dead man does not bind the shires to his son."
+        - The three levers — a goal, a claim, the foreign sympathies — are the facilitator's and are the point of the rule. It exists so the umpire can make a losing game interesting again, so the app records what they changed rather than deciding it.
+    game_design:
+      participating_roles:
+        - facilitator
+    implementation:
+      status: declared
+      tests:
+        - npm test
+    evidence:
+      - kind: source-document
+        reference: Raven Banner Facilitators Guide v1.1.pdf, page 12
+        summary: >-
+          "If a character dies they return immediately with a replacement
+          character – usually their heir. They keep the same character sheet,
+          but you should change it in at least one of the following ways."
+      - kind: test
+        reference: tests/rules/scaling.test.js
+        summary: >-
+          The heir keeps the silver and the shire, loses the wounds and the
+          crown, may stand for it again, and the generation count rises so a
+          third Ceowulf is not the second.
+
+  - decision: fixed-first-turn-targets
+    core:
+      status: implemented
+      confidence: confirmed
+      title: Turn One Is Written Down
+      summary: >-
+        Halfdan attacks Lindsey and Guthrum attacks Essex, seeded as
+        declarations rather than left to be made.
+      rationale:
+        - The guide says it twice, in the rules teach and again in the first-turn notes. Seeding it means the first battle phase has somewhere to go before anybody has worked out what they are doing.
+        - The declaration is still secret until the battle phase opens, exactly like a declared one, so turn one does not leak information turn two would not.
+        - Declaring is refused while the target is fixed, and opens from turn two — which is the moment the game hands the plan over to the players.
+    implementation:
+      status: declared
+      tests:
+        - npm test

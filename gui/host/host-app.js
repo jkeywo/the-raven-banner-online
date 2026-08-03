@@ -17,6 +17,7 @@ import { Persistence, saveFilename, downloadSave, parseSave } from './persistenc
 import { HostPeer } from '../net/host-peer.js';
 import { mintJoinCode, mintFacilitatorPin, playerLink } from '../net/join-code.js';
 import { mintSeed } from '../rules/rng.js';
+import { rosterFor } from '../rules/state.js';
 import { KNOWN_GAPS } from '../rules/gaps.js';
 import '../components/rb-connection-dot.js';
 import '../components/rb-seat-roster.js';
@@ -85,6 +86,9 @@ export async function startHostApp({ location = window.location } = {}) {
       joinCode: mintJoinCode(),
       seed: mintSeed(Math.random),
       facilitatorPin: mintFacilitatorPin(),
+      // Chosen before anybody joins, because the guide's table changes the
+      // opening position rather than anything that happens later.
+      roleIds: rosterFor(data, Number($('player-count').value)),
       data,
     }));
   });

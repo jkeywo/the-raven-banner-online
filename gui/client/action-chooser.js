@@ -317,6 +317,15 @@ export function fieldsFor(verb, view, data) {
       }];
     }
 
+    case 'use-mercenary':
+      return [{
+        name: 'shireId',
+        label: 'Which battle',
+        kind: 'select',
+        options: (view.battle?.targets ?? [])
+          .map((id) => ({ value: id, label: data.shires.shires[id]?.name ?? id })),
+      }];
+
     case 'collect-income':
       // Only a pagan Dane is asked; everyone else just collects.
       return view.derived?.roles?.[me]?.pagan

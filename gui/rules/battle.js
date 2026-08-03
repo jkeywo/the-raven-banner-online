@@ -81,10 +81,18 @@ export function tally(state, shireId) {
     else defenderWins += 1;
   }
 
+  // "Your side counts as achieving victory in one additional clash during the
+  // battle." Handed in before the pairing, so it is spent knowing who joined
+  // rather than knowing who you will face.
+  const hired = state.battle.mercenaries?.[shireId] ?? {};
+  attackerWins += hired.attackers ?? 0;
+  defenderWins += hired.defenders ?? 0;
+
   const resolved = clashes.length > 0 && clashes.every((c) => c.stage === 'resolved');
   return {
     attackerWins,
     defenderWins,
+    mercenaries: hired,
     scouts,
     resolved,
     castles: shire?.castles ?? 0,

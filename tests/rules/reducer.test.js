@@ -159,11 +159,11 @@ describe('commands', () => {
     let state = seated();
     state.seats.s1.roleId = 'halfdan_ragnarsson';
     const halfdan = { seatId: 's1', kind: 'player', roleId: 'halfdan_ragnarsson' };
-    state = run(state, [
-      [FACILITATOR, 'facilitator:advance-phase', {}],                 // lobby -> team
-      [halfdan, 'declare-initiative-target', { shireId: 'lindsey' }],
-    ]);
-    expect(state.initiative.declared.white.revealed).toBe(false);
+    // Turn one's target is fixed rather than declared, and it is still a
+    // secret until the battle phase opens.
+    state = run(state, [[FACILITATOR, 'facilitator:advance-phase', {}]]);  // lobby -> team
+    expect(state.initiative.declared.white).toMatchObject(
+      { shireId: 'lindsey', revealed: false, fixed: true });
     state = run(state, [[FACILITATOR, 'facilitator:advance-phase', {}]]);  // team -> battle
     expect(state.phase.name).toBe('battle');
     expect(state.initiative.declared.white.revealed).toBe(true);
@@ -201,7 +201,6 @@ describe('replay', () => {
 
     state = run(state, [
       [FACILITATOR, 'facilitator:advance-phase', {}],
-      [halfdan, 'declare-initiative-target', { shireId: 'lindsey' }],
       [halfdan, 'swear-allegiance', { liegeId: 'guthrum_the_old' }],
       [FACILITATOR, 'facilitator:advance-phase', {}],
       [FACILITATOR, 'facilitator:advance-phase', {}],

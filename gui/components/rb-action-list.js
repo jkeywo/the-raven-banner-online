@@ -43,6 +43,7 @@ const LABELS = {
   'claim-crown': 'Claim a crown',
   'cast-vote': 'Cast your vote',
   rebel: 'Rebel against your liege',
+  'use-mercenary': 'Call in the mercenaries',
 };
 
 const NOTES = {
@@ -71,6 +72,7 @@ const NOTES = {
   'request-allegiance': 'They must agree, and must wear a crown or be a Dane.',
   'claim-crown': 'Every shire that supports it gets a say.',
   rebel: 'A shire and two soldiers to the man you are leaving.',
+  'use-mercenary': 'Once a game. Your side wins one more clash.',
 };
 
 /** Verbs that need the player to say more before they mean anything. */
@@ -81,7 +83,7 @@ export const NEEDS_CHOICE = new Set([
   'missionary-expedition', 'rousing-sermon', 'baptise',
   'request-settle', 'drive-out-missionaries',
   'offer-contract', 'answer-contract', 'cancel-contract',
-  'request-allegiance', 'claim-crown', 'rebel',
+  'request-allegiance', 'claim-crown', 'rebel', 'use-mercenary',
 ]);
 
 export class RbActionList extends HTMLElement {

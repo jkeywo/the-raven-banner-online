@@ -72,8 +72,14 @@ export function apply(state, data, cmd, actor, meta = {}) {
  *
  * @returns {{state: object, refused: {seq: number, verb: string, reason: string}[]}}
  */
-export function replay({ joinCode, seed, log }, data, { roleIds } = {}) {
-  let state = createInitialState({ joinCode, seed, data, roleIds });
+export function replay(save, data, { roleIds } = {}) {
+  const { joinCode, seed, log } = save;
+  // The save's own roster wins over anything passed in: it is what the game
+  // was actually dealt, and a caller guessing at a head count is how a
+  // short-handed game comes back with a player who was never there.
+  let state = createInitialState({
+    joinCode, seed, data, roleIds: save.roleIds ?? roleIds,
+  });
   const refused = [];
 
   for (const entry of log) {

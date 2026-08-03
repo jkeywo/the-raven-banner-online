@@ -332,8 +332,7 @@ describe('through the reducer', () => {
       state = result.state;
     };
     step('facilitator:advance-phase', {});                                    // team
-    step('declare-initiative-target', { shireId: 'lindsey' },
-      { seatId: 's1', kind: 'player', roleId: 'halfdan_ragnarsson' });
+    // No declaration: turn one's targets are fixed, and Halfdan's is Lindsey.
     step('facilitator:advance-phase', {});                                    // battle
     step('facilitator:announce-targets', {});
     step('join-battle', { shireId: 'lindsey', side: 'attackers' },

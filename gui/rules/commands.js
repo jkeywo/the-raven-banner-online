@@ -128,6 +128,10 @@ export function resolveConsent(draft, data, request) {
   }
 }
 
+/** Which side of a battle this role joined, or null. */
+const sideOf = (state, shireId, roleId) => ['attackers', 'defenders'].find(
+  (side) => state.battle.sides[shireId]?.[side]?.includes(roleId)) ?? null;
+
 /** The crowns this role actually wears. */
 const crownsHeldBy = (state, roleId) =>
   Object.keys(state.crownHolders).filter((crown) => state.crownHolders[crown] === roleId);
@@ -325,6 +329,11 @@ export const COMMANDS = {
       const token = Object.keys(state.initiative)
         .find((k) => ['white', 'black', 'bonus'].includes(k) && state.initiative[k] === roleId);
       if (!token) return no('you do not hold an initiative token');
+      // Turn one is written down for you. From turn two it is your problem,
+      // which is exactly the moment the game hands the plan over.
+      if (state.initiative.declared[token]?.fixed) {
+        return no('this turn\'s target is fixed by the rules');
+      }
       if (!state.shires[cmd.payload?.shireId]) return no('no such shire');
       return ok();
     },
@@ -1573,6 +1582,41 @@ export const COMMANDS = {
   },
 
   /**
+   * Hand in the mercenary card.
+   *
+   * "Your side counts as achieving victory in one additional clash during the
+   * battle." Once per game, after the sides are set but before the pairing —
+   * so it is spent knowing who joined and not knowing who you will face.
+   * Either side of that line and the decision stops being interesting.
+   */
+  'use-mercenary': {
+    phases: ['battle'],
+    actor: 'player',
+    probe: (state) => ({ shireId: state.battle.targets[0] }),
+    admit(ctx) {
+      const roleId = subjectOf(ctx);
+      const role = ctx.state.roles[roleId];
+      if (!role?.mercenary) return no('you have no mercenaries to call on');
+      const { shireId } = ctx.cmd.payload ?? {};
+      if (!ctx.state.battle.targets.includes(shireId)) return no('no battle is being fought there');
+      if (ctx.state.battle.pairingComplete) return no('the fighters are already paired');
+      if (!sideOf(ctx.state, shireId, roleId)) return no('you are not in that battle');
+      return ok();
+    },
+    effects(draft, ctx) {
+      const roleId = subjectOf(ctx);
+      const { shireId } = ctx.cmd.payload;
+      const side = sideOf(draft, shireId, roleId);
+      const hired = draft.battle.mercenaries[shireId] ?? { attackers: 0, defenders: 0 };
+      hired[side] += 1;
+      draft.battle.mercenaries[shireId] = hired;
+      draft.roles[roleId].once.mercenary = true;
+      // Spent. The card is handed over, not merely ticked off.
+      draft.roles[roleId].mercenary = false;
+    },
+  },
+
+  /**
    * Choose a card, in secret.
    *
    * Freely changeable until the other side has chosen too — the commitment is
@@ -1906,6 +1950,53 @@ export const COMMANDS = {
     },
   },
 
+  /**
+   * The heir arrives.
+   *
+   * "If a character dies they return immediately with a replacement character
+   * – usually their heir. They keep the same character sheet, but you should
+   * change it in at least one of the following ways" — a goal, a claim, or the
+   * foreign sympathies toward them.
+   *
+   * So death is not elimination and never was: the seat keeps playing, with
+   * the same lands, soldiers and silver, as somebody else. The wounds go back
+   * to zero because the new man has not been in a fight yet, and the crowns go
+   * because "the new character will need to claim any crowns they want to
+   * hold, even if their previous character already held them" — an election
+   * won by a dead man does not bind the shires to his son.
+   *
+   * The three levers are the facilitator's, and they are the point of the
+   * rule: it exists so the umpire can make a losing game interesting again.
+   * The app records what they changed rather than deciding it.
+   */
+  'facilitator:heir-arrives': {
+    phases: '*',
+    actor: 'facilitator',
+    admit(ctx) {
+      const role = ctx.state.roles[ctx.cmd.payload?.roleId];
+      if (!role) return no('no such character');
+      return ok();
+    },
+    effects(draft, ctx) {
+      const { roleId, note, addClaim, dropClaim } = ctx.cmd.payload;
+      const role = draft.roles[roleId];
+
+      role.dead = false;
+      role.wounds = 0;
+      role.generation += 1;
+      // Whatever crowns the father wore are back on the table.
+      for (const [crown, who] of Object.entries(draft.crownHolders)) {
+        if (who === roleId) delete draft.crownHolders[crown];
+      }
+      if (dropClaim) role.claims = role.claims.filter((crown) => crown !== dropClaim);
+      if (addClaim && !role.claims.includes(addClaim)) role.claims.push(addClaim);
+      // What the umpire changed, in their own words, for the epilogue.
+      if (note) {
+        draft.facilitatorNotes[`heir:${roleId}:${role.generation}`] = String(note);
+      }
+    },
+  },
+
   /** Count the clashes and move the board. */
   'facilitator:settle-battle': {
     phases: ['battle'],
@@ -1928,7 +2019,8 @@ export const COMMANDS = {
     admit: ok,
     effects(draft) {
       seizeInitiative(draft);
-      draft.battle = { targets: [], sides: {}, clashes: {}, spare: {}, scouts: {}, pairingComplete: false };
+      draft.battle = { targets: [], sides: {}, clashes: {}, spare: {}, scouts: {},
+        mercenaries: {}, pairingComplete: false };
     },
   },
 
