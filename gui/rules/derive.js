@@ -102,6 +102,39 @@ export function reachableFrom(state, data, roleId) {
   return [...reach].sort();
 }
 
+/** Shires a faction's members currently steward between them. */
+export function shiresOfFaction(state, factionId) {
+  return Object.keys(state.shires).filter((id) => {
+    const steward = state.shires[id].stewardRoleId;
+    return steward && state.roles[steward]?.factionId === factionId;
+  });
+}
+
+/**
+ * Shires adjacent to anything a faction holds.
+ *
+ * Raiding reaches further than attacking does, and reaches on behalf of the
+ * whole faction rather than the raider: the printed target is "a settlement in
+ * a shire adjacent to one your faction controls". A landless Dane can burn a
+ * farm next to a shire his jarl took, which is exactly what a landless Dane is
+ * for.
+ *
+ * Borders only — no support shortcut and no buying passage by sea, both of
+ * which are how an *army* moves rather than how a raiding party does.
+ */
+export function factionReach(state, data, factionId) {
+  const held = new Set(shiresOfFaction(state, factionId));
+  const reach = new Set();
+  for (const [a, b] of data.adjacency.edges) {
+    if (held.has(a)) reach.add(b);
+    if (held.has(b)) reach.add(a);
+  }
+  // A faction's own shires are reachable too: a lord may burn his own farm,
+  // and more usefully may raid a shire he has just taken.
+  for (const id of held) reach.add(id);
+  return [...reach].sort();
+}
+
 /**
  * What a role with no land collects instead, by archetype.
  *

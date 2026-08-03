@@ -16,7 +16,9 @@
  */
 
 import { PHASES, seatHolding } from './state.js';
-import { incomeFor, isDanish, isPagan, momentumGain, reachableFrom } from './derive.js';
+import {
+  incomeFor, isDanish, isPagan, momentumGain, reachableFrom, factionReach, churchesHeld,
+} from './derive.js';
 import {
   advanceClash, amendLead, confirmLead, sidesOf, resolveClash, MAX_REINFORCEMENT,
 } from './clash.js';
@@ -326,9 +328,16 @@ export const COMMANDS = {
         }
       }
 
-      // The Danish Trader is paid for every contract that is in use.
-      if (data.roles.roles[roleId]?.archetype === 'danish_trader') {
-        role.silver += 2 * draft.contracts.filter((c) => c.active).length;
+      // A contract pays *both* signatories two silver a turn: the trader who
+      // arranged it and the steward whose port it runs through. Paying only
+      // the trader would make the deal worthless to the person being asked
+      // for a soldier, which is the half that has to be persuaded.
+      for (const contract of draft.contracts) {
+        if (!contract.active) continue;
+        if (contract.traderRoleId === roleId
+            || draft.shires[contract.shireId]?.stewardRoleId === roleId) {
+          role.silver += 2;
+        }
       }
 
       const income = incomeFor(draft, data, roleId);
@@ -444,7 +453,150 @@ export const COMMANDS = {
     },
   },
 
+  /**
+   * Once a game, and free: the banners go up and the faithful turn out.
+   *
+   * Scales with the turn, so it is worth more the longer you hold it — a
+   * first-turn Alfred gains one soldier, a fifth-turn Alfred five. The whole
+   * design of the card is "save this for when it matters".
+   */
+  'raise-christian-banners': {
+    phases: ['maintenance'],
+    actor: 'player',
+    admit(ctx) {
+      const roleId = subjectOf(ctx);
+      if (isDanish(ctx.state, ctx.data, roleId) && !ctx.state.roles[roleId].baptised) {
+        return no('the banners are Christian');
+      }
+      if (ctx.state.roles[roleId].once.christianBanners) {
+        return no('you have raised them once already');
+      }
+      const churches = churchesHeld(ctx.state, roleId);
+      if (churches < 3) return no(`you control ${churches} churches and this needs 3`);
+      return ok();
+    },
+    effects(draft, ctx) {
+      const role = draft.roles[subjectOf(ctx)];
+      role.soldiers += draft.phase.turn;
+      role.once.christianBanners = true;
+    },
+  },
+
+  /** Two ships stood offshore make a shire harder to come at by sea. */
+  'defensive-fleet': {
+    phases: ['maintenance'],
+    actor: 'player',
+    probe: (state, data, roleId) => ({
+      shireId: Object.keys(state.shires).find((id) => state.shires[id].stewardRoleId === roleId),
+    }),
+    admit(ctx) {
+      const roleId = subjectOf(ctx);
+      const shire = ctx.state.shires[ctx.cmd.payload?.shireId];
+      if (!shire) return no('no such shire');
+      if (shire.stewardRoleId !== roleId) return no('you can only guard a shire you steward');
+      if (ctx.data.shires.shires[shire.id].shipCost === null) {
+        return no('that shire has no coast to guard');
+      }
+      const reason = affordable(ctx.state.roles[roleId], { ships: 2 });
+      return reason ? no(reason) : ok();
+    },
+    effects(draft, ctx) {
+      spend(draft.roles[subjectOf(ctx)], { ships: 2 });
+      draft.shires[ctx.cmd.payload.shireId].shipCostDelta += 1;
+    },
+  },
+
+  /** Six silver puts a burned settlement back. */
+  'rebuild-settlement': {
+    phases: ['maintenance'],
+    actor: 'player',
+    probe: (state, data, roleId) => {
+      for (const [shireId, shire] of Object.entries(state.shires)) {
+        if (shire.stewardRoleId !== roleId) continue;
+        const ruin = Object.values(shire.settlements).find((s) => s.destroyed);
+        if (ruin) return { shireId, settlementId: ruin.id };
+      }
+      return {};
+    },
+    admit(ctx) {
+      const roleId = subjectOf(ctx);
+      const reason = affordable(ctx.state.roles[roleId], { silver: 6 });
+      if (reason) return no(reason);
+      const shire = ctx.state.shires[ctx.cmd.payload?.shireId];
+      if (!shire) return no('no such shire');
+      if (shire.stewardRoleId !== roleId) return no('you can only rebuild where you steward');
+      const settlement = shire.settlements[ctx.cmd.payload?.settlementId];
+      if (!settlement) return no('no such settlement');
+      if (!settlement.destroyed) return no('that settlement is still standing');
+      return ok();
+    },
+    effects(draft, ctx) {
+      spend(draft.roles[subjectOf(ctx)], { silver: 6 });
+      const settlement = draft.shires[ctx.cmd.payload.shireId]
+        .settlements[ctx.cmd.payload.settlementId];
+      settlement.destroyed = false;
+      // It comes back as it was printed, undefended: rebuilding a place is not
+      // the same as walling it.
+      settlement.defended = false;
+    },
+  },
+
   // --- encounter phase -----------------------------------------------------
+  /**
+   * Burn a settlement and carry off what it was worth.
+   *
+   * The one action that reaches on the faction's behalf rather than your own —
+   * "a settlement in a shire adjacent to one your faction controls" — so a
+   * landless Dane can raid beside a shire his jarl took, which is most of what
+   * a landless Dane is for.
+   *
+   * Raiding is not gated on support, unlike income: a defended settlement that
+   * pays its holder nothing is still perfectly worth burning.
+   */
+  'raid-settlement': {
+    phases: ['encounter'],
+    actor: 'player',
+    probe: (state, data, roleId) => {
+      const role = state.roles[roleId];
+      for (const shireId of factionReach(state, data, role?.factionId)) {
+        const target = Object.values(state.shires[shireId].settlements)
+          .find((s) => !s.destroyed && !s.defended);
+        if (target) return { shireId, settlementId: target.id };
+      }
+      return {};
+    },
+    admit(ctx) {
+      const roleId = subjectOf(ctx);
+      const role = ctx.state.roles[roleId];
+      const shire = ctx.state.shires[ctx.cmd.payload?.shireId];
+      if (!shire) return no('no such shire');
+      if (!factionReach(ctx.state, ctx.data, role.factionId).includes(shire.id)) {
+        return no('your faction holds nothing next to that shire');
+      }
+      const settlement = shire.settlements[ctx.cmd.payload?.settlementId];
+      if (!settlement) return no('no such settlement');
+      if (settlement.destroyed) return no('somebody has already burned it');
+
+      const cost = { momentum: 2, ...(settlement.defended ? { soldiers: 2 } : {}) };
+      const reason = affordable(role, cost);
+      return reason ? no(reason) : ok();
+    },
+    effects(draft, ctx, { data }) {
+      const roleId = subjectOf(ctx);
+      const role = draft.roles[roleId];
+      const settlement = draft.shires[ctx.cmd.payload.shireId]
+        .settlements[ctx.cmd.payload.settlementId];
+
+      spend(role, { momentum: 2, ...(settlement.defended ? { soldiers: 2 } : {}) });
+      settlement.destroyed = true;
+
+      const spoils = data.meta.raidSpoils[settlement.type] ?? {};
+      role.silver += spoils.silver ?? 0;
+      role.food += spoils.food ?? 0;
+    },
+  },
+
+  // --- encounter phase, diplomacy ------------------------------------------
   /**
    * Open a line to a power nobody plays.
    *

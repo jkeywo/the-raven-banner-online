@@ -9,7 +9,14 @@
  *
  * Pure description plus one render function. The sending is the caller's job,
  * which keeps this testable without a network.
+ *
+ * It asks the rules the same questions the host will. A projection is
+ * state-shaped, so `derive.js` works on it directly -- and reimplementing
+ * "which shires can this faction reach" here would be a second answer waiting
+ * to disagree with the first.
  */
+
+import { factionReach } from '../rules/derive.js';
 
 /**
  * @typedef {object} Field
@@ -109,6 +116,52 @@ export function fieldsFor(verb, view, data) {
           .map((id) => ({ value: id, label: data.shires.shires[id]?.name ?? id })),
       }];
 
+    case 'raid-settlement': {
+      // Only what the faction can actually reach, so a player is not invited
+      // to burn something on the other side of England.
+      const factionId = view.roles?.[me]?.factionId;
+      const reach = new Set(factionReach(view, data, factionId));
+      const options = Object.entries(view.shires ?? {})
+        .filter(([shireId]) => reach.has(shireId))
+        .flatMap(([shireId, shire]) => Object.values(shire.settlements ?? {})
+          .filter((s) => !s.destroyed)
+          .map((s) => ({
+            value: `${shireId}|${s.id}`,
+            label: `${data.shires.shires[shireId]?.name ?? shireId} — ${settlementLabel(s)}`,
+          })));
+      return [{ name: 'target', label: 'Which settlement', kind: 'select', options }];
+    }
+
+    case 'defensive-fleet':
+      return [{
+        name: 'shireId',
+        label: 'Which shire',
+        kind: 'select',
+        // Coastal only: there is nothing to guard inland.
+        options: held().filter(({ value }) => data.shires.shires[value]?.shipCost !== null),
+      }];
+
+    case 'rebuild-settlement': {
+      const options = Object.entries(view.shires ?? {})
+        .filter(([, shire]) => shire.stewardRoleId === me)
+        .flatMap(([shireId, shire]) => Object.values(shire.settlements ?? {})
+          .filter((s) => s.destroyed)
+          .map((s) => ({
+            value: `${shireId}|${s.id}`,
+            label: `${data.shires.shires[shireId]?.name ?? shireId} — ${s.type}`,
+          })));
+      return [{ name: 'target', label: 'Which ruin', kind: 'select', options }];
+    }
+
+    case 'send-envoy':
+      return [{
+        name: 'npcFaction',
+        label: 'To',
+        kind: 'select',
+        options: (data.factions.envoy?.[data.roles.roles[me]?.archetype]?.to ?? [])
+          .map((id) => ({ value: id, label: data.factions.npc[id]?.name ?? id })),
+      }];
+
     case 'collect-income':
       // Only a pagan Dane is asked; everyone else just collects.
       return view.derived?.roles?.[me]?.pagan
@@ -130,6 +183,10 @@ export function fieldsFor(verb, view, data) {
 
 /** Turn a filled-in form into the payload the command expects. */
 export function payloadFrom(verb, values) {
+  if (verb === 'raid-settlement' || verb === 'rebuild-settlement') {
+    const [shireId, settlementId] = String(values.target ?? '').split('|');
+    return { shireId, settlementId };
+  }
   if (verb === 'reinforce') {
     const [shireId, settlementId] = String(values.target ?? '').split('|');
     return { shireId, settlementId };

@@ -1,5 +1,5 @@
 {
- "_generated": "raven_banner gamespec @ analogue-projects d1ca1d8 via tools/export_web_data.py",
+ "_generated": "raven_banner gamespec @ analogue-projects f3d620a via tools/export_web_data.py",
  "_doNotEdit": true,
  "turns": 5,
  "phases": [
@@ -27,6 +27,22 @@
  "momentumCap": 4,
  "woundsFatal": 3,
  "castleFloor": 2,
+ "raidSpoils": {
+  "farm": {
+   "food": 2
+  },
+  "town": {
+   "silver": 4
+  },
+  "church": {
+   "silver": 5
+  }
+ },
+ "tradeContractShires": [
+  "wrekinsets",
+  "kent",
+  "west_country"
+ ],
  "attackersWinTies": true,
  "leadTheChargeIsARatchet": true,
  "defenderBonusAtDefendedSettlements": 3,

@@ -146,10 +146,11 @@ describe('a pagan Dane owes their followers', () => {
 describe('the Danish Trader', () => {
   it('is paid two silver for every contract in use', () => {
     const { state, actor } = playing('frida_anundottir');
+    const trader = 'frida_anundottir';
     state.contracts = [
-      { id: 'c1', shireId: 'kent', active: true },
-      { id: 'c2', shireId: 'west_country', active: true },
-      { id: 'c3', shireId: 'wrekinsets', active: false },
+      { id: 'c1', shireId: 'kent', traderRoleId: trader, active: true },
+      { id: 'c2', shireId: 'west_country', traderRoleId: trader, active: true },
+      { id: 'c3', shireId: 'wrekinsets', traderRoleId: trader, active: false },
     ];
     const before = state.roles.frida_anundottir.silver;
     // Landless, so no income of her own — just the contracts.

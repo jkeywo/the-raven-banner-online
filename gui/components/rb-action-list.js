@@ -26,6 +26,11 @@ const LABELS = {
   reinforce: 'Reinforce a settlement',
   trade: 'Trade at market',
   give: 'Give to another player',
+  'raid-settlement': 'Raid a settlement',
+  'raise-christian-banners': 'Raise Christian banners',
+  'defensive-fleet': 'Station a defensive fleet',
+  'rebuild-settlement': 'Rebuild a settlement',
+  'send-envoy': 'Send an envoy',
 };
 
 const NOTES = {
@@ -38,12 +43,18 @@ const NOTES = {
   'declare-initiative-target': 'Only if you hold an initiative token.',
   'transfer-stewardship': 'They collect its income, and must hold it.',
   'swear-allegiance': 'Their crowns then count as support for you.',
+  'raid-settlement': 'Two momentum, and two soldiers if it is defended.',
+  'raise-christian-banners': 'Once a game. Soldiers equal to the turn.',
+  'defensive-fleet': 'Two ships. Makes the shire dearer to reach by sea.',
+  'rebuild-settlement': 'Six silver. It comes back undefended.',
+  'send-envoy': 'Buys a hearing, not a deal.',
 };
 
 /** Verbs that need the player to say more before they mean anything. */
 export const NEEDS_CHOICE = new Set([
   'trade', 'give', 'reinforce', 'transfer-stewardship',
   'swear-allegiance', 'declare-initiative-target',
+  'raid-settlement', 'defensive-fleet', 'rebuild-settlement', 'send-envoy',
 ]);
 
 export class RbActionList extends HTMLElement {
