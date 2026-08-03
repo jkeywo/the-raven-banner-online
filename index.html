@@ -67,7 +67,7 @@
         <nav id="game-tabs" class="rb-tabs" role="tablist">
           <button type="button" role="tab" data-pane="map" aria-selected="true">The board</button>
           <button type="button" role="tab" data-pane="battle" id="tab-battle" aria-selected="false">Battle</button>
-          <button type="button" role="tab" data-pane="me" aria-selected="false">Your sheet</button>
+          <button type="button" role="tab" data-pane="me" id="tab-me" aria-selected="false">Your sheet</button>
           <button type="button" role="tab" data-pane="envoys" aria-selected="false">Envoys</button>
           <button type="button" role="tab" data-pane="aftermath" aria-selected="false">England</button>
         </nav>
@@ -92,6 +92,7 @@
       <div data-pane-body="me" class="rb-pane rb-pane-me" hidden>
         <rb-private-sheet id="sheet"></rb-private-sheet>
         <aside class="rb-actions-panel">
+          <rb-consent-panel id="consents"></rb-consent-panel>
           <h2>What you can do</h2>
           <p id="action-error" class="rb-error" role="alert"></p>
           <div id="chooser" class="rb-chooser-panel" hidden></div>

@@ -22,6 +22,7 @@ import '../components/rb-seat-roster.js';
 import '../components/rb-phase-clock.js';
 import '../components/rb-facilitator-grid.js';
 import '../components/rb-envoy-queue.js';
+import '../components/rb-consent-queue.js';
 import '../components/rb-state-inspector.js';
 
 const $ = (id) => document.getElementById(id);
@@ -148,6 +149,12 @@ export async function startHostApp({ location = window.location } = {}) {
     $('battle-grid').state = host.state;
     $('envoy-queue').data = data;
     $('envoy-queue').state = host.state;
+    $('consent-queue').data = data;
+    $('consent-queue').state = host.state;
+    // Hidden until somebody asks: an empty panel above the envoys is a panel
+    // the facilitator learns to scroll past.
+    $('consent-panel').hidden = !Object.values(host.state.consents ?? {})
+      .some((r) => !r.resolved);
     $('inspector').state = host.state;
     const waiting = Object.values(host.state.envoys).filter((t) => t.open
       && t.messages.at(-1)?.from === t.roleId).length;

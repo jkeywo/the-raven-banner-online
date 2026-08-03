@@ -143,6 +143,9 @@ export const FIELD_VISIBILITY = [
   },
 
   // --- everything else -----------------------------------------------------
+  // Who is asking whom for what is public: a settlement is a thing the
+  // whole border can see being negotiated.
+  { path: 'consents.**', audience: PUBLIC },
   { path: 'contracts.**', audience: PUBLIC },
   { path: 'votes.**', audience: PUBLIC },
   // An envoy thread is a private line to the facilitator, one per role.

@@ -34,6 +34,8 @@ const LABELS = {
   'missionary-expedition': 'Send missionaries',
   'rousing-sermon': 'Preach a rousing sermon',
   baptise: 'Baptise a pagan',
+  'request-settle': 'Settle a shire',
+  'drive-out-missionaries': 'Drive out the missionaries',
 };
 
 const NOTES = {
@@ -54,6 +56,8 @@ const NOTES = {
   'missionary-expedition': 'One momentum. The shire stops counting as pagan.',
   'rousing-sermon': 'One momentum. They gain a soldier.',
   baptise: 'Free, but they must agree. Ends their upkeep.',
+  'request-settle': 'Every neighbouring steward has to agree first.',
+  'drive-out-missionaries': 'One momentum. The cross comes down.',
 };
 
 /** Verbs that need the player to say more before they mean anything. */
@@ -62,6 +66,7 @@ export const NEEDS_CHOICE = new Set([
   'swear-allegiance', 'declare-initiative-target',
   'raid-settlement', 'defensive-fleet', 'rebuild-settlement', 'send-envoy',
   'missionary-expedition', 'rousing-sermon', 'baptise',
+  'request-settle', 'drive-out-missionaries',
 ]);
 
 export class RbActionList extends HTMLElement {

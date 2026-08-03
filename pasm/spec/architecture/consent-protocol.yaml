@@ -1,0 +1,132 @@
+entities:
+  - mechanic: neighbour-consent
+    core:
+      status: implemented
+      confidence: confirmed
+      title: Neighbour Consent
+      summary: >-
+        A standing request one player opens and several others answer, used by
+        Settle Shire, which requires consent from the stewards of every adjacent
+        shire before the settlement can happen.
+      rationale:
+        - The first thing in the game that makes one player wait on several others, so it is a request held in state rather than an action that succeeds or fails at the moment it is taken.
+        - Nothing is spent until it carries. A neighbour who refuses costs the asker the time and nothing else, which is what makes asking worth doing at all.
+        - One refusal closes it immediately. The requirement is consent from all of them, so a neighbour who says no does not have to wait for the rest to answer.
+        - A shire with no steward is silent rather than obstructive — there is nobody to ask — and a Dane holding both sides of a border does not need his own permission.
+        - The whole request is public. A settlement is public business, and knowing that a Dane is trying to put down roots next door is exactly the sort of thing to trade on.
+      assumptions:
+        - The request outlives the phase it was opened in. A negotiation started in the maintenance phase should not die because the clock ran out mid-conversation.
+      references:
+        - consent-request-state
+        - facilitator-consent-override
+    game_design:
+      participating_roles:
+        - settling-dane
+        - adjacent-steward
+        - facilitator
+    implementation:
+      status: declared
+      paths:
+        - gui/rules/commands.js
+        - gui/components/rb-consent-panel.js
+        - gui/components/rb-consent-queue.js
+      symbols:
+        - neighbourStewards
+        - resolveConsent
+        - RbConsentPanel
+        - RbConsentQueue
+      tests:
+        - npm test
+    evidence:
+      - kind: test
+        reference: tests/rules/settle-shire.test.js
+        summary: >-
+          Halfdan asks for Jorvik, both neighbouring stewards agree, and only
+          then is he charged — the shire becoming supported takes it out of the
+          Disorder count while leaving the Danelaw and Paganism counts alone.
+      - kind: test
+        reference: tests/components/consent.test.js
+        summary: >-
+          A neighbour who was asked gets two buttons, the asker gets a tally of
+          who has not answered, and a bystander gets neither.
+
+  - state: consent-request-state
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Consent Request State
+      summary: >-
+        One open question — who asked, about which shire, which stewards were
+        asked, what each has answered, and whether it has closed.
+      rationale:
+        - Public in the visibility manifest, so every console renders the same negotiation and nobody has to be told what is being asked.
+        - Who was asked is fixed when the request opens rather than recomputed as it is answered, so a shire changing hands mid-negotiation cannot silently change the electorate.
+    architecture:
+      classification: authoritative
+      owner: game-host
+      writers:
+        - game-host
+
+  - message: request-settle-command
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Request Settle
+      summary: A Dane opens a consent round about a shire he stewards and has not already settled.
+      rationale:
+        - Admission checks he could afford it before three neighbours are put through a decision he cannot pay for.
+        - Only one open round per shire, so a refused asker cannot simply ask again until somebody clicks the wrong button.
+    architecture:
+      authority: request
+      producer:
+        - client-command-gateway
+      consumer:
+        - command-admission
+      validator:
+        - command-admission
+      trust_boundary: client-to-host
+      payload: shire-identifier
+
+  - message: answer-consent-command
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Answer Consent
+      summary: A steward who was asked says yes or no, closing the round when the answer is no longer in doubt.
+    architecture:
+      authority: request
+      producer:
+        - client-command-gateway
+      consumer:
+        - command-admission
+      validator:
+        - command-admission
+      trust_boundary: client-to-host
+      payload: consent-and-answer
+
+  - decision: facilitator-consent-override
+    core:
+      status: implemented
+      confidence: confirmed
+      title: The Facilitator Can Answer For Whoever Has Wandered Off
+      summary: >-
+        The facilitator may answer on behalf of one named steward, or on behalf
+        of everyone still silent at once, but cannot overwrite an answer
+        somebody has already given.
+      rationale:
+        - At a live event somebody is always away from their screen, and twenty people should not wait on one of them. In the room this is simply the umpire asking the table out loud and hearing no objection.
+        - It goes through the same command everyone else uses, so it lands in the log tagged as an override and replays like any other decision.
+        - It cannot reopen a closed round, which is what stops an override quietly reversing a refusal a player made deliberately.
+    implementation:
+      status: declared
+      paths:
+        - gui/rules/commands.js
+        - gui/components/rb-consent-queue.js
+      symbols:
+        - resolveConsent
+      tests:
+        - npm test
+    evidence:
+      - kind: test
+        reference: tests/rules/settle-shire.test.js
+        summary: The facilitator carries a round for one absent neighbour and for everyone still silent, and is refused on one already settled.

@@ -28,6 +28,7 @@ import '../components/rb-phase-clock.js';
 import '../components/rb-action-list.js';
 import '../components/rb-clash-panel.js';
 import '../components/rb-envoy-channel.js';
+import '../components/rb-consent-panel.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -177,6 +178,12 @@ export async function startPlayerApp({ location = window.location } = {}) {
     $('actions').data = data;
     $('actions').view = view;
     $('action-error').textContent = client.lastRefusal?.reason ?? '';
+
+    $('consents').data = data;
+    $('consents').view = view;
+    // Being asked for consent is the one thing that goes stale while you are
+    // looking at the map, so the tab says so.
+    $('tab-me').dataset.live = String($('consents').pending.length > 0);
 
     $('clash').data = data;
     $('clash').view = view;

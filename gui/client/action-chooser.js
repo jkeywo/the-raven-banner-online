@@ -205,6 +205,24 @@ export function fieldsFor(verb, view, data) {
         },
       ];
 
+    case 'request-settle':
+      return [{
+        name: 'shireId',
+        label: 'Settle',
+        kind: 'select',
+        // Yours, and not already settled — asking twice about the same ground
+        // wastes everybody's evening.
+        options: held().filter(({ value }) => !view.shires[value]?.danishSupport),
+      }];
+
+    case 'drive-out-missionaries':
+      return [{
+        name: 'shireId',
+        label: 'Which shire',
+        kind: 'select',
+        options: held().filter(({ value }) => view.shires[value]?.missionaryCross),
+      }];
+
     case 'collect-income':
       // Only a pagan Dane is asked; everyone else just collects.
       return view.derived?.roles?.[me]?.pagan

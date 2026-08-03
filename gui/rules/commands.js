@@ -69,6 +69,60 @@ function canReinforceIn(state, data, roleId, shire) {
 }
 
 /**
+ * Everybody who has to agree before a shire can be settled.
+ *
+ * The stewards of every adjacent shire, across map boundaries as well as
+ * within one, minus the asker themselves — a Dane who already holds both sides
+ * of a border does not need his own permission. A shire with no steward is
+ * silent rather than obstructive.
+ */
+export function neighbourStewards(state, data, shireId, askerRoleId) {
+  const stewards = new Set();
+  for (const [a, b] of data.adjacency.edges) {
+    const other = a === shireId ? b : b === shireId ? a : null;
+    if (!other) continue;
+    const steward = state.shires[other]?.stewardRoleId;
+    if (steward && steward !== askerRoleId) stewards.add(steward);
+  }
+  return [...stewards].sort();
+}
+
+/**
+ * Close a consent request once its answer is no longer in doubt.
+ *
+ * One refusal is enough to end it — the requirement is consent from *all* of
+ * them — so a neighbour who says no does not have to wait for the rest.
+ */
+export function resolveConsent(draft, data, request) {
+  const answers = Object.values(request.granted);
+  const refused = answers.some((granted) => granted === false);
+  const allAnswered = request.asked.every((who) => request.granted[who] !== undefined);
+  if (!refused && !allAnswered) return;
+
+  request.resolved = true;
+  request.outcome = refused ? 'refused' : 'granted';
+  if (refused || request.kind !== 'settle') return;
+
+  // Carried: now it costs something.
+  const role = draft.roles[request.roleId];
+  role.momentum -= 1;
+  role.soldiers -= 3;
+  role.silver -= 5;
+
+  const shire = draft.shires[request.shireId];
+  shire.danishSupport = true;
+  // "add defenders to two settlements of your choice" — the app takes the two
+  // that are not already defended, which is the only choice worth making.
+  let toDefend = 2;
+  for (const settlement of Object.values(shire.settlements)) {
+    if (toDefend === 0) break;
+    if (settlement.defended || settlement.destroyed) continue;
+    settlement.defended = true;
+    toDefend -= 1;
+  }
+}
+
+/**
  * When the phase now beginning should end.
  *
  * A deadline rather than a countdown, so a client works out what is left from
@@ -539,6 +593,129 @@ export const COMMANDS = {
       // It comes back as it was printed, undefended: rebuilding a place is not
       // the same as walling it.
       settlement.defended = false;
+    },
+  },
+
+  /**
+   * Ask the neighbours whether you may settle.
+   *
+   * The only action in the game that needs other people's agreement before it
+   * happens, and the printed requirement is broad: *"Consent from the stewards
+   * of all adjacent Shires"* — every neighbour, whatever side they are on, so
+   * a Dane wanting to put down roots has to talk to the Saxons he has been
+   * raiding.
+   *
+   * Modelled as a request rather than an instant action, because that is what
+   * it is. Nothing is spent until it carries; a refusal costs the asker
+   * nothing but the time. A shire with no steward consents by default — there
+   * is nobody to ask — and the facilitator can force it through for anyone who
+   * has wandered off, which at a live event is always somebody.
+   */
+  'request-settle': {
+    phases: ['maintenance'],
+    actor: 'player',
+    probe: (state, data, roleId) => ({
+      shireId: Object.keys(state.shires).find((id) => state.shires[id].stewardRoleId === roleId),
+    }),
+    admit(ctx) {
+      const roleId = subjectOf(ctx);
+      if (!isDanish(ctx.state, ctx.data, roleId)) return no('only Danes settle');
+      const shire = ctx.state.shires[ctx.cmd.payload?.shireId];
+      if (!shire) return no('no such shire');
+      if (shire.stewardRoleId !== roleId) return no('you can only settle a shire you steward');
+      if (shire.danishSupport) return no('you have already settled there');
+      if (Object.values(ctx.state.consents).some(
+        (c) => c.shireId === shire.id && !c.resolved)) {
+        return no('you are already asking about that shire');
+      }
+      const reason = affordable(ctx.state.roles[roleId],
+        { momentum: 1, soldiers: 3, silver: 5 });
+      return reason ? no(reason) : ok();
+    },
+    effects(draft, ctx, { data }) {
+      const roleId = subjectOf(ctx);
+      const shireId = ctx.cmd.payload.shireId;
+      const id = `settle:${shireId}:${Object.keys(draft.consents).length + 1}`;
+      draft.consents[id] = {
+        id,
+        kind: 'settle',
+        roleId,
+        shireId,
+        // Every neighbour with somebody in charge of it. An unheld shire has
+        // nobody to object.
+        asked: neighbourStewards(draft, data, shireId, roleId),
+        granted: {},
+        resolved: false,
+        outcome: null,
+      };
+    },
+  },
+
+  /** A neighbour says yes, or says no. */
+  'answer-consent': {
+    phases: '*',
+    actor: 'player',
+    admit(ctx) {
+      const request = ctx.state.consents[ctx.cmd.payload?.consentId];
+      if (!request) return no('no such request');
+      if (request.resolved) return no('that has already been settled one way or the other');
+      const roleId = subjectOf(ctx);
+      if (!request.asked.includes(roleId)) return no('nobody asked you');
+      if (typeof ctx.cmd.payload?.granted !== 'boolean') return no('yes or no?');
+      return ok();
+    },
+    effects(draft, ctx, { data }) {
+      const request = draft.consents[ctx.cmd.payload.consentId];
+      request.granted[subjectOf(ctx)] = ctx.cmd.payload.granted;
+      resolveConsent(draft, data, request);
+    },
+  },
+
+  /**
+   * The facilitator answers for a neighbour who is not at their screen.
+   *
+   * Twenty people should not wait on one person who has gone to make tea, and
+   * in the room this is simply the umpire asking them out loud.
+   */
+  'facilitator:answer-consent': {
+    phases: '*',
+    actor: 'facilitator',
+    admit(ctx) {
+      const request = ctx.state.consents[ctx.cmd.payload?.consentId];
+      if (!request) return no('no such request');
+      return request.resolved ? no('that has already been settled') : ok();
+    },
+    effects(draft, ctx, { data }) {
+      const request = draft.consents[ctx.cmd.payload.consentId];
+      const { onBehalfOf, granted } = ctx.cmd.payload;
+      if (onBehalfOf) request.granted[onBehalfOf] = Boolean(granted);
+      // With no name, the facilitator is answering for everyone still silent.
+      else for (const who of request.asked) request.granted[who] ??= Boolean(granted);
+      resolveConsent(draft, data, request);
+    },
+  },
+
+  /** Take the cross back out again. */
+  'drive-out-missionaries': {
+    phases: ['encounter'],
+    actor: 'player',
+    probe: (state, data, roleId) => ({
+      shireId: Object.keys(state.shires).find(
+        (id) => state.shires[id].missionaryCross && state.shires[id].stewardRoleId === roleId),
+    }),
+    admit(ctx) {
+      const roleId = subjectOf(ctx);
+      const reason = affordable(ctx.state.roles[roleId], { momentum: 1 });
+      if (reason) return no(reason);
+      const shire = ctx.state.shires[ctx.cmd.payload?.shireId];
+      if (!shire) return no('no such shire');
+      if (shire.stewardRoleId !== roleId) return no('you do not control that shire');
+      if (!shire.missionaryCross) return no('there are no missionaries there');
+      return ok();
+    },
+    effects(draft, ctx) {
+      spend(draft.roles[subjectOf(ctx)], { momentum: 1 });
+      draft.shires[ctx.cmd.payload.shireId].missionaryCross = false;
     },
   },
 

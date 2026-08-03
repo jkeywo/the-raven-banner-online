@@ -48,6 +48,7 @@ entities:
       owns:
         - authoritative-game-state
         - clash-machine-state
+        - consent-request-state
       coordinates:
         - command-admission
         - view-projector
@@ -212,6 +213,7 @@ entities:
         - phase-clock
         - clash-resolution
         - envoy-negotiation
+        - neighbour-consent
     implementation:
       status: declared
       paths:

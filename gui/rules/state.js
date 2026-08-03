@@ -107,6 +107,10 @@ export function createInitialState({ joinCode, seed, data, roleIds }) {
       spare: {}, scouts: {},
       pairingComplete: false,
     },
+    // Requests waiting on other people's agreement. Settling a shire is the
+    // only one so far, and the first thing in the game that makes one player
+    // wait on several others.
+    consents: {},
     contracts: [],
     votes: {},
     envoys: {},

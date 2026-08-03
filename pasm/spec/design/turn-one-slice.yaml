@@ -60,6 +60,24 @@ entities:
       title: Defending Combatant
       summary: A player fighting on the defending side of a clash, possibly with a bonus from defended settlements.
 
+  - role: settling-dane
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Settling Dane
+      summary: >-
+        A Danish player asking to put down roots in a shire he already holds by
+        force, which is the only way a Dane gains support anywhere.
+
+  - role: adjacent-steward
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Adjacent Steward
+      summary: >-
+        Whoever holds a shire bordering the one being settled. Their consent is
+        required, and withholding it costs them nothing.
+
   - verb: claim-role
     core:
       status: proposed
