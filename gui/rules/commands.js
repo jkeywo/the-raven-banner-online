@@ -17,7 +17,8 @@
 
 import { PHASES, seatHolding } from './state.js';
 import {
-  incomeFor, isDanish, isPagan, momentumGain, reachableFrom, factionReach, churchesHeld,
+  incomeFor, isDanish, isPagan, isChristian, isDanishHeld, momentumGain,
+  reachableFrom, factionReach, churchesHeld,
 } from './derive.js';
 import {
   advanceClash, amendLead, confirmLead, sidesOf, resolveClash, MAX_REINFORCEMENT,
@@ -541,7 +542,117 @@ export const COMMANDS = {
     },
   },
 
+  /**
+   * Send missionaries into a Danish shire.
+   *
+   * A cross does three things at once, which is why one momentum is cheap for
+   * it: the shire stops counting toward Paganism at the end, the priest may
+   * reinforce there as though it were their own, and a Dane who is later
+   * baptised gains a de jure claim on every Danish shire that has one. Sending
+   * a missionary is how the church buys a claim it can cash years later.
+   */
+  'missionary-expedition': {
+    phases: ['maintenance'],
+    actor: 'player',
+    probe: (state, data, roleId) => ({
+      shireId: Object.keys(state.shires).find((id) => isDanishHeld(state, data, id)),
+    }),
+    admit(ctx) {
+      const roleId = subjectOf(ctx);
+      if (ctx.data.roles.roles[roleId]?.archetype !== 'saxon_priest') {
+        return no('only a priest sends missionaries');
+      }
+      const reason = affordable(ctx.state.roles[roleId], { momentum: 1 });
+      if (reason) return no(reason);
+
+      const shire = ctx.state.shires[ctx.cmd.payload?.shireId];
+      if (!shire) return no('no such shire');
+      // "One occupied or settled Danish shire" — held by a Dane, or one they
+      // have Settled. No adjacency, and no limit per turn.
+      if (!isDanishHeld(ctx.state, ctx.data, shire.id)) {
+        return no('missionaries go to Danish shires');
+      }
+      if (shire.missionaryCross) return no('a cross already stands there');
+      return ok();
+    },
+    effects(draft, ctx) {
+      spend(draft.roles[subjectOf(ctx)], { momentum: 1 });
+      draft.shires[ctx.cmd.payload.shireId].missionaryCross = true;
+    },
+  },
+
   // --- encounter phase -----------------------------------------------------
+  /** A momentum spent preaching puts a soldier in somebody else's hand. */
+  'rousing-sermon': {
+    phases: ['encounter'],
+    actor: 'player',
+    probe: (state, data, roleId) => ({
+      targetRoleId: Object.keys(state.roles).find(
+        (id) => id !== roleId && isChristian(state, data, id)),
+    }),
+    admit(ctx) {
+      const roleId = subjectOf(ctx);
+      if (ctx.data.roles.roles[roleId]?.archetype !== 'saxon_priest') {
+        return no('only a priest preaches');
+      }
+      const reason = affordable(ctx.state.roles[roleId], { momentum: 1 });
+      if (reason) return no(reason);
+
+      const target = ctx.cmd.payload?.targetRoleId;
+      if (!ctx.state.roles[target]) return no('no such character');
+      if (target === roleId) return no('preach to somebody else');
+      if (!isChristian(ctx.state, ctx.data, target)) return no('they are not a Christian');
+      return ok();
+    },
+    effects(draft, ctx) {
+      spend(draft.roles[subjectOf(ctx)], { momentum: 1 });
+      draft.roles[ctx.cmd.payload.targetRoleId].soldiers += 1;
+    },
+  },
+
+  /**
+   * Baptise a willing pagan.
+   *
+   * Free, as printed — the cost is that they have to agree, and a Dane agreeing
+   * is the whole negotiation. What they get is a goal about Christian England
+   * and a de jure claim on every Danish shire with a cross in it; what they
+   * stop paying is the followers' upkeep. What they keep is their support in
+   * shires they have Settled, since the printed rule says "Danes", not "pagan
+   * Danes".
+   *
+   * The priest counts two extra churches for every baptism they perform, which
+   * is what can push a faction over the ten that buys a third momentum.
+   */
+  baptise: {
+    phases: ['encounter'],
+    actor: 'player',
+    probe: (state, data, roleId) => ({
+      targetRoleId: Object.keys(state.roles).find((id) => isPagan(state, data, id)),
+    }),
+    admit(ctx) {
+      const roleId = subjectOf(ctx);
+      if (ctx.data.roles.roles[roleId]?.archetype !== 'saxon_priest') {
+        return no('only a priest baptises');
+      }
+      const target = ctx.cmd.payload?.targetRoleId;
+      if (!ctx.state.roles[target]) return no('no such character');
+      if (!isPagan(ctx.state, ctx.data, target)) return no('they are already Christian');
+      // "One willing pagan character". Willingness is agreed out loud and
+      // confirmed here, so the app never converts anybody against their will.
+      if (!ctx.cmd.payload?.willing) return no('they have to agree to it');
+      return ok();
+    },
+    effects(draft, ctx, { data }) {
+      const roleId = subjectOf(ctx);
+      const convert = draft.roles[ctx.cmd.payload.targetRoleId];
+      convert.baptised = true;
+      // A de jure claim on every Danish shire the church has already reached.
+      convert.deJureShires = Object.keys(draft.shires).filter(
+        (id) => draft.shires[id].missionaryCross && isDanishHeld(draft, data, id));
+      draft.roles[roleId].baptismsPerformed += 1;
+    },
+  },
+
   /**
    * Burn a settlement and carry off what it was worth.
    *

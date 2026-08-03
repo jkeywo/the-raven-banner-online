@@ -31,6 +31,9 @@ const LABELS = {
   'defensive-fleet': 'Station a defensive fleet',
   'rebuild-settlement': 'Rebuild a settlement',
   'send-envoy': 'Send an envoy',
+  'missionary-expedition': 'Send missionaries',
+  'rousing-sermon': 'Preach a rousing sermon',
+  baptise: 'Baptise a pagan',
 };
 
 const NOTES = {
@@ -48,6 +51,9 @@ const NOTES = {
   'defensive-fleet': 'Two ships. Makes the shire dearer to reach by sea.',
   'rebuild-settlement': 'Six silver. It comes back undefended.',
   'send-envoy': 'Buys a hearing, not a deal.',
+  'missionary-expedition': 'One momentum. The shire stops counting as pagan.',
+  'rousing-sermon': 'One momentum. They gain a soldier.',
+  baptise: 'Free, but they must agree. Ends their upkeep.',
 };
 
 /** Verbs that need the player to say more before they mean anything. */
@@ -55,6 +61,7 @@ export const NEEDS_CHOICE = new Set([
   'trade', 'give', 'reinforce', 'transfer-stewardship',
   'swear-allegiance', 'declare-initiative-target',
   'raid-settlement', 'defensive-fleet', 'rebuild-settlement', 'send-envoy',
+  'missionary-expedition', 'rousing-sermon', 'baptise',
 ]);
 
 export class RbActionList extends HTMLElement {

@@ -67,6 +67,10 @@ export const FIELD_VISIBILITY = [
   { path: 'roles.*.factionId', audience: PUBLIC },
   { path: 'roles.*.crowns', audience: PUBLIC },
   { path: 'roles.*.baptised', audience: PUBLIC },
+  // A conversion is a public event and its consequences are read off the
+  // board, so both of these are everybody's business.
+  { path: 'roles.*.deJureShires', audience: PUBLIC },
+  { path: 'roles.*.baptismsPerformed', audience: PUBLIC },
   { path: 'roles.*.dead', audience: PUBLIC },
 
   { path: 'roles.*.momentum', audience: OWNER, owner: ownerAtIndex(1) },

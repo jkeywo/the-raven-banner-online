@@ -47,6 +47,32 @@ export function isPagan(state, data, roleId) {
 }
 
 /**
+ * Whether a role is Christian.
+ *
+ * Everyone who is not a pagan, which after a baptism includes Danes. The
+ * distinction matters for who may be preached to, who may raise banners, and
+ * which shires count toward Paganism at the end.
+ */
+export function isChristian(state, data, roleId) {
+  return Boolean(state.roles[roleId]) && !isPagan(state, data, roleId);
+}
+
+/**
+ * Whether a shire is Danish for missionary purposes.
+ *
+ * The printed target is "one occupied or settled Danish shire" -- so a shire a
+ * Dane stewards, or one they have Settled. A baptised Dane's shire still
+ * counts: the cross is what stops it reading as pagan at the end, and a
+ * convert's lands are exactly where a church wants one.
+ */
+export function isDanishHeld(state, data, shireId) {
+  const shire = state.shires[shireId];
+  if (!shire) return false;
+  if (shire.danishSupport) return true;
+  return Boolean(shire.stewardRoleId) && isDanish(state, data, shire.stewardRoleId);
+}
+
+/**
  * Whether a role has support in a shire.
  *
  * The printed rule: support is given in a shire if you or your liege hold the
@@ -205,7 +231,12 @@ export function momentumGain(state, data, roleId) {
   const base = 2;
   const archetype = data.roles.roles[roleId]?.archetype;
   if (archetype !== 'saxon_priest') return base;
-  return base + (factionChurches(state, roleId) >= 10 ? 1 : 0);
+  // Every baptism the priest has performed counts as two more churches. A
+  // missionary who converts three Danes has effectively built six of them,
+  // which is the game saying conversion is worth as much as construction.
+  const notional = factionChurches(state, roleId)
+    + 2 * (state.roles[roleId]?.baptismsPerformed ?? 0);
+  return base + (notional >= 10 ? 1 : 0);
 }
 
 /** Settlements still standing, across the whole board. */
@@ -229,8 +260,15 @@ export function aftermath(state, data) {
   const ids = Object.keys(state.shires).sort();
   const stewardOf = (id) => state.shires[id].stewardRoleId;
 
+  // Danelaw counts Danish stewards; Paganism counts *pagan* ones. The two are
+  // the same list until somebody is baptised, and then they are not: a
+  // converted jarl's shires stay Danish for the culture count and stop being
+  // pagan for the church's. Getting these the same way round would make
+  // conversion worth nothing on the tracker, which is where the game is read.
   const danelaw = ids.filter((id) => stewardOf(id) && isDanish(state, data, stewardOf(id)));
-  const paganism = danelaw.filter((id) => !state.shires[id].missionaryCross);
+  const paganism = ids.filter((id) => stewardOf(id)
+    && isPagan(state, data, stewardOf(id))
+    && !state.shires[id].missionaryCross);
   const disorder = ids.filter((id) => stewardOf(id) && !hasSupport(state, data, id));
   const prosperity = settlementsStanding(state);
 

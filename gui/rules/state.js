@@ -48,6 +48,11 @@ export function createInitialState({ joinCode, seed, data, roleIds }) {
       factionId: role.team,
       crowns: [...role.claims],
       baptised: false,
+      // Shires a baptised Dane gained a de jure claim on: the Danish ones the
+      // church had already reached with a cross when they converted.
+      deJureShires: [],
+      // A priest counts two extra churches for each of these.
+      baptismsPerformed: 0,
       dead: false,
       once: { christianBanners: false },
       perTurn: { shipsBuilt: 0, tradesUsed: 0 },

@@ -16,7 +16,7 @@
  * to disagree with the first.
  */
 
-import { factionReach } from '../rules/derive.js';
+import { factionReach, isChristian, isPagan, isDanishHeld } from '../rules/derive.js';
 
 /**
  * @typedef {object} Field
@@ -162,6 +162,49 @@ export function fieldsFor(verb, view, data) {
           .map((id) => ({ value: id, label: data.factions.npc[id]?.name ?? id })),
       }];
 
+    case 'missionary-expedition':
+      return [{
+        name: 'shireId',
+        label: 'Which shire',
+        kind: 'select',
+        options: Object.keys(view.shires ?? {})
+          .filter((id) => isDanishHeld(view, data, id) && !view.shires[id].missionaryCross)
+          .map((id) => ({ value: id, label: data.shires.shires[id]?.name ?? id })),
+      }];
+
+    case 'rousing-sermon':
+      return [{
+        name: 'targetRoleId',
+        label: 'Preach to',
+        kind: 'select',
+        options: Object.keys(view.roles ?? {})
+          .filter((id) => id !== me && isChristian(view, data, id))
+          .map((id) => ({ value: id, label: data.roles.roles[id]?.name ?? id })),
+      }];
+
+    case 'baptise':
+      return [
+        {
+          name: 'targetRoleId',
+          label: 'Baptise',
+          kind: 'select',
+          options: Object.keys(view.roles ?? {})
+            .filter((id) => isPagan(view, data, id))
+            .map((id) => ({ value: id, label: data.roles.roles[id]?.name ?? id })),
+        },
+        // Not a formality. A conversion agreed out loud is the whole
+        // negotiation, and the app should never perform one without it.
+        {
+          name: 'willing',
+          label: 'Have they agreed?',
+          kind: 'select',
+          options: [
+            { value: '', label: 'not yet — go and ask them' },
+            { value: 'yes', label: 'yes, they are willing' },
+          ],
+        },
+      ];
+
     case 'collect-income':
       // Only a pagan Dane is asked; everyone else just collects.
       return view.derived?.roles?.[me]?.pagan
@@ -193,6 +236,7 @@ export function payloadFrom(verb, values) {
   }
   if (verb === 'give') return { ...values, amount: Number(values.amount) };
   if (verb === 'swear-allegiance') return { liegeId: values.liegeId || null };
+  if (verb === 'baptise') return { ...values, willing: values.willing === 'yes' };
   return values;
 }
 
