@@ -9,6 +9,11 @@
  * redaction already happened on the host, so there is nothing here that has to
  * remember to hide anything. If another player's silver is not in the view,
  * this cannot display it by mistake.
+ *
+ * Momentum and the four tracks stay in view always — a player checks those
+ * constantly. Everything else sits in an accordion: opening one section
+ * should not mean losing your place in another, so each is independent rather
+ * than a set of tabs that hide each other.
  */
 
 const TRACKS = [
@@ -59,16 +64,28 @@ export class RbPrivateSheet extends HTMLElement {
           <div class="rb-track" title="${note}">
             <dt>${label}</dt>
             <dd>${role[key] ?? 0}</dd>
+            ${this._trackModifier(key, derived.income)}
           </div>`).join('')}
       </dl>
 
       ${this._wounds(role.wounds ?? 0, fatal)}
-      ${this._income(derived.income)}
-      ${this._lands(held)}
-      ${this._claims(role.claims ?? [])}
-      ${this._promises()}
-      ${this._brief(this._view.brief)}
+
+      <div class="rb-sheet-accordion">
+        ${this._section('Lands', this._lands(held), { open: true })}
+        ${this._section('Crowns and claims', this._claims(role.claims ?? []))}
+        ${this._section('What you have promised', this._promises())}
+        ${this._section('Your goals', this._brief(this._view.brief))}
+      </div>
     `;
+  }
+
+  /** One accordion section, or nothing at all if there is nothing to say. */
+  _section(label, body, { open = false } = {}) {
+    if (!body) return '';
+    return `<details class="rb-sheet-section" ${open ? 'open' : ''}>
+      <summary>${label}</summary>
+      ${body}
+    </details>`;
   }
 
   _name(roleId) {
@@ -83,8 +100,21 @@ export class RbPrivateSheet extends HTMLElement {
       <div class="rb-momentum">
         <span class="rb-track-label">Momentum</span>
         <span class="rb-pips" role="img" aria-label="${value} of ${cap}">${pips}</span>
+        ${derived.momentumGain ? `<span class="rb-track-mod">+${derived.momentumGain}/turn</span>` : ''}
         ${derived.churches ? `<span class="rb-meta">${derived.churches} churches</span>` : ''}
       </div>`;
+  }
+
+  /**
+   * What a stat is worth next maintenance phase, shown on the card it belongs
+   * to rather than as a separate paragraph underneath everything. A landless
+   * role earns a fixed amount instead of rent from land, which is worth
+   * saying right where the number it changes is sitting.
+   */
+  _trackModifier(key, income) {
+    const amount = income?.[key];
+    if (!amount) return '';
+    return `<span class="rb-track-mod">+${amount}${income.landless ? ' landless' : '/turn'}</span>`;
   }
 
   _wounds(value, fatal) {
@@ -97,18 +127,8 @@ export class RbPrivateSheet extends HTMLElement {
     </p>`;
   }
 
-  _income(income) {
-    if (!income) return '';
-    if (income.landless) {
-      return `<p class="rb-meta">Holding no land, you collect
-        ${income.food} food and ${income.soldiers} soldier each maintenance phase.</p>`;
-    }
-    return `<p class="rb-meta">Your lands pay
-      ${income.silver} silver and ${income.food} food each maintenance phase.</p>`;
-  }
-
   _lands(held) {
-    if (!held.length) return '<h3>Lands</h3><p class="rb-empty">You steward nothing.</p>';
+    if (!held.length) return '<p class="rb-empty">You steward nothing.</p>';
     const rows = held.map(([id, shire]) => {
       const printed = this._data.shires.shires[id];
       const supported = this._view.derived?.shires?.[id]?.supported;
@@ -119,7 +139,7 @@ export class RbPrivateSheet extends HTMLElement {
         ${supported ? '' : '<span class="rb-warn">no support</span>'}
       </li>`;
     }).join('');
-    return `<h3>Lands</h3><ul class="rb-lands">${rows}</ul>`;
+    return `<ul class="rb-lands">${rows}</ul>`;
   }
 
   /**
@@ -137,8 +157,8 @@ export class RbPrivateSheet extends HTMLElement {
     if (!crowns.length && !worn.length) return '';
 
     return `
-      ${worn.length ? `<h3>Crowns</h3><p>${worn.map((c) => title(c)).join(', ')}</p>` : ''}
-      ${crowns.length ? `<h3>Claims</h3><p>${crowns.map((c) => (
+      ${worn.length ? `<p><strong>Wears:</strong> ${worn.map((c) => title(c)).join(', ')}</p>` : ''}
+      ${crowns.length ? `<p><strong>Claims:</strong> ${crowns.map((c) => (
     taken.includes(c) ? `<s>${title(c)}</s>` : title(c))).join(', ')}
         ${taken.length ? '<span class="rb-warn">crowned elsewhere</span>' : ''}</p>` : ''}`;
   }
@@ -155,7 +175,6 @@ export class RbPrivateSheet extends HTMLElement {
     const mine = Object.values(this._view.concessions ?? {});
     if (!mine.length) return '';
     return `
-      <h3>What you have promised</h3>
       <ul class="rb-ledger">${mine.map((c) => `
         <li data-kept="${c.kept}">
           <span>${c.kept ? '' : '<s>'}${escape(c.text)}${c.kept ? '' : '</s>'}</span>
@@ -169,13 +188,12 @@ export class RbPrivateSheet extends HTMLElement {
     const goals = (brief.goals ?? []).map((g) => `<li>${escape(g)}</li>`).join('');
     const guidance = (brief.guidance ?? []).map((g) => `<li>${escape(g)}</li>`).join('');
     return `
-      <h3>Your goals</h3>
       <p class="rb-meta">
         Nobody wins this game. At the end you judge your own part in it against
         these — so keep them to yourself.
       </p>
       <ul class="rb-goals">${goals}</ul>
-      ${guidance ? `<h3>Guidance</h3><ul class="rb-guidance">${guidance}</ul>` : ''}`;
+      ${guidance ? `<h4>Guidance</h4><ul class="rb-guidance">${guidance}</ul>` : ''}`;
   }
 }
 

@@ -226,13 +226,16 @@ export async function startHostApp({ location = window.location } = {}) {
     $('crowns').state = session.state;
     // Hidden until somebody asks: an empty panel above the envoys is a panel
     // the facilitator learns to scroll past.
-    $('consent-panel').hidden = !Object.values(session.state.consents ?? {})
+    const consentsPending = Object.values(session.state.consents ?? {})
       .some((r) => !r.resolved);
+    $('consent-panel').hidden = !consentsPending;
+    $('tab-fac-crowns').dataset.live = String(consentsPending);
     $('inspector').state = session.state;
     const waiting = Object.values(session.state.envoys).filter((t) => t.open
       && t.messages.at(-1)?.from === t.roleId).length;
     $('envoy-count').textContent = waiting
       ? `${waiting} waiting on you` : 'nothing waiting';
+    $('tab-fac-envoys').dataset.live = String(waiting > 0);
     // The co-facilitator's banner, and whether there is enough mirrored to
     // take the game over with.
     $('co-banner').hidden = session.kind !== 'co';
@@ -244,12 +247,19 @@ export async function startHostApp({ location = window.location } = {}) {
         : 'nothing has arrived yet';
     }
 
-    $('battle-panel').hidden = phase.name !== 'battle';
+    // The tab flags itself live rather than the panel disappearing — a
+    // control the facilitator needs stays reachable on every phase, it just
+    // says when it matters most.
+    $('tab-fac-battle').dataset.live = String(phase.name === 'battle');
+
     // The debrief appears when the game ends and not before: a half-played
     // epilogue is a thing to be misread out loud.
-    $('epilogue-panel').hidden = phase.name !== 'epilogue';
-    $('end-game').disabled = phase.name === 'epilogue' || phase.name === 'lobby';
-    if (phase.name === 'epilogue') {
+    const ended = phase.name === 'epilogue';
+    $('epilogue-panel').hidden = !ended;
+    $('debrief-waiting').hidden = ended;
+    $('tab-fac-debrief').dataset.live = String(ended);
+    $('end-game').disabled = ended || phase.name === 'lobby';
+    if (ended) {
       $('epilogue').data = data;
       $('epilogue').state = session.state;
     }
@@ -270,6 +280,25 @@ export async function startHostApp({ location = window.location } = {}) {
 
   document.addEventListener('rb-facilitate', (event) =>
     asFacilitator(event.detail.verb, event.detail.payload));
+
+  // --- the facilitator's own tabs -------------------------------------------
+  // One clock and one set of setup details stay on screen throughout; the
+  // rest — battle, crowns, envoys, the debrief, the inspector — are each a
+  // control panel in its own right, and only one needs to be in front at a
+  // time.
+  $('facilitator-tabs').addEventListener('click', (event) => {
+    const button = event.target.closest('[data-pane]');
+    if (button) selectFacilitatorPane(button.dataset.pane);
+  });
+
+  function selectFacilitatorPane(pane) {
+    for (const button of $('facilitator-tabs').children) {
+      button.setAttribute('aria-selected', String(button.dataset.pane === pane));
+    }
+    for (const section of document.querySelectorAll('[data-pane-body]')) {
+      section.hidden = section.dataset.paneBody !== pane;
+    }
+  }
 
   $('advance-phase').addEventListener('click', () => asFacilitator('facilitator:advance-phase'));
   $('pause-clock').addEventListener('click', () => asFacilitator('facilitator:pause-clock'));
@@ -322,7 +351,7 @@ export async function startHostApp({ location = window.location } = {}) {
  */
 async function loadData() {
   const names = ['shires', 'adjacency', 'roles', 'briefs', 'archetypes',
-    'tactics', 'factions', 'meta'];
+    'tactics', 'factions', 'meta', 'scaling'];
   const loaded = await Promise.all(
     names.map((name) => fetch(`data/${name}.json`).then((r) => r.json())));
   return Object.fromEntries(names.map((name, i) => [name, loaded[i]]));

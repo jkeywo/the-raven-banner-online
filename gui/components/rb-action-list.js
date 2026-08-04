@@ -10,9 +10,19 @@
  * player who cannot see that Recruit Soldiers exists cannot learn that it
  * costs five silver, and "why is there nothing here?" is a worse question than
  * "why can't I afford that?".
+ *
+ * Available actions come first, everything refused sits below under its own
+ * heading — a player scans one short list of what they can actually do rather
+ * than picking it out of everything the phase makes available in principle.
+ *
+ * A shire clicked on the map (`focusShireId`) promotes and marks whichever
+ * available actions could target it, using the same field data the chooser
+ * would render — so "click a target to see what you can do with it" can never
+ * name an action the chooser would then refuse a shire for.
  */
 
 import { availableTo } from '../rules/admission.js';
+import { shireTargetsFor } from '../client/action-chooser.js';
 
 /** Player-facing names. The verb ids are for the wire, not for reading. */
 const LABELS = {
@@ -91,6 +101,9 @@ export class RbActionList extends HTMLElement {
 
   set view(value) { this._view = value; this._render(); }
 
+  /** The shire last clicked on the map, or null to clear the promotion. */
+  set focusShireId(value) { this._focusShireId = value; this._render(); }
+
   connectedCallback() { this._render(); }
 
   _render() {
@@ -112,14 +125,35 @@ export class RbActionList extends HTMLElement {
       return;
     }
 
-    this.innerHTML = `<ul class="rb-actions">${actions.map((action) => `
-      <li class="rb-action" data-ok="${action.ok}">
+    // Which available actions the focused shire is a legal target of. Asking
+    // afresh on every render rather than caching: the fields it reads already
+    // change with the view, so a cache would be one more thing to invalidate.
+    const relevant = this._focusShireId
+      ? new Set(actions
+        .filter((a) => a.ok
+          && shireTargetsFor(a.verb, this._view, this._data).includes(this._focusShireId))
+        .map((a) => a.verb))
+      : new Set();
+
+    const available = actions.filter((a) => a.ok)
+      .sort((a, b) => Number(relevant.has(b.verb)) - Number(relevant.has(a.verb)));
+    const unavailable = actions.filter((a) => !a.ok);
+
+    const row = (action) => `
+      <li class="rb-action" data-ok="${action.ok}" data-relevant="${relevant.has(action.verb)}">
         <button type="button" data-verb="${action.verb}" ${action.ok ? '' : 'disabled'}>
           ${LABELS[action.verb] ?? action.verb}${NEEDS_CHOICE.has(action.verb) ? '…' : ''}
         </button>
         <span class="rb-action-note">${
   action.ok ? (NOTES[action.verb] ?? '') : escape(action.reason ?? '')}</span>
-      </li>`).join('')}</ul>`;
+      </li>`;
+
+    this.innerHTML = `
+      <ul class="rb-actions rb-actions-available">${available.map(row).join('')}</ul>
+      ${unavailable.length ? `
+        <h4 class="rb-actions-heading">Not right now</h4>
+        <ul class="rb-actions rb-actions-unavailable">${unavailable.map(row).join('')}</ul>`
+    : ''}`;
   }
 }
 

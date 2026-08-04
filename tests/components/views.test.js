@@ -94,6 +94,29 @@ describe('<rb-map>', () => {
     expect(map.querySelectorAll('path.rb-shire')).toHaveLength(6);
     expect(map.querySelector('img').getAttribute('src')).toBe('assets/maps/eastern.png');
   });
+
+  it('points at the shires an action was given to target, and nowhere else', () => {
+    const { view } = seatedView();
+    const map = mount('rb-map');
+    map.setAttribute('sheet', 'northern');
+    map.data = data;
+    map.view = view;
+    map.highlighted = ['jorvik', 'ribble'];
+
+    const lit = [...map.querySelectorAll('path.is-highlighted')].map((p) => p.dataset.shire);
+    expect(lit.sort()).toEqual(['jorvik', 'ribble']);
+  });
+
+  it('clears the highlight once the chooser it was for is gone', () => {
+    const { view } = seatedView();
+    const map = mount('rb-map');
+    map.setAttribute('sheet', 'northern');
+    map.data = data;
+    map.view = view;
+    map.highlighted = ['jorvik'];
+    map.highlighted = null;
+    expect(map.querySelectorAll('path.is-highlighted')).toHaveLength(0);
+  });
 });
 
 describe('<rb-private-sheet>', () => {
@@ -137,13 +160,24 @@ describe('<rb-private-sheet>', () => {
     expect(sheet.querySelectorAll('.rb-warn').length).toBe(2);   // Jorvik and Ribble
   });
 
-  it('tells a landless player what they collect instead', () => {
+  it('marks a landless player’s stat cards with what they collect instead', () => {
+    // The modifier sits on the card it changes rather than in a separate
+    // paragraph, so it reads as "this number, because of that" at a glance.
     const { view } = seatedView({ roleId: 'godric' });
     const sheet = mount('rb-private-sheet');
     sheet.data = data;
     sheet.view = view;
-    expect(sheet.textContent).toContain('Holding no land');
+    expect(sheet.textContent).toContain('+2 landless');   // food
+    expect(sheet.textContent).toContain('+1 landless');   // soldiers
     expect(sheet.textContent).toContain('You steward nothing');
+  });
+
+  it('shows what a landed player’s stat cards will pay next turn', () => {
+    const { view } = seatedView();
+    const sheet = mount('rb-private-sheet');
+    sheet.data = data;
+    sheet.view = view;
+    expect(sheet.textContent).toMatch(/\+\d+\/turn/);
   });
 
   it('warns before a third wound rather than after', () => {

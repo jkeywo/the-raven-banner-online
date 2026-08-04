@@ -1,8 +1,10 @@
 /**
  * gui/client/player-app.js — the player's whole console.
  *
- * Four screens: the code, your name, the lobby, and then the game. The game is
- * three panes — the board, your own sheet, and how England is doing.
+ * Four screens: the code, your name, the lobby, and then the game. The game
+ * itself is three columns that hold no matter which tab is open — what you
+ * can do on the left, your own sheet on the right, and the board, a battle,
+ * the envoy queue or how England is doing in between.
  *
  * Nothing here decides anything. It sends what the player asked for and
  * renders whatever the host sends back, including the reason a request was
@@ -18,7 +20,7 @@ import { identify } from '../net/wire.js';
 import { sendCommand } from '../net/command-gateway.js';
 import { ClientState } from './client-state.js';
 import { loadData } from './load-data.js';
-import { renderChooser, valuesFrom, payloadFrom } from './action-chooser.js';
+import { renderChooser, valuesFrom, payloadFrom, shireTargetsFor } from './action-chooser.js';
 import '../components/rb-connection-dot.js';
 import '../components/rb-seat-roster.js';
 import '../components/rb-map.js';
@@ -104,8 +106,34 @@ export async function startPlayerApp({ location = window.location } = {}) {
     }
   }
 
-  document.addEventListener('rb-shire', (event) => showShire(event.detail.shireId));
+  document.addEventListener('rb-shire', (event) => onShireClicked(event.detail.shireId));
   document.addEventListener('rb-command', (event) => dispatch(event.detail.verb, event.detail.payload));
+
+  /**
+   * A shire was clicked, either on its own or while an action's chooser is
+   * open.
+   *
+   * With a chooser open, the click finishes the field the dropdown would
+   * otherwise have set — the map becomes the input, not just an illustration
+   * of the dropdown's options. Without one open, the click instead asks the
+   * action list which of the currently-available actions could use this
+   * shire, and promotes those to the top so the answer to "what can I do
+   * here?" is the first thing the player sees.
+   */
+  function onShireClicked(shireId) {
+    showShire(shireId);
+
+    const form = $('chooser').hidden ? null : $('chooser').querySelector('form');
+    const field = form?.querySelector('select[name="shireId"], select[name="target"]');
+    const match = field && [...field.options]
+      .find((o) => o.value === shireId || o.value.startsWith(`${shireId}|`));
+    if (field && match) {
+      field.value = match.value;
+      $('actions').focusShireId = null;
+    } else {
+      $('actions').focusShireId = shireId;
+    }
+  }
 
   function showShire(shireId) {
     const printed = data.shires.shires[shireId];
@@ -189,9 +217,10 @@ export async function startPlayerApp({ location = window.location } = {}) {
     $('consents').view = view;
     $('ballot').data = data;
     $('ballot').view = view;
-    // An answer somebody is waiting on is the one thing that goes stale while
-    // you are looking at the map, so the tab says so.
-    $('tab-me').dataset.live = String(
+    // The action rail is always in view now, whichever tab is open, so an
+    // answer somebody is waiting on can mark the rail itself rather than a
+    // tab a player might not be looking at.
+    $('action-rail').dataset.waiting = String(
       $('consents').pending.length > 0 || $('ballot').pending.length > 0);
 
     $('clash').data = data;
@@ -258,11 +287,21 @@ export async function startPlayerApp({ location = window.location } = {}) {
       closeChooser();
     });
     form.querySelector('[data-cancel]').addEventListener('click', closeChooser);
+
+    // Point at the shires this action could land on, so a player can finish
+    // it by clicking the map instead of hunting through the dropdown. Once a
+    // choice is being made, a shire clicked for its own sake is answered
+    // already — the action list is not also trying to say what else it could
+    // be relevant to.
+    const targets = shireTargetsFor(form.dataset.verb, client.view, data);
+    $('map').highlighted = targets.length ? targets : null;
+    $('actions').focusShireId = null;
   }
 
   function closeChooser() {
     $('chooser').hidden = true;
     $('chooser').replaceChildren();
+    $('map').highlighted = null;
   }
 
   function dispatch(verb, payload) {

@@ -157,4 +157,50 @@ describe('<rb-action-list>', () => {
     const verbs = [...list.querySelectorAll('[data-verb]')].map((b) => b.dataset.verb);
     expect(verbs.some((v) => v.startsWith('facilitator:'))).toBe(false);
   });
+
+  it('lists what is refused separately from what can actually be done', () => {
+    const view = seated('maintenance');
+    view.roles.king_alfred.silver = 1;
+    const list = mount('rb-action-list');
+    list.data = data;
+    list.view = view;
+
+    expect(list.querySelector('.rb-actions-available [data-verb="collect-income"]')).toBeTruthy();
+    expect(list.querySelector('.rb-actions-unavailable [data-verb="recruit-soldiers"]')).toBeTruthy();
+    expect(list.querySelector('.rb-actions-available [data-verb="recruit-soldiers"]')).toBeNull();
+  });
+
+  it('promotes and marks an available action once a shire it could target is clicked', () => {
+    const list = mount('rb-action-list');
+    list.data = data;
+    list.view = seated('team');
+    // Alfred stewards Wiltshire, so transfer-stewardship can target it.
+    list.focusShireId = 'wiltshire';
+
+    const row = list.querySelector('[data-verb="transfer-stewardship"]').closest('.rb-action');
+    expect(row.dataset.relevant).toBe('true');
+    // And it leads the available list, ahead of actions the click said
+    // nothing about.
+    expect(list.querySelector('.rb-actions-available .rb-action').dataset.relevant).toBe('true');
+  });
+
+  it('marks nothing once the focus is cleared', () => {
+    const list = mount('rb-action-list');
+    list.data = data;
+    list.view = seated('team');
+    list.focusShireId = 'wiltshire';
+    list.focusShireId = null;
+    expect(list.querySelectorAll('[data-relevant="true"]')).toHaveLength(0);
+  });
+
+  it('never promotes a refused action, whatever it could target', () => {
+    // Declaring is a facilitator-only concern for a role with no initiative
+    // token, so it should never be marked relevant no matter what is clicked.
+    const list = mount('rb-action-list');
+    list.data = data;
+    list.view = seated('team');
+    list.focusShireId = 'wiltshire';
+    const row = list.querySelector('[data-verb="declare-initiative-target"]')?.closest('.rb-action');
+    if (row) expect(row.dataset.relevant).toBe('false');
+  });
 });

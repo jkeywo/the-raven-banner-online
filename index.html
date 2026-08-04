@@ -67,31 +67,14 @@
         <nav id="game-tabs" class="rb-tabs" role="tablist">
           <button type="button" role="tab" data-pane="map" aria-selected="true">The board</button>
           <button type="button" role="tab" data-pane="battle" id="tab-battle" aria-selected="false">Battle</button>
-          <button type="button" role="tab" data-pane="me" id="tab-me" aria-selected="false">Your sheet</button>
           <button type="button" role="tab" data-pane="envoys" aria-selected="false">Envoys</button>
           <button type="button" role="tab" data-pane="aftermath" aria-selected="false">England</button>
         </nav>
       </header>
 
-      <div data-pane-body="map" class="rb-pane rb-pane-map">
-        <rb-map id="map" sheet="northern"></rb-map>
-        <aside id="shire-detail" class="rb-detail-panel">
-          <p class="rb-empty">Choose a shire on the map.</p>
-        </aside>
-      </div>
-
-      <div data-pane-body="battle" class="rb-pane" hidden>
-        <rb-clash-panel id="clash"></rb-clash-panel>
-      </div>
-
-      <div data-pane-body="envoys" class="rb-pane" hidden>
-        <h2>Envoys</h2>
-        <rb-envoy-channel id="envoys"></rb-envoy-channel>
-      </div>
-
-      <div data-pane-body="me" class="rb-pane rb-pane-me" hidden>
-        <rb-private-sheet id="sheet"></rb-private-sheet>
-        <aside class="rb-actions-panel">
+      <div class="rb-game-body">
+        <!-- what you can do, always in view whichever tab the main pane shows -->
+        <aside id="action-rail" class="rb-rail rb-action-rail">
           <rb-ballot id="ballot"></rb-ballot>
           <rb-consent-panel id="consents"></rb-consent-panel>
           <h2>What you can do</h2>
@@ -99,12 +82,36 @@
           <div id="chooser" class="rb-chooser-panel" hidden></div>
           <rb-action-list id="actions"></rb-action-list>
         </aside>
-      </div>
 
-      <div data-pane-body="aftermath" class="rb-pane" hidden>
-        <rb-aftermath id="aftermath"></rb-aftermath>
-        <h2>Who is here</h2>
-        <rb-seat-roster id="game-roster"></rb-seat-roster>
+        <!-- the board, or how England is doing, or a battle, or the courts -->
+        <div class="rb-game-main">
+          <div data-pane-body="map" class="rb-pane rb-pane-map">
+            <rb-map id="map" sheet="northern"></rb-map>
+            <aside id="shire-detail" class="rb-detail-panel">
+              <p class="rb-empty">Choose a shire on the map.</p>
+            </aside>
+          </div>
+
+          <div data-pane-body="battle" class="rb-pane" hidden>
+            <rb-clash-panel id="clash"></rb-clash-panel>
+          </div>
+
+          <div data-pane-body="envoys" class="rb-pane" hidden>
+            <h2>Envoys</h2>
+            <rb-envoy-channel id="envoys"></rb-envoy-channel>
+          </div>
+
+          <div data-pane-body="aftermath" class="rb-pane" hidden>
+            <rb-aftermath id="aftermath"></rb-aftermath>
+            <h2>Who is here</h2>
+            <rb-seat-roster id="game-roster"></rb-seat-roster>
+          </div>
+        </div>
+
+        <!-- your own sheet, always in view -->
+        <aside id="character-rail" class="rb-rail rb-character-rail">
+          <rb-private-sheet id="sheet"></rb-private-sheet>
+        </aside>
       </div>
     </section>
   </main>

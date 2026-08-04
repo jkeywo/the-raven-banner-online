@@ -5,7 +5,9 @@ import { createInitialState } from '../../gui/rules/state.js';
 import { projectView } from '../../gui/rules/views.js';
 import { apply } from '../../gui/rules/reducer.js';
 import { admit } from '../../gui/rules/admission.js';
-import { fieldsFor, payloadFrom, renderChooser, valuesFrom } from '../../gui/client/action-chooser.js';
+import {
+  fieldsFor, payloadFrom, renderChooser, valuesFrom, shireTargetsFor,
+} from '../../gui/client/action-chooser.js';
 
 const data = await loadData();
 const FACILITATOR = { seatId: 's9', kind: 'facilitator', roleId: null };
@@ -169,5 +171,26 @@ describe('the form', () => {
     const { view: seen } = view('godric', 'team');
     const form = renderChooser('transfer-stewardship', seen, data);
     expect(form.querySelector('select[name="shireId"]').disabled).toBe(true);
+  });
+});
+
+describe('what the map should point at', () => {
+  it('names the shires a shire-targeted action could land on', () => {
+    const { view: seen } = view('king_alfred', 'team');
+    const targets = shireTargetsFor('transfer-stewardship', seen, data);
+    // Alfred's own shires — the same list the dropdown offers.
+    expect(targets.sort()).toEqual(
+      fieldsFor('transfer-stewardship', seen, data)[0].options.map((o) => o.value).sort());
+  });
+
+  it('names the shire half of a settlement target, not the settlement', () => {
+    const { view: seen } = view('king_alfred', 'encounter');
+    const targets = shireTargetsFor('rebuild-settlement', seen, data);
+    for (const id of targets) expect(data.shires.shires[id], id).toBeTruthy();
+  });
+
+  it('names nothing for an action with no shire in it', () => {
+    expect(shireTargetsFor('recruit-soldiers', view('king_alfred').view, data)).toEqual([]);
+    expect(shireTargetsFor('give', view('king_alfred', 'encounter').view, data)).toEqual([]);
   });
 });

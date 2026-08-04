@@ -374,6 +374,22 @@ a { color: var(--rb-blood); text-underline-offset: 0.15em; }
   stroke-opacity: 0.95;
 }
 
+/* A valid target of the action just chosen — an amber glow rather than the
+   blood-red the game already uses for "yours" and "unsupported", so a
+   highlighted shire cannot be mistaken for either. */
+.rb-shire.is-highlighted {
+  fill: var(--rb-amber);
+  fill-opacity: 0.4;
+  stroke: var(--rb-amber);
+  stroke-width: 5;
+  stroke-opacity: 1;
+  animation: rb-shire-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes rb-shire-pulse {
+  50% { fill-opacity: 0.18; }
+}
+
 .rb-shire-tokens { pointer-events: none; }
 
 .rb-shire-label {
@@ -455,7 +471,19 @@ rb-private-sheet { display: block; max-width: 44rem; }
 }
 
 .rb-track dt { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--rb-muted); }
-.rb-track dd { margin: 0; font-family: var(--rb-serif); font-size: 1.6rem; }
+.rb-track dd { margin: 0; font-family: var(--rb-serif); font-size: 1.6rem; display: inline-block; }
+
+/* A modifier sits on the card whose number it changes — what a stat is about
+   to become, next to what it is now — rather than in a paragraph underneath
+   everything a player has to go find and match back up themselves. */
+.rb-track-mod {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--rb-green);
+  margin-top: 0.1rem;
+}
+
+.rb-momentum .rb-track-mod { display: inline; margin: 0; }
 
 .rb-wounds {
   border-left: 3px solid var(--rb-amber);
@@ -472,6 +500,28 @@ rb-private-sheet { display: block; max-width: 44rem; }
 .rb-goals, .rb-guidance { padding-left: 1.2rem; }
 .rb-goals li { margin-bottom: 0.4rem; }
 .rb-guidance li { margin-bottom: 0.5rem; color: var(--rb-muted); font-size: 0.9rem; }
+
+/* Independent accordion sections, not tabs: opening Lands should not close
+   Crowns, because a player often wants both in view while deciding. */
+.rb-sheet-accordion { display: grid; gap: 0.5rem; margin-top: 1rem; }
+
+.rb-sheet-section {
+  background: var(--rb-parchment);
+  border: 1px solid var(--rb-rule);
+  border-radius: 3px;
+  padding: 0.2rem 0.9rem 0.8rem;
+}
+
+.rb-sheet-section[open] { padding-bottom: 0.9rem; }
+
+.rb-sheet-section summary {
+  cursor: pointer;
+  font-family: var(--rb-serif);
+  font-size: 1.05rem;
+  padding: 0.6rem 0;
+}
+
+.rb-sheet-section h4 { margin: 0.8rem 0 0.3rem; font-size: 0.9rem; }
 
 h3 { font-family: var(--rb-serif); font-size: 1rem; margin: 1.6rem 0 0.4rem; }
 
@@ -567,27 +617,41 @@ rb-phase-clock[data-state="paused"] .rb-clock-time::after { content: ' paused'; 
 .rb-run-control .rb-meta { grid-column: 1 / -1; margin: 0; }
 .rb-clock-buttons { display: flex; gap: 0.4rem; flex-wrap: wrap; }
 
-/* --- the action list ----------------------------------------------------- */
+/* --- the game body: what you can do | the board | your sheet ------------- */
 
-.rb-pane-me {
+.rb-game-body {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(15rem, 1fr);
-  gap: 2rem;
+  grid-template-columns: minmax(15rem, 0.9fr) minmax(0, 2.4fr) minmax(15rem, 0.9fr);
+  gap: 1.5rem;
   align-items: start;
 }
 
-@media (max-width: 60rem) {
-  .rb-pane-me { grid-template-columns: 1fr; }
+@media (max-width: 75rem) {
+  /* Board first, then what you can do, then your own sheet last: the two
+     rails still stack, but the map is what a shrinking window keeps. */
+  .rb-game-body { grid-template-columns: 1fr; }
+  .rb-game-main { order: -1; }
 }
 
-.rb-actions-panel {
+.rb-rail {
   background: var(--rb-parchment);
   border: 1px solid var(--rb-rule);
   border-radius: 3px;
   padding: 0.4rem 1.1rem 1.1rem;
   position: sticky;
   top: 1rem;
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
 }
+
+/* Something is waiting on an answer that is not on screen right now — a
+   settle request, a vote — and the rail says so without needing a tab to
+   flash, since the rail is never the thing hidden behind another tab. */
+.rb-action-rail[data-waiting="true"] { border-left: 3px solid var(--rb-blood); }
+
+.rb-character-rail rb-private-sheet { max-width: none; }
+
+/* --- the action list ----------------------------------------------------- */
 
 .rb-actions { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.7rem; }
 .rb-action button { width: 100%; text-align: left; }
@@ -601,6 +665,23 @@ rb-phase-clock[data-state="paused"] .rb-clock-time::after { content: ' paused'; 
 }
 
 .rb-action[data-ok="false"] .rb-action-note { color: var(--rb-blood); }
+
+/* A shire was clicked on the map, and this is one of the things it could be
+   used for — promoted to the top of the list and picked out here. */
+.rb-action[data-relevant="true"] button {
+  border-color: var(--rb-blood);
+  box-shadow: 0 0 0 1px var(--rb-blood);
+}
+
+.rb-actions-heading {
+  margin: 1rem 0 0.4rem;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--rb-muted);
+}
+
+.rb-actions-unavailable { opacity: 0.85; }
 
 /* --- action choosers ----------------------------------------------------- */
 
@@ -726,7 +807,9 @@ rb-clash-panel { display: block; }
 .rb-settle select { font: inherit; padding: 0.35rem; border: 1px solid var(--rb-rule); border-radius: 3px; }
 
 #tab-battle[data-live="true"],
-#tab-me[data-live="true"] { border-color: var(--rb-blood); font-weight: 600; }
+#facilitator-tabs [data-live="true"] { border-color: var(--rb-blood); font-weight: 600; }
+
+#facilitator-tabs { margin: 1.2rem 0 -1px; }
 
 /* --- envoys -------------------------------------------------------------- */
 

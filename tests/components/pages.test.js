@@ -64,7 +64,10 @@ describe('the facilitator console', () => {
 
     for (const id of ['new-game', 'player-count', 'join-as-co', 'co-code', 'co-pin',
       'co-name', 'take-over', 'end-game', 'print-epilogue', 'save-epilogue',
-      'advance-phase', 'pause-clock', 'download-save', 'rules-gaps']) {
+      'advance-phase', 'pause-clock', 'download-save', 'rules-gaps',
+      'facilitator-tabs', 'tab-fac-battle', 'tab-fac-crowns', 'tab-fac-envoys',
+      'tab-fac-debrief', 'battle-panel', 'consent-panel', 'epilogue-panel',
+      'debrief-waiting']) {
       expect(document.getElementById(id), id).toBeTruthy();
     }
   });
@@ -81,6 +84,35 @@ describe('the facilitator console', () => {
     const options = [...document.getElementById('player-count').options].map((o) => o.value);
     expect(options).toEqual(['16', '15', '14', '13', '12']);
   });
+
+  it('loads the scaling table for itself, not just the player console', async () => {
+    // host-app.js keeps its own private loadData rather than sharing
+    // gui/client/load-data.js, and it fell out of sync with the player-count
+    // work: scaling.json was added to the player's loader but not this one,
+    // so a short-handed game silently skipped every top-up, mercenary card
+    // and castle removal the guide's table calls for.
+    await loadPage('host.html');
+    const { startHostApp } = await import('../../gui/host/host-app.js');
+    await startHostApp({ location: { hash: '', href: 'http://x/host.html' } });
+    const fetched = globalThis.fetch.mock.calls.map(([url]) => String(url));
+    expect(fetched).toContain('data/scaling.json');
+  });
+
+  it('switches control panels on the facilitator’s own tabs', async () => {
+    await loadPage('host.html');
+    const { startHostApp } = await import('../../gui/host/host-app.js');
+    await startHostApp({ location: { hash: '', href: 'http://x/host.html' } });
+
+    expect(document.getElementById('battle-panel').closest('[data-pane-body]').hidden).toBe(false);
+    expect(document.getElementById('consent-panel').closest('[data-pane-body]').hidden).toBe(true);
+
+    document.getElementById('tab-fac-crowns').click();
+
+    expect(document.getElementById('battle-panel').closest('[data-pane-body]').hidden).toBe(true);
+    expect(document.getElementById('consent-panel').closest('[data-pane-body]').hidden).toBe(false);
+    expect(document.getElementById('tab-fac-crowns').getAttribute('aria-selected')).toBe('true');
+    expect(document.getElementById('tab-fac-battle').getAttribute('aria-selected')).toBe('false');
+  });
 });
 
 describe('the player console', () => {
@@ -96,7 +128,8 @@ describe('the player console', () => {
     await startPlayerApp({ location: { hash: '' } });
 
     for (const id of ['code-form', 'join-code', 'name-form', 'player-name', 'role-picker',
-      'game-tabs', 'tab-me', 'tab-battle', 'consents', 'ballot', 'chooser', 'actions']) {
+      'game-tabs', 'tab-battle', 'action-rail', 'character-rail', 'sheet',
+      'consents', 'ballot', 'chooser', 'actions']) {
       expect(document.getElementById(id), id).toBeTruthy();
     }
   });

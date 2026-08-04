@@ -345,6 +345,24 @@ export function fieldsFor(verb, view, data) {
   }
 }
 
+/**
+ * The shires this action could land on, for pointing at them on the map.
+ *
+ * Reads the same options the chooser itself renders, so a highlighted shire
+ * can never disagree with what the dropdown actually offers — this has no
+ * knowledge of its own, only the fields' options split on `|` where a target
+ * names a settlement rather than a shire outright.
+ *
+ * @returns {string[]} shire ids, or empty for an action with no shire field
+ */
+export function shireTargetsFor(verb, view, data) {
+  const field = fieldsFor(verb, view, data)
+    .find((f) => f.name === 'shireId' || f.name === 'target');
+  if (!field) return [];
+  const ids = field.options.map((o) => String(o.value).split('|')[0]);
+  return [...new Set(ids.filter((id) => data.shires.shires[id]))];
+}
+
 /** Turn a filled-in form into the payload the command expects. */
 export function payloadFrom(verb, values) {
   if (verb === 'raid-settlement' || verb === 'rebuild-settlement') {

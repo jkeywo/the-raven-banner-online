@@ -42,6 +42,16 @@ export class RbMap extends HTMLElement {
   /** The current projection. */
   set view(value) { this._view = value; this._render(); }
 
+  /**
+   * Shires worth pointing a player's eye at right now — the valid targets of
+   * an action they have just picked. Presentation only: clicking one of these
+   * still goes through the same `rb-shire` event as clicking any other.
+   */
+  set highlighted(ids) {
+    this._highlighted = ids ? new Set(ids) : null;
+    this._render();
+  }
+
   get sheet() { return this.getAttribute('sheet') || 'northern'; }
 
   connectedCallback() {
@@ -123,6 +133,7 @@ export class RbMap extends HTMLElement {
     path.setAttribute('class', 'rb-shire');
     path.dataset.shire = id;
     if (id === this._selected) path.classList.add('is-selected');
+    if (this._highlighted?.has(id)) path.classList.add('is-highlighted');
 
     // Tinted by whoever holds it. An unheld shire, or one whose holder has no
     // faction, is left as the printed parchment.

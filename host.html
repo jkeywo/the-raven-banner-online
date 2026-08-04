@@ -90,64 +90,86 @@
         </p>
       </section>
 
-      <section id="battle-panel" class="rb-battle-panel" hidden>
-        <h2>The battle phase</h2>
-        <rb-facilitator-grid id="battle-grid"></rb-facilitator-grid>
-      </section>
+      <nav id="facilitator-tabs" class="rb-tabs" role="tablist">
+        <button type="button" role="tab" data-pane="battle" id="tab-fac-battle" aria-selected="true">Battle</button>
+        <button type="button" role="tab" data-pane="crowns" id="tab-fac-crowns" aria-selected="false">Crowns &amp; consents</button>
+        <button type="button" role="tab" data-pane="envoys" id="tab-fac-envoys" aria-selected="false">Envoys</button>
+        <button type="button" role="tab" data-pane="debrief" id="tab-fac-debrief" aria-selected="false">Debrief</button>
+        <button type="button" role="tab" data-pane="inspector" aria-selected="false">Inspector</button>
+      </nav>
 
-      <section id="epilogue-panel" class="rb-epilogue-panel" hidden>
-        <h2>The debrief</h2>
-        <p class="rb-meta">
-          Read from this. Everything on it is worked out from the board, so it
-          cannot disagree with the maps the players are looking at.
-        </p>
-        <div class="rb-epilogue-buttons">
-          <button id="print-epilogue" type="button" class="rb-primary">Print it</button>
-          <button id="save-epilogue" type="button">Save as a page</button>
-        </div>
-        <rb-epilogue id="epilogue"></rb-epilogue>
-      </section>
+      <div data-pane-body="battle" class="rb-pane">
+        <section id="battle-panel" class="rb-battle-panel">
+          <h2>The battle phase</h2>
+          <rb-facilitator-grid id="battle-grid"></rb-facilitator-grid>
+        </section>
+      </div>
 
-      <section class="rb-crown-panel">
-        <h2>Crowns and homage</h2>
-        <rb-crown-panel id="crowns"></rb-crown-panel>
-      </section>
+      <div data-pane-body="crowns" class="rb-pane" hidden>
+        <section class="rb-crown-panel">
+          <h2>Crowns and homage</h2>
+          <rb-crown-panel id="crowns"></rb-crown-panel>
+        </section>
 
-      <section id="consent-panel" class="rb-consent-panel" hidden>
-        <h2>Waiting on the neighbours</h2>
-        <p class="rb-meta">
-          Nobody settles a shire without the stewards either side agreeing. If
-          one of them is not at their screen, ask the table and answer for them.
-        </p>
-        <rb-consent-queue id="consent-queue"></rb-consent-queue>
-      </section>
-
-      <section class="rb-envoy-panel">
-        <h2>Envoys <span id="envoy-count" class="rb-meta"></span></h2>
-        <p class="rb-meta">
-          You are the Franks, the Britons, the Danish Kings and the Pope. Each
-          wants something; none of them gives anything away.
-        </p>
-        <rb-envoy-queue id="envoy-queue"></rb-envoy-queue>
-      </section>
-
-      <section class="rb-inspector-panel">
-        <h2>Change anything</h2>
-        <rb-state-inspector id="inspector"></rb-state-inspector>
-      </section>
-
-      <section class="rb-gaps-panel">
-        <details>
-          <summary>Where the rules are silent</summary>
+        <section id="consent-panel" class="rb-consent-panel" hidden>
+          <h2>Waiting on the neighbours</h2>
           <p class="rb-meta">
-            The printed rules were written for a room with you in it, so a few
-            questions are never answered on paper. The app had to pick something
-            before anybody sat down. Here is what it picked — overrule any of it
-            with the inspector above.
+            Nobody settles a shire without the stewards either side agreeing.
+            If one of them is not at their screen, ask the table and answer
+            for them.
           </p>
-          <dl id="rules-gaps" class="rb-gaps"></dl>
-        </details>
-      </section>
+          <rb-consent-queue id="consent-queue"></rb-consent-queue>
+        </section>
+      </div>
+
+      <div data-pane-body="envoys" class="rb-pane" hidden>
+        <section class="rb-envoy-panel">
+          <h2>Envoys <span id="envoy-count" class="rb-meta"></span></h2>
+          <p class="rb-meta">
+            You are the Franks, the Britons, the Danish Kings and the Pope.
+            Each wants something; none of them gives anything away.
+          </p>
+          <rb-envoy-queue id="envoy-queue"></rb-envoy-queue>
+        </section>
+      </div>
+
+      <div data-pane-body="debrief" class="rb-pane" hidden>
+        <section id="epilogue-panel" class="rb-epilogue-panel" hidden>
+          <h2>The debrief</h2>
+          <p class="rb-meta">
+            Read from this. Everything on it is worked out from the board, so
+            it cannot disagree with the maps the players are looking at.
+          </p>
+          <div class="rb-epilogue-buttons">
+            <button id="print-epilogue" type="button" class="rb-primary">Print it</button>
+            <button id="save-epilogue" type="button">Save as a page</button>
+          </div>
+          <rb-epilogue id="epilogue"></rb-epilogue>
+        </section>
+        <p id="debrief-waiting" class="rb-meta">
+          Nothing to read yet — this fills in once you call time.
+        </p>
+      </div>
+
+      <div data-pane-body="inspector" class="rb-pane" hidden>
+        <section class="rb-inspector-panel">
+          <h2>Change anything</h2>
+          <rb-state-inspector id="inspector"></rb-state-inspector>
+        </section>
+
+        <section class="rb-gaps-panel">
+          <details>
+            <summary>Where the rules are silent</summary>
+            <p class="rb-meta">
+              The printed rules were written for a room with you in it, so a
+              few questions are never answered on paper. The app had to pick
+              something before anybody sat down. Here is what it picked —
+              overrule any of it with the inspector above.
+            </p>
+            <dl id="rules-gaps" class="rb-gaps"></dl>
+          </details>
+        </section>
+      </div>
 
       <div class="rb-columns">
         <div>
