@@ -3,8 +3,11 @@
  *
  * Four screens: the code, your name, the lobby, and then the game. The game
  * itself is three columns that hold no matter which tab is open — what you
- * can do on the left, your own sheet on the right, and the board, a battle,
- * the envoy queue or how England is doing in between.
+ * can do on the left, your own sheet on the right, and the board, a battle
+ * or how England is doing in between. Envoys live in the left column too,
+ * beneath the actions: sending the first one is an action like any other,
+ * gated to the phase it belongs to, and a conversation already open stays
+ * reachable whatever phase it is now.
  *
  * Nothing here decides anything. It sends what the player asked for and
  * renders whatever the host sends back, including the reason a request was

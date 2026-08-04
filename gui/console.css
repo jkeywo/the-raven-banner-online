@@ -895,22 +895,11 @@ rb-clash-panel { display: block; }
 
 /* --- envoys -------------------------------------------------------------- */
 
-.rb-courts {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
-  gap: 0.5rem;
-  margin-bottom: 1.2rem;
-}
-
-.rb-courts button {
-  display: grid;
-  gap: 0.15rem;
-  text-align: left;
-  padding: 0.7rem 0.85rem;
-}
-
-.rb-court-name { font-family: var(--rb-serif); font-size: 1.05rem; }
-.rb-court-wants { font-size: 0.75rem; color: var(--rb-muted); }
+/* Sits in the action rail now, beneath the actions, rather than filling a
+   tab of its own — empty (nothing open) it renders nothing and takes no
+   space. */
+rb-envoy-channel { display: block; margin-top: 1rem; }
+rb-envoy-channel h4 { margin: 0 0 0.5rem; }
 
 .rb-threads, .rb-envoy-queue { display: grid; gap: 0.7rem; }
 

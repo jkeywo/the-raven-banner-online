@@ -1,9 +1,17 @@
 /**
- * <rb-envoy-channel> — a private line to a power nobody plays.
+ * <rb-envoy-channel> — a private line to a power nobody plays, continued.
  *
  * In the room this is standing up, walking over to a facilitator and asking
  * the Franks for a fleet. The answer is never a price list — it is "what will
  * you give us for it?" — so this is a conversation rather than a shop.
+ *
+ * Opening a thread is Send An Envoy, an ordinary action in <rb-action-list>
+ * gated to the Encounter Phase like everything else on that list — this
+ * component used to also offer its own "which court" buttons, unconditionally
+ * on a permanent tab, which was a second way to start the same conversation
+ * that never checked the phase at all. This is what is left once that is
+ * gone: whatever is already open, so a reply is never blocked by the phase
+ * that started it (see envoy-message, phases: '*').
  *
  * Only the sender and the facilitator ever see a thread. That is the manifest's
  * doing, not this component's: another player's negotiation with Rome is absent
@@ -21,48 +29,26 @@ export class RbEnvoyChannel extends HTMLElement {
     this.dispatchEvent(new CustomEvent('rb-command', { bubbles: true, detail: { verb, payload } }));
   }
 
+  /** Whether there is anything at all for this player to see right now. */
+  get hasThreads() {
+    return Object.values(this._view?.envoys ?? {}).length > 0;
+  }
+
   _render() {
     if (!this.isConnected || !this._view || !this._data) return;
     const me = this._view.viewer?.roleId;
     if (!me) { this.innerHTML = ''; return; }
 
-    const archetype = this._data.roles.roles[me]?.archetype;
-    const rules = this._data.factions.envoy?.[archetype];
     const threads = Object.values(this._view.envoys ?? {});
-
-    if (!rules) {
-      this.innerHTML = '<p class="rb-empty">Your archetype sends no envoys.</p>';
-      return;
-    }
+    if (!threads.length) { this.innerHTML = ''; return; }
 
     // Keeping the scroll position of an open thread is worth the bookkeeping:
     // a projection arrives on every command anyone in the game makes, and a
     // conversation that jumped to the top each time would be unusable.
     const openId = this._openId ?? threads.find((t) => t.open)?.id ?? null;
 
-    this.innerHTML = `
-      ${this._courts(rules, threads)}
-      ${threads.length ? this._threads(threads, openId) : ''}`;
+    this.innerHTML = `<h4>Envoys</h4>${this._threads(threads, openId)}`;
     this._wire();
-  }
-
-  _courts(rules, threads) {
-    const cost = Object.entries(rules.cost)
-      .map(([what, amount]) => `${amount} ${what}`).join(' and ');
-    return `
-      <p class="rb-meta">An envoy costs ${cost}, and buys you a hearing — not a
-        deal. They will want something.</p>
-      <div class="rb-courts">${rules.to.map((id) => {
-    const npc = this._data.factions.npc[id] ?? { name: id };
-    const already = threads.some((t) => t.npcFaction === id && t.open);
-    return `
-          <button type="button" data-send="${id}" ${already ? 'disabled' : ''}
-                  title="${npc.wants ? `They want ${npc.wants}.` : ''}">
-            <span class="rb-court-name">${npc.name}</span>
-            <span class="rb-court-wants">${already ? 'already talking'
-    : npc.wants ? `wants ${npc.wants}` : ''}</span>
-          </button>`;
-  }).join('')}</div>`;
   }
 
   _threads(threads, openId) {
@@ -96,9 +82,6 @@ export class RbEnvoyChannel extends HTMLElement {
   }
 
   _wire() {
-    for (const button of this.querySelectorAll('[data-send]')) {
-      button.onclick = () => this._emit('send-envoy', { npcFaction: button.dataset.send });
-    }
     for (const button of this.querySelectorAll('[data-open]')) {
       button.onclick = () => {
         this._openId = this._openId === button.dataset.open ? null : button.dataset.open;

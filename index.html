@@ -68,7 +68,6 @@
         <nav id="game-tabs" class="rb-tabs" role="tablist">
           <button type="button" role="tab" data-pane="map" aria-selected="true">The board</button>
           <button type="button" role="tab" data-pane="battle" id="tab-battle" aria-selected="false">Battle</button>
-          <button type="button" role="tab" data-pane="envoys" aria-selected="false">Envoys</button>
           <button type="button" role="tab" data-pane="aftermath" aria-selected="false">Aftermath</button>
         </nav>
       </header>
@@ -82,9 +81,14 @@
           <p id="action-error" class="rb-error" role="alert"></p>
           <div id="chooser" class="rb-chooser-panel" hidden></div>
           <rb-action-list id="actions"></rb-action-list>
+          <!-- Sending the first envoy is itself an action above, gated to the
+               Encounter Phase like everything else on this list. This is only
+               for a conversation already under way, which stays reachable
+               whatever phase it is now (see envoy-message, phases: '*'). -->
+          <rb-envoy-channel id="envoys"></rb-envoy-channel>
         </aside>
 
-        <!-- the board, or how England is doing, or a battle, or the courts -->
+        <!-- the board, or how England is doing, or a battle -->
         <div class="rb-game-main">
           <div data-pane-body="map" class="rb-pane rb-pane-map">
             <rb-map id="map" sheet="northern"></rb-map>
@@ -95,11 +99,6 @@
 
           <div data-pane-body="battle" class="rb-pane" hidden>
             <rb-clash-panel id="clash"></rb-clash-panel>
-          </div>
-
-          <div data-pane-body="envoys" class="rb-pane" hidden>
-            <h2>Envoys</h2>
-            <rb-envoy-channel id="envoys"></rb-envoy-channel>
           </div>
 
           <div data-pane-body="aftermath" class="rb-pane" hidden>

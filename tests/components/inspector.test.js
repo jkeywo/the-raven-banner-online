@@ -227,6 +227,10 @@ describe('adding a role from the inspector', () => {
 });
 
 describe('<rb-envoy-channel>', () => {
+  // Opening a thread is now solely rb-action-list's send-envoy action, gated
+  // to the Encounter Phase; this component only continues a conversation
+  // that is already open, whatever phase it now is.
+
   /** A projection for a seated player, with whatever envoys we hand it. */
   const viewFor = (roleId, envoys = {}) => ({
     viewer: { roleId, kind: 'player' },
@@ -234,31 +238,37 @@ describe('<rb-envoy-channel>', () => {
     envoys,
   });
 
-  it('offers a warrior the secular courts and says what they want', () => {
+  it('takes up nothing when there is no conversation open', () => {
     const channel = mount('rb-envoy-channel');
     channel.data = data;
     channel.view = viewFor('king_alfred');
-    const courts = [...channel.querySelectorAll('[data-send]')].map((b) => b.dataset.send);
-    expect(courts).toEqual(['britons', 'franks', 'danish_kings']);
-    expect(channel.textContent).toContain('English territory');
+    expect(channel.innerHTML).toBe('');
   });
 
-  it('offers a priest only Rome', () => {
-    const channel = mount('rb-envoy-channel');
-    channel.data = data;
-    channel.view = viewFor('archbishop_aethelred');
-    expect([...channel.querySelectorAll('[data-send]')].map((b) => b.dataset.send))
-      .toEqual(['pope']);
-  });
-
-  it('shuts a court you are already talking to', () => {
+  it('shows a thread once one exists, named for who it is with', () => {
     const channel = mount('rb-envoy-channel');
     channel.data = data;
     channel.view = viewFor('king_alfred', {
       t1: { id: 't1', roleId: 'king_alfred', npcFaction: 'franks', open: true, messages: [] },
     });
-    expect(channel.querySelector('[data-send="franks"]').disabled).toBe(true);
-    expect(channel.querySelector('[data-send="britons"]').disabled).toBe(false);
+    expect(channel.querySelector('[data-thread="t1"]')).toBeTruthy();
+    expect(channel.textContent).toContain(data.factions.npc.franks.name);
+  });
+
+  it('sends a reply into the open thread', () => {
+    const channel = mount('rb-envoy-channel');
+    channel.data = data;
+    channel.view = viewFor('king_alfred', {
+      t1: { id: 't1', roleId: 'king_alfred', npcFaction: 'franks', open: true, messages: [] },
+    });
+    let raised = null;
+    channel.addEventListener('rb-command', (event) => { raised = event.detail; });
+    const form = channel.querySelector('[data-say="t1"]');
+    form.elements.text.value = 'A fleet, for silver.';
+    form.dispatchEvent(new Event('submit'));
+    expect(raised).toEqual({
+      verb: 'envoy-message', payload: { threadId: 't1', text: 'A fleet, for silver.' },
+    });
   });
 
   it('escapes what somebody typed', () => {
