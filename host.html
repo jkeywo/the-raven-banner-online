@@ -91,14 +91,20 @@
       </section>
 
       <nav id="facilitator-tabs" class="rb-tabs" role="tablist">
-        <button type="button" role="tab" data-pane="battle" id="tab-fac-battle" aria-selected="true">Battle</button>
+        <button type="button" role="tab" data-pane="map" aria-selected="true">Map</button>
+        <button type="button" role="tab" data-pane="battle" id="tab-fac-battle" aria-selected="false">Battle</button>
         <button type="button" role="tab" data-pane="crowns" id="tab-fac-crowns" aria-selected="false">Crowns &amp; consents</button>
         <button type="button" role="tab" data-pane="envoys" id="tab-fac-envoys" aria-selected="false">Envoys</button>
         <button type="button" role="tab" data-pane="debrief" id="tab-fac-debrief" aria-selected="false">Debrief</button>
         <button type="button" role="tab" data-pane="inspector" aria-selected="false">Inspector</button>
       </nav>
 
-      <div data-pane-body="battle" class="rb-pane">
+      <div data-pane-body="map" class="rb-pane rb-pane-map">
+        <rb-map id="fac-map" sheet="northern"></rb-map>
+        <rb-shire-editor id="shire-editor"></rb-shire-editor>
+      </div>
+
+      <div data-pane-body="battle" class="rb-pane" hidden>
         <section id="battle-panel" class="rb-battle-panel">
           <h2>The battle phase</h2>
           <rb-facilitator-grid id="battle-grid"></rb-facilitator-grid>

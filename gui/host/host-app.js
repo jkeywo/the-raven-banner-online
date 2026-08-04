@@ -23,6 +23,7 @@ import {
 } from '../net/join-code.js';
 import { mintSeed } from '../rules/rng.js';
 import { rosterFor } from '../rules/state.js';
+import { projectView } from '../rules/views.js';
 import { KNOWN_GAPS } from '../rules/gaps.js';
 import '../components/rb-connection-dot.js';
 import '../components/rb-seat-roster.js';
@@ -33,6 +34,8 @@ import '../components/rb-consent-queue.js';
 import '../components/rb-crown-panel.js';
 import '../components/rb-epilogue.js';
 import '../components/rb-state-inspector.js';
+import '../components/rb-map.js';
+import '../components/rb-shire-editor.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -216,6 +219,15 @@ export async function startHostApp({ location = window.location } = {}) {
 
     const phase = session.state.phase;
     $('clock').phase = phase;
+    // The map wants a projection rather than raw state, purely for the
+    // `.derived` tints and support hatching it already knows how to draw — a
+    // facilitator's own projection is the whole board anyway, so nothing is
+    // hidden by asking for one.
+    const facilitatorView = projectView(session.state, data, { kind: 'facilitator' });
+    $('fac-map').data = data;
+    $('fac-map').view = facilitatorView;
+    $('shire-editor').data = data;
+    $('shire-editor').state = session.state;
     $('battle-grid').data = data;
     $('battle-grid').state = session.state;
     $('envoy-queue').data = data;
@@ -283,6 +295,10 @@ export async function startHostApp({ location = window.location } = {}) {
 
   document.addEventListener('rb-facilitate', (event) =>
     asFacilitator(event.detail.verb, event.detail.payload));
+
+  document.addEventListener('rb-shire', (event) => {
+    $('shire-editor').shireId = event.detail.shireId;
+  });
 
   // --- the facilitator's own tabs -------------------------------------------
   // One clock and one set of setup details stay on screen throughout; the
@@ -354,7 +370,7 @@ export async function startHostApp({ location = window.location } = {}) {
  */
 async function loadData() {
   const names = ['shires', 'adjacency', 'roles', 'briefs', 'archetypes',
-    'tactics', 'factions', 'meta', 'scaling'];
+    'tactics', 'factions', 'meta', 'scaling', 'geometry'];
   const loaded = await Promise.all(
     names.map((name) => fetch(`data/${name}.json`).then((r) => r.json())));
   return Object.fromEntries(names.map((name, i) => [name, loaded[i]]));

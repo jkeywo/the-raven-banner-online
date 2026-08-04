@@ -107,6 +107,9 @@ entities:
         - crown-election
         - debrief-report
         - room-addressing
+        - facilitator-map-editor
+        - player-console
+        - view-projector
     implementation:
       status: declared
       paths:

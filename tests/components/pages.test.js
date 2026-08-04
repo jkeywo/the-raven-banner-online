@@ -67,7 +67,7 @@ describe('the facilitator console', () => {
       'advance-phase', 'pause-clock', 'download-save', 'rules-gaps',
       'facilitator-tabs', 'tab-fac-battle', 'tab-fac-crowns', 'tab-fac-envoys',
       'tab-fac-debrief', 'battle-panel', 'consent-panel', 'epilogue-panel',
-      'debrief-waiting']) {
+      'debrief-waiting', 'fac-map', 'shire-editor']) {
       expect(document.getElementById(id), id).toBeTruthy();
     }
   });
@@ -98,17 +98,27 @@ describe('the facilitator console', () => {
     expect(fetched).toContain('data/scaling.json');
   });
 
+  it('loads the map geometry so the facilitator\'s own map can draw', async () => {
+    await loadPage('host.html');
+    const { startHostApp } = await import('../../gui/host/host-app.js');
+    await startHostApp({ location: { hash: '', href: 'http://x/host.html' } });
+    const fetched = globalThis.fetch.mock.calls.map(([url]) => String(url));
+    expect(fetched).toContain('data/geometry.json');
+  });
+
   it('switches control panels on the facilitator’s own tabs', async () => {
     await loadPage('host.html');
     const { startHostApp } = await import('../../gui/host/host-app.js');
     await startHostApp({ location: { hash: '', href: 'http://x/host.html' } });
 
-    expect(document.getElementById('battle-panel').closest('[data-pane-body]').hidden).toBe(false);
-    expect(document.getElementById('consent-panel').closest('[data-pane-body]').hidden).toBe(true);
+    // The map is the default tab — a facilitator opens the console into the
+    // board, not into whichever control happened to be built first.
+    expect(document.getElementById('fac-map').closest('[data-pane-body]').hidden).toBe(false);
+    expect(document.getElementById('battle-panel').closest('[data-pane-body]').hidden).toBe(true);
 
     document.getElementById('tab-fac-crowns').click();
 
-    expect(document.getElementById('battle-panel').closest('[data-pane-body]').hidden).toBe(true);
+    expect(document.getElementById('fac-map').closest('[data-pane-body]').hidden).toBe(true);
     expect(document.getElementById('consent-panel').closest('[data-pane-body]').hidden).toBe(false);
     expect(document.getElementById('tab-fac-crowns').getAttribute('aria-selected')).toBe('true');
     expect(document.getElementById('tab-fac-battle').getAttribute('aria-selected')).toBe('false');

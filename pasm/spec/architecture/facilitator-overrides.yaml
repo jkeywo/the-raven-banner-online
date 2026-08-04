@@ -73,6 +73,42 @@ entities:
           empties their shires, un-seats whoever was playing them, and frees
           any vassal sworn to them.
 
+  - mechanic: facilitator-map-editor
+    core:
+      status: implemented
+      confidence: confirmed
+      title: The Facilitator's Pencil Over The Map
+      summary: >-
+        The facilitator's own tab shows the same map the players see, and a
+        shire clicked there opens an editor for everything about it: steward,
+        castles, ship value, and each settlement's defended and destroyed
+        state.
+      rationale:
+        - "The facilitator does not need a bespoke map component: a facilitator's projection is already defined as the full unredacted state plus derived, which is exactly what rb-map already renders for a player's redacted one. Feeding it projectView(state, data, { kind: 'facilitator' }) instead of a player's view is the entire integration."
+        - "Claims are edited on the role's own card in the inspector, not here — a claim belongs to a role, not a shire, and duplicating that control on the map would just be a second place for the two to disagree. The shire editor owns only what is actually a shire's own field: steward, castles, ship value and its settlements."
+        - Castles and ship value are adjusted the same delta-and-commit way as every other facilitator number, for the same race-safety reason as numeric-adjustment — a steward's own spend and a facilitator's correction cannot silently overwrite one another.
+        - Ship value is a delta on top of shipCostDelta rather than a replacement of the printed cost, so it stacks correctly with whatever a trade contract or a defensive fleet already did to the same field instead of clobbering it.
+    game_design:
+      participating_roles:
+        - facilitator
+    implementation:
+      status: declared
+      paths:
+        - gui/components/rb-shire-editor.js
+      symbols:
+        - RbShireEditor
+      tests:
+        - npm test
+    evidence:
+      - kind: test
+        reference: tests/components/shire-editor.test.js
+        summary: >-
+          Reassigning a steward keeps the shire's faction in step, a castle
+          or ship-value commit round-trips as a delta and is refused when
+          empty or zero, ship value stacks on an existing shipCostDelta
+          rather than replacing it, and toggling a settlement's defended or
+          destroyed state fires the matching command.
+
   - message: adjust-command
     core:
       status: proposed
