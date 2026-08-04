@@ -232,6 +232,7 @@ export async function startHostApp({ location = window.location } = {}) {
     const rebellionsPending = Object.values(session.state.rebellions ?? {})
       .some((r) => r.status === 'pending' || r.status === 'priced');
     $('tab-fac-crowns').dataset.live = String(consentsPending || rebellionsPending);
+    $('inspector').data = data;
     $('inspector').state = session.state;
     const waiting = Object.values(session.state.envoys).filter((t) => t.open
       && t.messages.at(-1)?.from === t.roleId).length;

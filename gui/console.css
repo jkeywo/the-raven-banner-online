@@ -1104,3 +1104,117 @@ rb-clash-panel { display: block; }
 .rb-inspector-row input[type="text"],
 .rb-inspector-row input[type="number"] { padding: 0.25rem 0.4rem; font-size: 0.85rem; }
 .rb-inspector-row input[type="checkbox"] { width: auto; justify-self: start; }
+
+.rb-inspector-cardgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+  gap: 0.8rem;
+  margin-bottom: 1rem;
+}
+
+.rb-inspector-card {
+  background: var(--rb-parchment);
+  border: 1px solid var(--rb-rule);
+  border-radius: 3px;
+  padding: 0.7rem 0.9rem;
+  display: grid;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.rb-inspector-card header h5 { margin: 0; font-family: var(--rb-serif); font-size: 1rem; }
+
+.rb-inspector-stats { display: grid; gap: 0.35rem; }
+
+.rb-inspector-stat {
+  display: grid;
+  grid-template-columns: 5rem 2rem 3.5rem auto 1fr;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.rb-inspector-stat-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--rb-muted);
+}
+
+.rb-inspector-stat-value { font-family: var(--rb-serif); }
+.rb-inspector-stat input[type="number"] { width: 100%; padding: 0.2rem 0.3rem; font-size: 0.82rem; }
+.rb-inspector-stat button { font-size: 0.72rem; padding: 0.15rem 0.4rem; }
+.rb-inspector-error { grid-column: 1 / -1; color: var(--rb-blood); font-size: 0.72rem; }
+
+.rb-inspector-claim-list {
+  list-style: none;
+  margin: 0.2rem 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.rb-inspector-claim-list li {
+  background: var(--rb-paper);
+  border: 1px solid var(--rb-rule);
+  border-radius: 3px;
+  padding: 0.1rem 0.4rem;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.rb-inspector-claim-list button {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--rb-blood);
+  cursor: pointer;
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
+.rb-inspector-claims form { display: flex; gap: 0.3rem; margin-top: 0.2rem; }
+.rb-inspector-toggle { display: flex; align-items: center; gap: 0.4rem; }
+
+.rb-inspector-tokens {
+  border: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+}
+
+.rb-inspector-tokens legend {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--rb-muted);
+  padding: 0;
+}
+
+.rb-inspector-tokens label { display: flex; align-items: center; gap: 0.25rem; font-size: 0.8rem; }
+
+.rb-inspector-remove {
+  justify-self: start;
+  font-size: 0.75rem;
+  color: var(--rb-blood);
+  border-color: var(--rb-blood);
+}
+
+.rb-inspector-addrole {
+  background: var(--rb-parchment);
+  border: 1px solid var(--rb-rule);
+  border-radius: 3px;
+  padding: 0.7rem 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.rb-inspector-addrole-form fieldset {
+  border: 1px solid var(--rb-rule);
+  border-radius: 3px;
+  margin: 0.5rem 0;
+}
+
+.rb-inspector-addrole-form label { display: flex; align-items: center; gap: 0.35rem; font-size: 0.85rem; }

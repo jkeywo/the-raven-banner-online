@@ -1,0 +1,108 @@
+entities:
+  - mechanic: numeric-adjustment
+    core:
+      status: implemented
+      confidence: confirmed
+      title: Numeric Adjustment
+      summary: >-
+        A facilitator changes a number by an amount rather than replacing it,
+        refused outright rather than clamped if the change would take it below
+        zero.
+      rationale:
+        - "facilitator:set is a raw path-and-value override, which is exactly wrong for a number a player might also be changing: reading \"12\", typing \"15\", and committing a few seconds later overwrites whatever the player did in between, because \"15\" does not know it should have been \"was 12, plus a player's spend, plus three\". A delta has no such moment — it is applied against whatever the reducer is holding when the command actually reaches it, not whatever the facilitator saw on screen."
+        - Validated against the live state at admission time rather than a value the client remembers, which is also what makes the same command correct for a co-facilitator whose mirror might be a beat behind the primary.
+        - Refusing rather than clamping means a facilitator who tries to take twelve away from eight gets told no, not quietly given zero. A silently clamped edit is the app answering "yes" to a change that did not happen.
+    implementation:
+      status: declared
+      paths:
+        - gui/rules/commands.js
+      tests:
+        - npm test
+    evidence:
+      - kind: test
+        reference: tests/rules/facilitator-overrides.test.js
+        summary: >-
+          A delta commits correctly even after a player's own action changed
+          the value in between, and a delta that would go negative is refused
+          with the number actually in play.
+
+  - mechanic: structured-shire-edits
+    core:
+      status: implemented
+      confidence: confirmed
+      title: Structured Shire Edits
+      summary: >-
+        Hand a shire to a steward, or take one back, with the shire's faction
+        kept in step rather than left pointing at whoever used to hold it.
+      rationale:
+        - "A raw facilitator:set on stewardRoleId alone is a bug waiting to be filed: the shire's factionId is a second field that has to agree with it, the same way capture and swearTo already keep the two in step, and nothing else in the codebase writes stewardRoleId without also writing factionId."
+    implementation:
+      status: declared
+      paths:
+        - gui/rules/commands.js
+      tests:
+        - npm test
+
+  - mechanic: mid-game-roster-edit
+    core:
+      status: implemented
+      confidence: confirmed
+      title: Add Or Remove A Role Mid-Game
+      summary: >-
+        A facilitator can bring a dropped or never-seated role into a running
+        game, prefilled from the printed sheet and editable before it commits,
+        or take one back out with everything that could point at them cleared.
+      rationale:
+        - "\"Prefill from the starting rules, then let the facilitator modify before committing\" is a client-side concern rather than a server-side negotiation: the form fills in data.roles.roles[id].start, its printed claims and whichever shires the sheet names as its stewardship, the facilitator edits whatever they like, and one command carries the final values. There is no draft state on the host to go stale."
+        - "Removing cascades rather than leaving dangling references: their shires go unheld, a seat playing them is freed, an initiative token or crown they held is cleared, and anyone sworn to them loses their liege exactly as though that liege had died without an heir — the same shape rebel and heir-arrives already use."
+    game_design:
+      participating_roles:
+        - facilitator
+    implementation:
+      status: declared
+      paths:
+        - gui/rules/commands.js
+      tests:
+        - npm test
+    evidence:
+      - kind: test
+        reference: tests/rules/facilitator-overrides.test.js
+        summary: >-
+          A role built from the printed sheet plus whatever was committed
+          lands with the right liege, faction and stewardship; removing one
+          empties their shires, un-seats whoever was playing them, and frees
+          any vassal sworn to them.
+
+  - message: adjust-command
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Adjust
+      summary: A path and a delta. Refused if the target is not a number or the result would be negative.
+    architecture:
+      authority: request
+      producer:
+        - client-command-gateway
+      consumer:
+        - command-admission
+      validator:
+        - command-admission
+      trust_boundary: facilitator
+      payload: path-and-delta
+
+  - message: roster-edit-commands
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Roster Edit Commands
+      summary: set-steward, set-settlement, add-claim, remove-claim, assign-initiative, add-role and remove-role — the structured edits a role or shire card can make.
+    architecture:
+      authority: request
+      producer:
+        - client-command-gateway
+      consumer:
+        - command-admission
+      validator:
+        - command-admission
+      trust_boundary: facilitator
+      payload: varies-by-command

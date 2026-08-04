@@ -2106,6 +2106,234 @@ export const COMMANDS = {
     },
   },
 
+  /**
+   * Nudge a number by an amount, rather than replacing it.
+   *
+   * The inspector used to read a value and write a replacement, which is
+   * exactly wrong while players are also changing the game: a facilitator who
+   * opens the panel, reads "12", and types "15" a few seconds later can undo
+   * whatever a player spent in between, because "15" overwrites whatever is
+   * there rather than adding three to it. A delta commutes — it is applied
+   * against whatever the value actually is at the moment the command reaches
+   * the reducer, not whatever it was when the facilitator looked — so it
+   * cannot go stale between typing and committing.
+   *
+   * Refused rather than clamped if it would take the value below zero,
+   * because a silently clamped edit is a facilitator being told "yes" to a
+   * change that did not happen.
+   */
+  'facilitator:adjust': {
+    phases: '*',
+    actor: 'facilitator',
+    admit(ctx) {
+      const { path, delta } = ctx.cmd.payload ?? {};
+      if (!Array.isArray(path) || !path.length) return no('an adjustment needs a path');
+      if (typeof delta !== 'number' || !Number.isFinite(delta)) {
+        return no('say how much to change it by');
+      }
+      let at = ctx.state;
+      for (const key of path.slice(0, -1)) {
+        at = at?.[key];
+        if (at === undefined || at === null) return no('no such value');
+      }
+      const current = at[path[path.length - 1]];
+      if (typeof current !== 'number') return no('that is not a number');
+      if (current + delta < 0) return no(`would go negative — it is ${current} right now`);
+      return ok();
+    },
+    effects(draft, ctx) {
+      const { path, delta } = ctx.cmd.payload;
+      let at = draft;
+      for (const key of path.slice(0, -1)) at = at[key];
+      at[path[path.length - 1]] += delta;
+    },
+  },
+
+  /**
+   * Hand a shire to somebody, or to nobody, by fiat.
+   *
+   * A raw path override could set `stewardRoleId` alone and leave `factionId`
+   * pointing at whoever used to hold it — a stale value nothing would notice
+   * until the next thing that reads a shire's faction reads the wrong one.
+   * This keeps the two in step the same way capture and `swearTo` already do.
+   */
+  'facilitator:set-steward': {
+    phases: '*',
+    actor: 'facilitator',
+    admit(ctx) {
+      const { shireId, roleId } = ctx.cmd.payload ?? {};
+      if (!ctx.state.shires[shireId]) return no('no such shire');
+      if (roleId !== null && !ctx.state.roles[roleId]) return no('no such character');
+      return ok();
+    },
+    effects(draft, ctx) {
+      const { shireId, roleId } = ctx.cmd.payload;
+      draft.shires[shireId].stewardRoleId = roleId;
+      draft.shires[shireId].factionId = roleId ? draft.roles[roleId].factionId : null;
+    },
+  },
+
+  /** Circle a settlement, or strike it out, without a player having done it. */
+  'facilitator:set-settlement': {
+    phases: '*',
+    actor: 'facilitator',
+    admit(ctx) {
+      const { shireId, settlementId, field, value } = ctx.cmd.payload ?? {};
+      if (!ctx.state.shires[shireId]?.settlements[settlementId]) return no('no such settlement');
+      if (!['defended', 'destroyed'].includes(field)) return no('nothing there by that name');
+      if (typeof value !== 'boolean') return no('say yes or no');
+      return ok();
+    },
+    effects(draft, ctx) {
+      const { shireId, settlementId, field, value } = ctx.cmd.payload;
+      draft.shires[shireId].settlements[settlementId][field] = value;
+    },
+  },
+
+  /** Give a character a claim they were not printed with. */
+  'facilitator:add-claim': {
+    phases: '*',
+    actor: 'facilitator',
+    admit(ctx) {
+      const { roleId, crown } = ctx.cmd.payload ?? {};
+      if (!ctx.state.roles[roleId]) return no('no such character');
+      if (!ctx.data.factions.crownLetter[crown]) return no('no such crown');
+      if (ctx.state.roles[roleId].claims.includes(crown)) return no('already claims it');
+      return ok();
+    },
+    effects(draft, ctx) {
+      draft.roles[ctx.cmd.payload.roleId].claims.push(ctx.cmd.payload.crown);
+    },
+  },
+
+  /** Take one away. */
+  'facilitator:remove-claim': {
+    phases: '*',
+    actor: 'facilitator',
+    admit(ctx) {
+      const { roleId, crown } = ctx.cmd.payload ?? {};
+      if (!ctx.state.roles[roleId]?.claims.includes(crown)) return no('does not claim it');
+      return ok();
+    },
+    effects(draft, ctx) {
+      const role = draft.roles[ctx.cmd.payload.roleId];
+      role.claims = role.claims.filter((c) => c !== ctx.cmd.payload.crown);
+    },
+  },
+
+  /**
+   * Move an initiative token onto a role, or off it.
+   *
+   * White, black and bonus are three independent fields, so assigning one
+   * never has to go looking for who else might be holding it — there is
+   * nowhere else for it to be.
+   */
+  'facilitator:assign-initiative': {
+    phases: '*',
+    actor: 'facilitator',
+    admit(ctx) {
+      const { token, roleId } = ctx.cmd.payload ?? {};
+      if (!['white', 'black', 'bonus'].includes(token)) return no('no such token');
+      if (roleId !== null && !ctx.state.roles[roleId]) return no('no such character');
+      return ok();
+    },
+    effects(draft, ctx) {
+      draft.initiative[ctx.cmd.payload.token] = ctx.cmd.payload.roleId;
+    },
+  },
+
+  /**
+   * Bring a role into a game already running.
+   *
+   * The console prefills resources, claims and stewardship from the printed
+   * sheet before the facilitator ever sees this command — this just takes
+   * whatever they finished editing and commits it in one piece, the same
+   * shape createInitialState builds a role in at the very start.
+   */
+  'facilitator:add-role': {
+    phases: '*',
+    actor: 'facilitator',
+    admit(ctx) {
+      const { roleId } = ctx.cmd.payload ?? {};
+      if (!ctx.data.roles.roles[roleId]) return no('no such role in this game');
+      if (ctx.state.roles[roleId]) return no('already in the game');
+      return ok();
+    },
+    effects(draft, ctx, { data }) {
+      const { roleId, resources = {}, claims, stewardship = [] } = ctx.cmd.payload;
+      const printed = data.roles.roles[roleId];
+      const liege = printed.liege && draft.roles[printed.liege] ? printed.liege : null;
+
+      draft.roles[roleId] = {
+        id: roleId,
+        ...printed.start,
+        wounds: 0,
+        liegeId: liege,
+        teamId: printed.team,
+        factionId: liege ? draft.roles[liege].factionId : roleId,
+        claims: claims ?? [...printed.claims],
+        baptised: false,
+        deJureShires: [],
+        baptismsPerformed: 0,
+        dead: false,
+        generation: 0,
+        once: { christianBanners: false, mercenary: false },
+        mercenary: false,
+        perTurn: { shipsBuilt: 0, tradesUsed: 0 },
+        ...resources,
+      };
+
+      for (const shireId of stewardship) {
+        if (!draft.shires[shireId]) continue;
+        draft.shires[shireId].stewardRoleId = roleId;
+        draft.shires[shireId].factionId = draft.roles[roleId].factionId;
+      }
+    },
+  },
+
+  /**
+   * Take a role back out.
+   *
+   * Everything that could point at them is cleared rather than left dangling
+   * — their shires, a seat that was playing them, a token, a crown, and
+   * anyone who was sworn to them, who loses their liege exactly as though he
+   * had died without an heir.
+   */
+  'facilitator:remove-role': {
+    phases: '*',
+    actor: 'facilitator',
+    admit(ctx) {
+      return ctx.state.roles[ctx.cmd.payload?.roleId] ? ok() : no('not in the game');
+    },
+    effects(draft, ctx) {
+      const { roleId } = ctx.cmd.payload;
+      delete draft.roles[roleId];
+
+      for (const shire of Object.values(draft.shires)) {
+        if (shire.stewardRoleId !== roleId) continue;
+        shire.stewardRoleId = null;
+        shire.factionId = null;
+      }
+      for (const seat of Object.values(draft.seats)) {
+        if (seat.roleId === roleId) seat.roleId = null;
+      }
+      for (const token of ['white', 'black', 'bonus']) {
+        if (draft.initiative[token] === roleId) draft.initiative[token] = null;
+      }
+      for (const crown of Object.keys(draft.crownHolders)) {
+        if (draft.crownHolders[crown] === roleId) delete draft.crownHolders[crown];
+      }
+      for (const other of Object.values(draft.roles)) {
+        if (other.liegeId !== roleId) continue;
+        other.liegeId = null;
+        other.factionId = other.id;
+        for (const shire of Object.values(draft.shires)) {
+          if (shire.stewardRoleId === other.id) shire.factionId = other.id;
+        }
+      }
+    },
+  },
+
   'facilitator:set': {
     phases: '*',
     actor: 'facilitator',
