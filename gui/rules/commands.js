@@ -168,10 +168,20 @@ function swearTo(draft, roleId, liegeId) {
   }
 }
 
-/** What a rebellion costs this vassal, after any relief the umpire has granted. */
-export function rebellionCost(state, roleId) {
-  const relief = state.rebellionRelief?.[roleId];
-  return { shires: relief?.shires ?? 1, soldiers: relief?.soldiers ?? 2 };
+/**
+ * The printed price of a rebellion, before an umpire has heard anything.
+ *
+ * Not applied automatically. It exists so the facilitator's pricing form has
+ * something to start from — the rule that "this cost will be reduced,
+ * potentially down to zero" is a judgement made about one rebellion at a
+ * time, never a standing rate a vassal could bank on in advance.
+ */
+export const REBELLION_PRINTED_COST = { shires: 1, soldiers: 2 };
+
+/** This role's open petition to rebel, in any of the given states. */
+export function openRebellion(state, roleId, statuses = ['pending', 'priced']) {
+  return Object.values(state.rebellions ?? {})
+    .find((r) => r.roleId === roleId && statuses.includes(r.status)) ?? null;
 }
 
 /**
@@ -544,17 +554,19 @@ export const COMMANDS = {
   },
 
   /**
-   * Break with your liege.
+   * Ask to break with your liege.
    *
    * "Cost: Transfer one shire and two soldiers to your liege. This cost will be
    * reduced (potentially down to zero) by the organisers if the liege has lost
-   * the favour of God."
+   * the favour of God" — printed on the Saxon sheets only. A Dane already
+   * changes liege freely in the Team Phase, so has no rebellion to ask for and
+   * no cost to be judged on.
    *
-   * So the price is a facilitator's judgement as much as a rule, and the relief
-   * is set separately and in the open — a vassal should be able to see what
-   * rebelling would cost before deciding to do it.
+   * Opens a petition rather than doing anything, because the price is a
+   * judgement made about this rebellion rather than a standing rate: the
+   * facilitator has to actually be asked before it can be set.
    */
-  rebel: {
+  'request-rebel': {
     phases: ['team'],
     actor: 'player',
     probe: (state, data, roleId) => ({
@@ -562,33 +574,92 @@ export const COMMANDS = {
     }),
     admit(ctx) {
       const roleId = subjectOf(ctx);
-      const liege = ctx.state.roles[roleId]?.liegeId;
-      if (!liege) return no('you answer to nobody already');
-      const cost = rebellionCost(ctx.state, roleId);
-      const reason = affordable(ctx.state.roles[roleId], { soldiers: cost.soldiers });
-      if (reason) return no(reason);
-      if (cost.shires === 0) return ok();
-      const shire = ctx.state.shires[ctx.cmd.payload?.shireId];
+      if (isDanish(ctx.state, ctx.data, roleId)) {
+        return no('a Dane simply changes liege — no rebellion needed');
+      }
+      if (!ctx.state.roles[roleId]?.liegeId) return no('you answer to nobody already');
+      if (openRebellion(ctx.state, roleId)) return no('you have already asked to rebel');
+
       const held = Object.values(ctx.state.shires).filter((s) => s.stewardRoleId === roleId);
-      // A landless vassal cannot hand over a shire, and the paper rule does not
-      // ask them to. They pay the soldiers and go.
       if (held.length === 0) return ok();
-      if (!shire) return no('name the shire you are giving up');
-      if (shire.stewardRoleId !== roleId) return no('that is not yours to give');
+      const shire = ctx.state.shires[ctx.cmd.payload?.shireId];
+      if (!shire) return no('name the shire you would hand over');
+      if (shire.stewardRoleId !== roleId) return no('that is not yours to offer');
       return ok();
     },
     effects(draft, ctx) {
       const roleId = subjectOf(ctx);
-      const role = draft.roles[roleId];
-      const liegeId = role.liegeId;
-      const cost = rebellionCost(draft, roleId);
+      const id = `rebellion:${roleId}:${Object.keys(draft.rebellions).length + 1}`;
+      draft.rebellions[id] = {
+        id,
+        roleId,
+        liegeId: draft.roles[roleId].liegeId,
+        shireId: ctx.cmd.payload?.shireId ?? null,
+        status: 'pending',
+        cost: null,
+        note: '',
+      };
+    },
+  },
 
-      role.soldiers -= cost.soldiers;
-      draft.roles[liegeId].soldiers += cost.soldiers;
-      const shireId = ctx.cmd.payload?.shireId;
-      if (cost.shires > 0 && shireId && draft.shires[shireId]?.stewardRoleId === roleId) {
-        draft.shires[shireId].stewardRoleId = liegeId;
-        draft.shires[shireId].factionId = draft.roles[liegeId].factionId;
+  /**
+   * The umpire names the price.
+   *
+   * Answered in the open and before the fact, because a price a vassal cannot
+   * see is not a price they can weigh — they still have to confirm it once it
+   * is set.
+   */
+  'facilitator:price-rebellion': {
+    phases: '*',
+    actor: 'facilitator',
+    admit(ctx) {
+      const { roleId, shires, soldiers } = ctx.cmd.payload ?? {};
+      const request = openRebellion(ctx.state, roleId);
+      if (!request) return no('nobody is waiting on a price for that');
+      if (![0, 1].includes(shires)) return no('a rebellion costs one shire or none');
+      if (!Number.isInteger(soldiers) || soldiers < 0 || soldiers > 2) {
+        return no('a rebellion costs between none and two soldiers');
+      }
+      return ok();
+    },
+    effects(draft, ctx) {
+      const { roleId, shires, soldiers, note } = ctx.cmd.payload;
+      const request = openRebellion(draft, roleId);
+      request.cost = { shires, soldiers };
+      request.note = note ?? '';
+      request.status = 'priced';
+    },
+  },
+
+  /**
+   * The rebel's final say.
+   *
+   * The price is the facilitator's; whether to pay it is still the vassal's
+   * own decision, made with the number actually in front of them rather than
+   * the printed default they asked against.
+   */
+  'confirm-rebel': {
+    phases: '*',
+    actor: 'player',
+    admit(ctx) {
+      const roleId = subjectOf(ctx);
+      const request = openRebellion(ctx.state, roleId, ['priced']);
+      if (!request) return no('nothing priced yet — the facilitator has not set a price');
+      const reason = affordable(ctx.state.roles[roleId], { soldiers: request.cost.soldiers });
+      return reason ? no(reason) : ok();
+    },
+    effects(draft, ctx) {
+      const roleId = subjectOf(ctx);
+      const request = openRebellion(draft, roleId, ['priced']);
+      const role = draft.roles[roleId];
+      const liegeId = request.liegeId;
+
+      role.soldiers -= request.cost.soldiers;
+      draft.roles[liegeId].soldiers += request.cost.soldiers;
+      if (request.cost.shires > 0 && request.shireId
+        && draft.shires[request.shireId]?.stewardRoleId === roleId) {
+        draft.shires[request.shireId].stewardRoleId = liegeId;
+        draft.shires[request.shireId].factionId = draft.roles[liegeId].factionId;
       }
 
       // "You leave your faction, which means you are free to swear a new
@@ -599,32 +670,20 @@ export const COMMANDS = {
       for (const shire of Object.values(draft.shires)) {
         if (shire.stewardRoleId === roleId) shire.factionId = roleId;
       }
-      // The relief was a ruling about one rebellion, not a standing rate.
-      delete draft.rebellionRelief[roleId];
+      request.status = 'done';
     },
   },
 
-  /**
-   * What this rebellion will cost, if the umpire has heard enough to lower it.
-   *
-   * Set in the open and before the fact, because a price a vassal cannot see
-   * is not a price they can weigh.
-   */
-  'facilitator:set-rebellion-relief': {
+  /** Think better of it. Free at any stage — nothing was spent until this. */
+  'cancel-rebel': {
     phases: '*',
-    actor: 'facilitator',
+    actor: 'player',
     admit(ctx) {
-      const { roleId, shires, soldiers } = ctx.cmd.payload ?? {};
-      if (!ctx.state.roles[roleId]) return no('no such character');
-      if (![0, 1].includes(shires)) return no('a rebellion costs one shire or none');
-      if (!Number.isInteger(soldiers) || soldiers < 0 || soldiers > 2) {
-        return no('a rebellion costs between none and two soldiers');
-      }
-      return ok();
+      const request = openRebellion(ctx.state, subjectOf(ctx));
+      return request ? ok() : no('nothing to call off');
     },
     effects(draft, ctx) {
-      const { roleId, shires, soldiers, note } = ctx.cmd.payload;
-      draft.rebellionRelief[roleId] = { shires, soldiers, note: note ?? '' };
+      openRebellion(draft, subjectOf(ctx)).status = 'cancelled';
     },
   },
 

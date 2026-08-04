@@ -28,6 +28,9 @@ const viewFor = (state, roleId) => projectView(state, data, {
   kind: 'player', seatId: 's1', roleId, teamId: state.roles[roleId].teamId,
 });
 
+const shiresOf = (state, roleId) =>
+  Object.keys(state.shires).filter((id) => state.shires[id].stewardRoleId === roleId);
+
 const mount = (tag) => {
   const element = document.createElement(tag);
   document.body.append(element);
@@ -140,29 +143,47 @@ describe('<rb-crown-panel>', () => {
     expect(panel.textContent).not.toContain('Mercia:');
   });
 
-  it('sets what a rebellion costs a named vassal', () => {
+  it('says nobody has asked to rebel when nobody has', () => {
     const { state } = election();
     const panel = mount('rb-crown-panel');
     panel.data = data;
     panel.state = state;
+    expect(panel.textContent).toContain('Nobody has asked to rebel');
+  });
+
+  it('prices a waiting petition and commits it as one choice', () => {
+    let { state } = election();
+    state = apply(state, data, { verb: 'request-rebel', payload: { shireId: shiresOf(state, 'cenred')[0] } },
+      { seatId: 's1', kind: 'player', roleId: 'cenred' }, { ts: 0 }).state;
+
+    const panel = mount('rb-crown-panel');
+    panel.data = data;
+    panel.state = state;
+    expect(panel.textContent).toContain('Cenred');
 
     const sent = [];
     document.addEventListener('rb-facilitate', (event) => sent.push(event.detail));
-    const select = panel.querySelector('[data-relief="cenred"]');
-    select.value = '0|0';
-    select.dispatchEvent(new Event('change'));
+    const form = panel.querySelector('[data-price="cenred"]');
+    form.elements.price.value = '0|0';
+    form.dispatchEvent(new Event('submit'));
     expect(sent).toEqual([{
-      verb: 'facilitator:set-rebellion-relief',
+      verb: 'facilitator:price-rebellion',
       payload: { roleId: 'cenred', shires: 0, soldiers: 0 },
     }]);
   });
 
-  it('starts every vassal at the full printed price', () => {
-    const { state } = election();
+  it('says once priced that it is waiting on the vassal now', () => {
+    let { state } = election();
+    state = apply(state, data, { verb: 'request-rebel', payload: { shireId: shiresOf(state, 'cenred')[0] } },
+      { seatId: 's1', kind: 'player', roleId: 'cenred' }, { ts: 0 }).state;
+    state = apply(state, data, {
+      verb: 'facilitator:price-rebellion', payload: { roleId: 'cenred', shires: 1, soldiers: 2 },
+    }, { seatId: 's9', kind: 'facilitator', roleId: null }, { ts: 0 }).state;
+
     const panel = mount('rb-crown-panel');
     panel.data = data;
     panel.state = state;
-    expect(panel.querySelector('[data-relief="cenred"]').value).toBe('1|2');
+    expect(panel.textContent).toContain('Waiting on them now');
   });
 });
 
@@ -191,10 +212,18 @@ describe('the chooser', () => {
     expect(after[0].options.map((o) => o.value)).toContain('ceowulf');
   });
 
-  it('stops asking which shire when the rebellion is free', () => {
+  it('asks a landed vassal which shire he would offer', () => {
+    // The price is not known yet — the facilitator has not been asked — so
+    // this is what he would put up if a shire turns out to be part of it.
     const { state } = election();
-    expect(fieldsFor('rebel', viewFor(state, 'cenred'), data)).toHaveLength(1);
-    state.rebellionRelief.cenred = { shires: 0, soldiers: 0, note: '' };
-    expect(fieldsFor('rebel', viewFor(state, 'cenred'), data)).toEqual([]);
+    const [field] = fieldsFor('request-rebel', viewFor(state, 'cenred'), data);
+    expect(field.name).toBe('shireId');
+    expect(field.options.length).toBeGreaterThan(0);
+  });
+
+  it('asks a landless vassal nothing at all', () => {
+    const { state } = election();
+    for (const id of shiresOf(state, 'cenred')) state.shires[id].stewardRoleId = 'king_alfred';
+    expect(fieldsFor('request-rebel', viewFor(state, 'cenred'), data)).toEqual([]);
   });
 });

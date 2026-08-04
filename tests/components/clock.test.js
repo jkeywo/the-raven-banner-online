@@ -203,4 +203,31 @@ describe('<rb-action-list>', () => {
     const row = list.querySelector('[data-verb="declare-initiative-target"]')?.closest('.rb-action');
     if (row) expect(row.dataset.relevant).toBe('false');
   });
+
+  it('says a rebellion is waiting on the facilitator before it is priced', () => {
+    const view = seated('team');
+    view.rebellions = {
+      r1: { id: 'r1', roleId: 'king_alfred', liegeId: 'nobody', status: 'pending', cost: null },
+    };
+    const list = mount('rb-action-list');
+    list.data = data;
+    list.view = view;
+    const cancel = list.querySelector('[data-verb="cancel-rebel"]')?.closest('.rb-action');
+    expect(cancel?.textContent).toContain('Waiting on the facilitator to set a price');
+  });
+
+  it('shows the priced cost once the facilitator has set one', () => {
+    const view = seated('team');
+    view.rebellions = {
+      r1: {
+        id: 'r1', roleId: 'king_alfred', liegeId: 'nobody',
+        status: 'priced', cost: { shires: 1, soldiers: 2 },
+      },
+    };
+    const list = mount('rb-action-list');
+    list.data = data;
+    list.view = view;
+    const confirm = list.querySelector('[data-verb="confirm-rebel"]')?.closest('.rb-action');
+    expect(confirm?.textContent).toContain('Costs 1 shire and 2 soldiers');
+  });
 });

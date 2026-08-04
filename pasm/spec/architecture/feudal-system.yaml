@@ -88,11 +88,11 @@ entities:
           the crown unworn and re-contestable, and the facilitator can call the
           count on an election waiting for somebody who has gone home.
 
-  - mechanic: homage-and-rebellion
+  - mechanic: homage
     core:
       status: implemented
       confidence: confirmed
-      title: Homage And Rebellion
+      title: Homage
       summary: >-
         How a player changes who they answer to. Danes choose freely in the Team
         Phase; a Saxon must be unsworn, must ask somebody who wears a crown or
@@ -100,16 +100,43 @@ entities:
       rationale:
         - "Homage rides the existing consent machinery rather than a second one: it is the same shape as a settle request with one person asked instead of several, and reusing it means one set of facilitator overrides covers both."
         - "A crownless Saxon can take no vassals at all, which is the second thing that makes an election worth winning: it is not only support, it is followers."
-        - The rebellion price is a facilitator's judgement as much as a rule, so the relief is set separately and in the open. A price a vassal cannot see before deciding is not a price they can weigh.
-        - The relief is cleared when it is used. It was a ruling about one rebellion, not a standing rate.
+      references:
+        - rebellion-petition
     implementation:
       status: declared
       paths:
         - gui/rules/commands.js
       symbols:
         - swearTo
-        - rebellionCost
         - homageReason
+      tests:
+        - npm test
+
+  - mechanic: rebellion-petition
+    core:
+      status: implemented
+      confidence: confirmed
+      title: Rebellion Petition
+      summary: >-
+        A Saxon vassal asks to leave their liege; the facilitator is the only
+        one who can price it, and the vassal is the only one who can decide
+        whether to pay what was asked — three commands, three parties, and
+        nothing is spent until the last one.
+      rationale:
+        - "\"This cost will be reduced (potentially down to zero) by the organisers if the liege has lost the favour of God\" is a judgement about one rebellion, made once somebody has actually asked — not a standing rate a vassal could look up and bank on before deciding anything. Asking opens a petition with no price at all rather than the printed default, so the facilitator has to be heard before anything can be confirmed."
+        - "Printed on the Saxon sheets only. A Dane already changes liege freely in the Team Phase and has nothing to petition for, so request-rebel refuses one outright — the two mechanics are not the same shape wearing different names."
+        - "The vassal still confirms or calls it off once a price exists. A facilitator's ruling sets the number; it does not spend the vassal's soldiers for them — that is the read of \"this cost will be reduced\" that leaves the actual choice to rebel where the printed sheet puts it, with the player."
+        - Calling it off costs nothing at any stage, priced or not, because nothing has been spent until confirm-rebel actually runs.
+    game_design:
+      participating_roles:
+        - facilitator
+    implementation:
+      status: declared
+      paths:
+        - gui/rules/commands.js
+      symbols:
+        - openRebellion
+        - REBELLION_PRINTED_COST
       tests:
         - npm test
     evidence:
@@ -122,9 +149,78 @@ entities:
       - kind: test
         reference: tests/rules/feudal.test.js
         summary: >-
-          A rebel pays his shire and soldiers to the man he leaves, takes his
-          remaining lands into a faction of his own, and is then free to claim
-          the crown his liege was blocking.
+          A Dane is refused outright; a Saxon's petition sits unpriced until
+          the facilitator commits a number; the vassal is refused confirmation
+          before that, can call it off for nothing at any stage, and once
+          confirmed pays exactly the priced amount, takes his remaining lands
+          into a faction of his own, and is free to claim the crown his liege
+          was blocking.
+
+  - state: rebellion-record
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Rebellion Record
+      summary: One petition — who is asking, who they would leave, what they offered, what it was priced at, and whether it went through.
+      rationale:
+        - Kept once resolved rather than removed, like a contract or a consent request. A rebellion refused or called off is still part of the story of the game.
+        - Public without qualification. A rebellion brewing is exactly the sort of thing the rest of the table notices before the facilitator has even priced it.
+    architecture:
+      classification: authoritative
+      owner: game-host
+      writers:
+        - game-host
+
+  - message: request-rebel-command
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Request Rebel
+      summary: A Saxon vassal opens a petition, naming which shire they would offer if one is asked for.
+    architecture:
+      authority: request
+      producer:
+        - client-command-gateway
+      consumer:
+        - command-admission
+      validator:
+        - command-admission
+      trust_boundary: client-to-host
+      payload: shire-identifier
+
+  - message: price-rebellion-command
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Price Rebellion
+      summary: The facilitator names the price — up to one shire, up to two soldiers — for a petition that is waiting on them.
+    architecture:
+      authority: request
+      producer:
+        - client-command-gateway
+      consumer:
+        - command-admission
+      validator:
+        - command-admission
+      trust_boundary: facilitator
+      payload: role-and-cost
+
+  - message: confirm-or-cancel-rebel-command
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Confirm Or Cancel Rebel
+      summary: The vassal's own answer to a priced petition — go through with it, or call it off for nothing.
+    architecture:
+      authority: request
+      producer:
+        - client-command-gateway
+      consumer:
+        - command-admission
+      validator:
+        - command-admission
+      trust_boundary: client-to-host
+      payload: none
 
   - state: crown-holders
     core:

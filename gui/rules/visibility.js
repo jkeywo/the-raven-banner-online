@@ -155,11 +155,11 @@ export const FIELD_VISIBILITY = [
   { path: 'consents.**', audience: PUBLIC },
   { path: 'contracts.**', audience: PUBLIC },
   { path: 'votes.**', audience: PUBLIC },
-  // A coronation is the most public thing in the game, and what a rebellion
-  // was let off is a ruling the facilitator makes in the open rather than in
-  // a corner.
+  // A coronation is the most public thing in the game, and a rebellion
+  // brewing is exactly the sort of thing the rest of the table notices
+  // before the facilitator has even priced it.
   { path: 'crownHolders.**', audience: PUBLIC },
-  { path: 'rebellionRelief.**', audience: PUBLIC },
+  { path: 'rebellions.**', audience: PUBLIC },
   // An envoy thread is a private line to the facilitator, one per role.
   {
     path: 'envoys.**',

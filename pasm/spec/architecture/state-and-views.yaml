@@ -51,6 +51,7 @@ entities:
         - trade-contract-record
         - crown-holders
         - concession-record
+        - rebellion-record
       coordinates:
         - command-admission
         - view-projector

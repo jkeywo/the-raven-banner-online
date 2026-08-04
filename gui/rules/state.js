@@ -219,9 +219,12 @@ export function createInitialState({ joinCode, seed, data, roleIds }) {
     crownHolders: Object.fromEntries(
       Object.entries(data.meta.startingCrowns ?? {})
         .filter(([, roleId]) => inPlay.includes(roleId))),
-    // What a rebellion costs this vassal, where the facilitator has ruled that
-    // their liege has lost the favour of God and it should cost them less.
-    rebellionRelief: {},
+    // Petitions to rebel: a vassal has asked, and is waiting on the
+    // facilitator to price it before they decide whether to go through with
+    // it. Kept rather than removed once resolved, like a contract or a
+    // consent request — a rebellion refused or called off is still part of
+    // the story of the game.
+    rebellions: {},
     // Trade contracts, offered and signed. Three cards, one per named shire,
     // each carrying a status rather than being removed when it ends — a
     // cancelled deal is part of the story of the game.

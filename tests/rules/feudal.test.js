@@ -4,7 +4,6 @@ import { createInitialState, rosterFor } from '../../gui/rules/state.js';
 import { apply, replay } from '../../gui/rules/reducer.js';
 import { admit } from '../../gui/rules/admission.js';
 import { toSave } from '../../gui/rules/command-log.js';
-import { rebellionCost } from '../../gui/rules/commands.js';
 import {
   crownsOf, electorate, hasSupport, aftermath, churchesHeld, incomeFor,
 } from '../../gui/rules/derive.js';
@@ -312,26 +311,135 @@ describe('voting', () => {
   });
 });
 
-describe('rebellion', () => {
-  it('costs a shire and two soldiers, both to the liege', () => {
+describe('asking to rebel', () => {
+  /** Cenred asks, naming the first shire he holds. */
+  function asked(state = playing()) {
+    const shireId = shiresOf(state, 'cenred')[0];
+    const after = run(state, as('cenred'), 'request-rebel', { shireId });
+    return { state: after, id: Object.keys(after.rebellions)[0], shireId };
+  }
+
+  it('opens a petition rather than doing anything, until it is priced', () => {
+    const before = playing();
+    const { state } = asked(before);
+    expect(state.roles.cenred).toMatchObject({
+      liegeId: 'king_alfred',
+      soldiers: before.roles.cenred.soldiers,
+    });
+    expect(Object.values(state.rebellions)).toHaveLength(1);
+    expect(Object.values(state.rebellions)[0]).toMatchObject({
+      roleId: 'cenred', liegeId: 'king_alfred', status: 'pending', cost: null,
+    });
+  });
+
+  it('is a Saxon\'s to ask — a Dane already changes liege for free', () => {
     const state = playing();
+    expect(refusal(state, as('ubba_ragnarsson'), 'request-rebel', {}))
+      .toBe('a Dane simply changes liege — no rebellion needed');
+  });
+
+  it('is nothing to a man who answers to nobody', () => {
+    const state = playing();
+    expect(refusal(state, as('king_alfred'), 'request-rebel', {}))
+      .toBe('you answer to nobody already');
+  });
+
+  it('names which shire he would offer, if he holds any', () => {
+    const state = playing();
+    expect(refusal(state, as('cenred'), 'request-rebel', {}))
+      .toBe('name the shire you would hand over');
+    expect(refusal(state, as('cenred'), 'request-rebel', { shireId: 'wiltshire' }))
+      .toBe('that is not yours to offer');
+  });
+
+  it('asks nothing of a landless vassal', () => {
+    const state = playing();
+    for (const id of shiresOf(state, 'cenred')) state.shires[id].stewardRoleId = 'king_alfred';
+    expect(admit(state, data, { verb: 'request-rebel', payload: {} }, as('cenred')).ok).toBe(true);
+  });
+
+  it('will not run two petitions from the same vassal at once', () => {
+    const { state, shireId } = asked();
+    expect(refusal(state, as('cenred'), 'request-rebel', { shireId }))
+      .toBe('you have already asked to rebel');
+  });
+});
+
+describe('the umpire prices it', () => {
+  function asked(state = playing()) {
+    const shireId = shiresOf(state, 'cenred')[0];
+    const after = run(state, as('cenred'), 'request-rebel', { shireId });
+    return { state: after, shireId };
+  }
+
+  it('names the full printed price, or anything less down to nothing', () => {
+    const { state } = asked();
+    const priced = run(state, FACILITATOR, 'facilitator:price-rebellion',
+      { roleId: 'cenred', shires: 1, soldiers: 2 });
+    expect(Object.values(priced.rebellions)[0])
+      .toMatchObject({ status: 'priced', cost: { shires: 1, soldiers: 2 } });
+  });
+
+  it('is refused a price that is not a rebellion\'s to charge', () => {
+    const { state } = asked();
+    expect(refusal(state, FACILITATOR, 'facilitator:price-rebellion',
+      { roleId: 'cenred', shires: 3, soldiers: 0 })).toContain('one shire or none');
+    expect(refusal(state, FACILITATOR, 'facilitator:price-rebellion',
+      { roleId: 'cenred', shires: 1, soldiers: 5 })).toContain('two soldiers');
+  });
+
+  it('has nobody to price when nobody has asked', () => {
+    const state = playing();
+    expect(refusal(state, FACILITATOR, 'facilitator:price-rebellion',
+      { roleId: 'cenred', shires: 1, soldiers: 2 })).toContain('nobody is waiting');
+  });
+
+  it('records why, for the debrief', () => {
+    const { state } = asked();
+    const priced = run(state, FACILITATOR, 'facilitator:price-rebellion',
+      { roleId: 'cenred', shires: 0, soldiers: 0, note: 'Alfred let the Danes into Wessex' });
+    expect(Object.values(priced.rebellions)[0].note).toBe('Alfred let the Danes into Wessex');
+  });
+});
+
+describe('the rebel\'s final say', () => {
+  /** Cenred's petition, priced at the full rate. */
+  function priced(cost = { shires: 1, soldiers: 2 }) {
+    let state = playing();
+    const shireId = shiresOf(state, 'cenred')[0];
+    state = run(state, as('cenred'), 'request-rebel', { shireId });
+    state = run(state, FACILITATOR, 'facilitator:price-rebellion', { roleId: 'cenred', ...cost });
+    return { state, shireId };
+  }
+
+  it('cannot be confirmed before it is priced', () => {
+    let state = playing();
+    state = run(state, as('cenred'), 'request-rebel', { shireId: shiresOf(state, 'cenred')[0] });
+    expect(refusal(state, as('cenred'), 'confirm-rebel', {})).toContain('nothing priced yet');
+  });
+
+  it('costs a shire and two soldiers, both to the liege, once confirmed', () => {
+    const { state, shireId } = priced();
     const before = {
       cenred: state.roles.cenred.soldiers,
       alfred: state.roles.king_alfred.soldiers,
     };
-    const shireId = shiresOf(state, 'cenred')[0];
-    const after = run(state, as('cenred'), 'rebel', { shireId });
+    const after = run(state, as('cenred'), 'confirm-rebel', {});
 
     expect(after.roles.cenred.soldiers).toBe(before.cenred - 2);
     expect(after.roles.king_alfred.soldiers).toBe(before.alfred + 2);
     expect(after.shires[shireId].stewardRoleId).toBe('king_alfred');
+    expect(Object.values(after.rebellions)[0].status).toBe('done');
   });
 
   it('leaves the faction, and takes his remaining lands with him', () => {
-    const state = playing();
+    let state = playing();
     state.shires.redding.stewardRoleId = 'cenred';
     state.shires.sussex.stewardRoleId = 'cenred';
-    const after = run(state, as('cenred'), 'rebel', { shireId: 'redding' });
+    state = run(state, as('cenred'), 'request-rebel', { shireId: 'redding' });
+    state = run(state, FACILITATOR, 'facilitator:price-rebellion',
+      { roleId: 'cenred', shires: 1, soldiers: 2 });
+    const after = run(state, as('cenred'), 'confirm-rebel', {});
 
     expect(after.roles.cenred).toMatchObject({ liegeId: null, factionId: 'cenred' });
     expect(after.shires.sussex.factionId).toBe('cenred');
@@ -343,60 +451,64 @@ describe('rebellion', () => {
     // Kent, not Wessex: Wessex is Alfred's outright from the start, and
     // rebelling against a king does not dethrone him. An unheld claim they
     // share is what the liege-block actually gates.
-    const state = playing();
+    let state = playing();
     state.roles.cenred.claims = ['kent'];
     expect(refusal(state, as('cenred'), 'claim-crown', { crown: 'kent' }))
       .toBe('you cannot claim a crown your liege claims');
-    const after = run(state, as('cenred'), 'rebel', { shireId: shiresOf(state, 'cenred')[0] });
+    state = run(state, as('cenred'), 'request-rebel', { shireId: shiresOf(state, 'cenred')[0] });
+    state = run(state, FACILITATOR, 'facilitator:price-rebellion',
+      { roleId: 'cenred', shires: 1, soldiers: 2 });
+    const after = run(state, as('cenred'), 'confirm-rebel', {});
     expect(admit(after, data, { verb: 'claim-crown', payload: { crown: 'kent' } },
       as('cenred')).ok).toBe(true);
   });
 
-  it('is nothing to a man who answers to nobody', () => {
-    const state = playing();
-    expect(refusal(state, as('king_alfred'), 'rebel', {}))
-      .toBe('you answer to nobody already');
-  });
-
-  it('is cheaper where the umpire has heard enough', () => {
+  it('costs nothing when the umpire has heard enough', () => {
     // "This cost will be reduced (potentially down to zero) by the organisers
     // if the liege has lost the favour of God."
-    let state = playing();
-    state = run(state, FACILITATOR, 'facilitator:set-rebellion-relief',
-      { roleId: 'cenred', shires: 0, soldiers: 0, note: 'Alfred let the Danes into Wessex' });
-    expect(rebellionCost(state, 'cenred')).toEqual({ shires: 0, soldiers: 0 });
-
+    const { state } = priced({ shires: 0, soldiers: 0 });
     const held = shiresOf(state, 'cenred');
     const before = state.roles.cenred.soldiers;
-    const after = run(state, as('cenred'), 'rebel', {});
+    const after = run(state, as('cenred'), 'confirm-rebel', {});
     expect(after.roles.cenred.soldiers).toBe(before);
     expect(shiresOf(after, 'cenred')).toEqual(held);
     expect(after.roles.cenred.liegeId).toBe(null);
-    // The ruling was about one rebellion, not a standing rate.
-    expect(after.rebellionRelief.cenred).toBeUndefined();
   });
 
-  it('is refused a relief that is not a rebellion’s price', () => {
-    const state = playing();
-    expect(refusal(state, FACILITATOR, 'facilitator:set-rebellion-relief',
-      { roleId: 'cenred', shires: 3, soldiers: 0 })).toContain('one shire or none');
-    expect(refusal(state, FACILITATOR, 'facilitator:set-rebellion-relief',
-      { roleId: 'cenred', shires: 1, soldiers: 5 })).toContain('two soldiers');
-  });
-
-  it('asks a landed rebel which shire he is giving up', () => {
-    const state = playing();
-    expect(refusal(state, as('cenred'), 'rebel', {})).toBe('name the shire you are giving up');
-    expect(refusal(state, as('cenred'), 'rebel', { shireId: 'wiltshire' }))
-      .toBe('that is not yours to give');
-  });
-
-  it('takes only the soldiers from a landless one', () => {
-    const state = playing();
+  it('takes only the soldiers from a landless vassal', () => {
+    let state = playing();
     for (const id of shiresOf(state, 'cenred')) state.shires[id].stewardRoleId = 'king_alfred';
-    const after = run(state, as('cenred'), 'rebel', {});
+    state = run(state, as('cenred'), 'request-rebel', {});
+    state = run(state, FACILITATOR, 'facilitator:price-rebellion',
+      { roleId: 'cenred', shires: 1, soldiers: 2 });
+    const before = state.roles.king_alfred.soldiers;
+    const after = run(state, as('cenred'), 'confirm-rebel', {});
     expect(after.roles.cenred.liegeId).toBe(null);
-    expect(after.roles.king_alfred.soldiers).toBe(state.roles.king_alfred.soldiers + 2);
+    expect(after.roles.king_alfred.soldiers).toBe(before + 2);
+  });
+
+  it('is refused when the price can no longer be paid', () => {
+    const { state } = priced();
+    state.roles.cenred.soldiers = 1;
+    expect(refusal(state, as('cenred'), 'confirm-rebel', {})).toContain('not enough soldiers');
+  });
+
+  it('can be called off instead, at any stage, for nothing', () => {
+    let state = playing();
+    state = run(state, as('cenred'), 'request-rebel', { shireId: shiresOf(state, 'cenred')[0] });
+    const beforePrice = run(state, as('cenred'), 'cancel-rebel', {});
+    expect(Object.values(beforePrice.rebellions)[0].status).toBe('cancelled');
+    expect(beforePrice.roles.cenred.liegeId).toBe('king_alfred');
+
+    // And once cancelled, he is free to ask again.
+    expect(admit(beforePrice, data,
+      { verb: 'request-rebel', payload: { shireId: shiresOf(beforePrice, 'cenred')[0] } },
+      as('cenred')).ok).toBe(true);
+  });
+
+  it('has nothing to call off once it is already settled', () => {
+    const state = playing();
+    expect(refusal(state, as('cenred'), 'cancel-rebel', {})).toBe('nothing to call off');
   });
 });
 
@@ -479,7 +591,10 @@ describe('the feudal system replays', () => {
     for (const who of Object.keys(state.votes[id].electorate)) {
       state = run(state, as(who), 'cast-vote', { voteId: id, forRoleId: 'ceowulf' });
     }
-    state = run(state, as('cenred'), 'rebel', { shireId: shiresOf(state, 'cenred')[0] });
+    state = run(state, as('cenred'), 'request-rebel', { shireId: shiresOf(state, 'cenred')[0] });
+    state = run(state, FACILITATOR, 'facilitator:price-rebellion',
+      { roleId: 'cenred', shires: 1, soldiers: 2 });
+    state = run(state, as('cenred'), 'confirm-rebel', {});
     state = run(state, as('abbess_wenyld'), 'request-allegiance', { liegeId: 'ceowulf' });
     const consentId = Object.keys(state.consents)[0];
     state = run(state, as('ceowulf'), 'answer-consent', { consentId, granted: true });

@@ -306,16 +306,16 @@ export function fieldsFor(verb, view, data) {
           .map((crown) => ({ value: crown, label: crownName(crown) })),
       }];
 
-    case 'rebel': {
-      // What it costs him, as the facilitator has left it.
-      const relief = view.rebellionRelief?.[me];
-      return (relief?.shires ?? 1) === 0 ? [] : [{
+    case 'request-rebel':
+      // Named up front, whatever it ends up costing — the facilitator has
+      // not priced it yet, so this is what you would offer if a shire is
+      // part of the bill.
+      return held().length ? [{
         name: 'shireId',
-        label: 'Hand over',
+        label: 'Offer',
         kind: 'select',
         options: held(),
-      }];
-    }
+      }] : [];
 
     case 'use-mercenary':
       return [{

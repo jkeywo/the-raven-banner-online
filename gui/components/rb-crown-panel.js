@@ -1,14 +1,14 @@
 /**
  * <rb-crown-panel> — the facilitator's end of the feudal system.
  *
- * Two jobs the umpire has that nobody else can do. One: call the count on an
- * election that is waiting for somebody who has gone home, because an election
- * that never ends stops the game around it. Two: rule that a liege has lost the
- * favour of God, which is the printed lever on what a rebellion costs.
+ * Three jobs the umpire has that nobody else can do. One: call the count on an
+ * election that is waiting for somebody who has gone home, because an
+ * election that never ends stops the game around it. Two: price a rebellion —
+ * the printed rule is a judgement about one vassal's one liege, made when
+ * they actually ask, not a standing rate. Three: bring back the fallen.
  *
- * The relief is set in the open and before the fact. A price a vassal cannot
- * see is not a price they can weigh, and the whole reason the rule exists is to
- * let a badly-led faction come apart.
+ * A rebellion is priced, not decided: the vassal still confirms or calls it
+ * off once they see the number, so this panel is only ever half of it.
  */
 
 const REBELLION = [
@@ -63,6 +63,38 @@ export class RbCrownPanel extends HTMLElement {
         </li>`).join('')}</ul>`;
   }
 
+  /**
+   * A vassal has asked to rebel, and is waiting on a price.
+   *
+   * The four presets are the same four the rule prints, so pricing one is a
+   * single choice rather than typing two numbers — pick the option, commit,
+   * and the vassal sees the number next.
+   */
+  _rebellions(nameOf) {
+    const open = Object.values(this._state.rebellions ?? {})
+      .filter((r) => r.status === 'pending' || r.status === 'priced');
+    if (!open.length) return '<p class="rb-empty">Nobody has asked to rebel.</p>';
+
+    return `<ul class="rb-relief">${open.map((request) => `
+      <li>
+        <p><strong>${nameOf(request.roleId)}</strong>
+          <span class="rb-meta">wants to leave ${nameOf(request.liegeId)}</span>
+          ${request.status === 'priced'
+    ? `<span class="rb-meta">— priced at ${request.cost.shires} shire(s),
+        ${request.cost.soldiers} soldiers. Waiting on them now.</span>`
+    : ''}
+        </p>
+        <form data-price="${request.roleId}">
+          <label>Price it
+            <select name="price">${REBELLION.map((option) => `
+              <option value="${option.shires}|${option.soldiers}">${option.label}</option>`).join('')}
+            </select>
+          </label>
+          <button type="submit" class="rb-primary">Commit</button>
+        </form>
+      </li>`).join('')}</ul>`;
+  }
+
   _render() {
     if (!this.isConnected || !this._state || !this._data) return;
     const nameOf = (id) => this._data.roles.roles[id]?.name ?? id;
@@ -71,7 +103,6 @@ export class RbCrownPanel extends HTMLElement {
 
     const open = Object.values(this._state.votes ?? {}).filter((v) => !v.resolved);
     const worn = Object.entries(this._state.crownHolders ?? {});
-    const vassals = Object.values(this._state.roles ?? {}).filter((r) => r.liegeId);
 
     this.innerHTML = `
       <div class="rb-crowns">
@@ -99,22 +130,8 @@ export class RbCrownPanel extends HTMLElement {
 
         ${this._dead(nameOf, crownName)}
 
-        <h3>What a rebellion costs</h3>
-        ${vassals.length ? `<ul class="rb-relief">${vassals.map((role) => {
-    const relief = this._state.rebellionRelief?.[role.id];
-    const current = `${relief?.shires ?? 1}|${relief?.soldiers ?? 2}`;
-    return `
-            <li>
-              <label>${nameOf(role.id)} <span class="rb-meta">under
-                ${nameOf(role.liegeId)}</span>
-                <select data-relief="${role.id}">${REBELLION.map((option) => `
-                  <option value="${option.shires}|${option.soldiers}"
-                    ${`${option.shires}|${option.soldiers}` === current ? 'selected' : ''}
-                  >${option.label}</option>`).join('')}
-                </select>
-              </label>
-            </li>`;
-  }).join('')}</ul>` : '<p class="rb-empty">Nobody answers to anybody.</p>'}
+        <h3>Rebellions waiting on you</h3>
+        ${this._rebellions(nameOf)}
       </div>`;
 
     for (const form of this.querySelectorAll('[data-heir]')) {
@@ -131,11 +148,12 @@ export class RbCrownPanel extends HTMLElement {
     for (const button of this.querySelectorAll('[data-close]')) {
       button.onclick = () => this._emit('facilitator:close-vote', { voteId: button.dataset.close });
     }
-    for (const select of this.querySelectorAll('[data-relief]')) {
-      select.onchange = () => {
-        const [shires, soldiers] = select.value.split('|').map(Number);
-        this._emit('facilitator:set-rebellion-relief',
-          { roleId: select.dataset.relief, shires, soldiers });
+    for (const form of this.querySelectorAll('[data-price]')) {
+      form.onsubmit = (event) => {
+        event.preventDefault();
+        const [shires, soldiers] = form.elements.price.value.split('|').map(Number);
+        this._emit('facilitator:price-rebellion',
+          { roleId: form.dataset.price, shires, soldiers });
       };
     }
   }

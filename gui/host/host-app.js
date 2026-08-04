@@ -229,7 +229,9 @@ export async function startHostApp({ location = window.location } = {}) {
     const consentsPending = Object.values(session.state.consents ?? {})
       .some((r) => !r.resolved);
     $('consent-panel').hidden = !consentsPending;
-    $('tab-fac-crowns').dataset.live = String(consentsPending);
+    const rebellionsPending = Object.values(session.state.rebellions ?? {})
+      .some((r) => r.status === 'pending' || r.status === 'priced');
+    $('tab-fac-crowns').dataset.live = String(consentsPending || rebellionsPending);
     $('inspector').state = session.state;
     const waiting = Object.values(session.state.envoys).filter((t) => t.open
       && t.messages.at(-1)?.from === t.roleId).length;

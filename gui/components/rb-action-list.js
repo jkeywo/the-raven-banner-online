@@ -52,7 +52,9 @@ const LABELS = {
   'request-allegiance': 'Ask to swear allegiance',
   'claim-crown': 'Claim a crown',
   'cast-vote': 'Cast your vote',
-  rebel: 'Rebel against your liege',
+  'request-rebel': 'Ask to rebel',
+  'confirm-rebel': 'Go through with it',
+  'cancel-rebel': 'Call off your rebellion',
   'use-mercenary': 'Call in the mercenaries',
 };
 
@@ -81,9 +83,26 @@ const NOTES = {
   'cancel-contract': 'Team Phase only. The ship value goes back up.',
   'request-allegiance': 'They must agree, and must wear a crown or be a Dane.',
   'claim-crown': 'Every shire that supports it gets a say.',
-  rebel: 'A shire and two soldiers to the man you are leaving.',
+  'request-rebel': 'The facilitator sets the price. You get the final say once you see it.',
   'use-mercenary': 'Once a game. Your side wins one more clash.',
 };
+
+/**
+ * A few notes cannot be written in advance — what a rebellion actually costs
+ * is a number the facilitator only just set, not a fact about the verb.
+ * Falls through to the static NOTES above when there is nothing to compute.
+ */
+function dynamicNote(verb, view) {
+  if (verb !== 'confirm-rebel' && verb !== 'cancel-rebel') return undefined;
+  const me = view.viewer?.roleId;
+  const mine = Object.values(view.rebellions ?? {})
+    .find((r) => r.roleId === me && (r.status === 'pending' || r.status === 'priced'));
+  if (!mine) return undefined;
+  if (mine.status === 'pending') return 'Waiting on the facilitator to set a price.';
+  const { shires, soldiers } = mine.cost;
+  return `Costs ${shires} shire${shires === 1 ? '' : 's'} and `
+    + `${soldiers} soldier${soldiers === 1 ? '' : 's'}.`;
+}
 
 /** Verbs that need the player to say more before they mean anything. */
 export const NEEDS_CHOICE = new Set([
@@ -93,7 +112,7 @@ export const NEEDS_CHOICE = new Set([
   'missionary-expedition', 'rousing-sermon', 'baptise',
   'request-settle', 'drive-out-missionaries',
   'offer-contract', 'answer-contract', 'cancel-contract',
-  'request-allegiance', 'claim-crown', 'rebel', 'use-mercenary',
+  'request-allegiance', 'claim-crown', 'request-rebel', 'use-mercenary',
 ]);
 
 export class RbActionList extends HTMLElement {
@@ -145,7 +164,8 @@ export class RbActionList extends HTMLElement {
           ${LABELS[action.verb] ?? action.verb}${NEEDS_CHOICE.has(action.verb) ? '…' : ''}
         </button>
         <span class="rb-action-note">${
-  action.ok ? (NOTES[action.verb] ?? '') : escape(action.reason ?? '')}</span>
+  action.ok ? (dynamicNote(action.verb, this._view) ?? NOTES[action.verb] ?? '')
+    : escape(action.reason ?? '')}</span>
       </li>`;
 
     this.innerHTML = `
