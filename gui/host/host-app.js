@@ -83,7 +83,7 @@ export async function startHostApp({ location = window.location } = {}) {
     }
     const enteredPin = $('co-pin').value.trim();
     if (!enteredPin) {
-      $('start-error').textContent = 'The PIN is on the other facilitator's screen.';
+      $('start-error').textContent = 'The PIN is on the other facilitator’s screen.';
       return;
     }
     $('start-error').textContent = '';
