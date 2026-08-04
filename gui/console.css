@@ -627,7 +627,7 @@ rb-phase-clock[data-state="paused"] .rb-clock-time::after { content: ' paused'; 
   padding: 1rem 1.2rem;
   margin-bottom: 1.5rem;
   position: sticky;
-  top: var(--rb-bar-height, 3.35rem);
+  top: var(--rb-bar-height);
   z-index: 20;
 }
 
