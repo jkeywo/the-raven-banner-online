@@ -39,6 +39,34 @@ body.rb-shell {
   line-height: 1.55;
 }
 
+/* The player's shell alone locks to the viewport: the header stays put, and
+   the game screen fills what is left rather than pushing the whole page
+   down. Its own panels — the two rails, and whichever centre pane is open —
+   scroll inside themselves instead, the same way the game already refuses to
+   scroll sideways (see .rb-map-stage and friends). The simpler screens ahead
+   of it (the code, the name, the lobby) are short enough that this is never
+   felt; .rb-main keeps its own overflow as a fallback for a long role
+   picker on a short window. */
+.rb-shell-player {
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.rb-shell-player .rb-main {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.rb-shell-player #screen-game.rb-full {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 /* --- chrome ------------------------------------------------------------- */
 
 .rb-bar {
@@ -636,18 +664,44 @@ rb-phase-clock[data-state="paused"] .rb-clock-time::after { content: ' paused'; 
 
 /* --- the game body: what you can do | the board | your sheet ------------- */
 
+.rb-game-head { flex: none; }
+
 .rb-game-body {
   display: grid;
   grid-template-columns: minmax(15rem, 0.9fr) minmax(0, 2.4fr) minmax(15rem, 0.9fr);
   gap: 1.5rem;
   align-items: start;
+  /* Fills whatever height #screen-game has left below the head, rather than
+     growing with its content — that growth is what used to push the whole
+     page into a scroll. Each column scrolls inside itself instead. */
+  flex: 1;
+  min-height: 0;
 }
+
+.rb-game-body > * { min-height: 0; }
 
 @media (max-width: 75rem) {
   /* Board first, then what you can do, then your own sheet last: the two
      rails still stack, but the map is what a shrinking window keeps. */
-  .rb-game-body { grid-template-columns: 1fr; }
+  .rb-game-body {
+    grid-template-columns: 1fr;
+    /* Stacked, there is no shared row height left to divide between three
+       panels — falling back to this one box's own scroll (rather than the
+       page's) is the honest answer on a window this narrow, so the header
+       still stays put. */
+    display: block;
+    overflow-y: auto;
+  }
   .rb-game-main { order: -1; }
+  /* The fixed-height, internally-scrolling treatment above only makes sense
+     when the three columns share one row — stacked, each reverts to normal
+     block flow and lets .rb-game-body do the one scroll that is needed. */
+  .rb-rail, .rb-game-main, .rb-game-main > [data-pane-body] {
+    height: auto;
+    max-height: none;
+    overflow: visible;
+    flex: initial;
+  }
 }
 
 .rb-rail {
@@ -655,9 +709,20 @@ rb-phase-clock[data-state="paused"] .rb-clock-time::after { content: ' paused'; 
   border: 1px solid var(--rb-rule);
   border-radius: 3px;
   padding: 0.4rem 1.1rem 1.1rem;
-  position: sticky;
-  top: 1rem;
-  max-height: calc(100vh - 2rem);
+  height: 100%;
+  overflow-y: auto;
+}
+
+.rb-game-main {
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.rb-game-main > [data-pane-body] {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
 }
 

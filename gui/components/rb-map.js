@@ -124,7 +124,7 @@ export class RbMap extends HTMLElement {
     }
     tabs.innerHTML = sheets.map((sheet) => `
       <button type="button" role="tab" data-sheet="${sheet.id}"
-              aria-selected="${sheet.id === this.sheet}">${sheet.display_name}</button>`).join('');
+              aria-selected="${sheet.id === this.sheet}">${sheetLabel(sheet.display_name)}</button>`).join('');
   }
 
   _shirePath(id, printed, live, outline) {
@@ -194,6 +194,17 @@ function titleFor(text) {
   const title = document.createElementNS(SVG_NS, 'title');
   title.textContent = text;
   return title;
+}
+
+/**
+ * "Northern England" trimmed to "Northern" for the sheet tab itself.
+ *
+ * These tabs live inside a pane the player already opened to see the map —
+ * saying "England" a second and third time only made them read as the same
+ * tab as the top-level one that actually shows the Aftermath tracker.
+ */
+function sheetLabel(displayName) {
+  return displayName.replace(/\s+England$/, '');
 }
 
 customElements.define('rb-map', RbMap);

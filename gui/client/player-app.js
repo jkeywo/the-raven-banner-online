@@ -16,6 +16,7 @@
 import { ConnectionManager } from '../net/connection-manager.js';
 import { peerIdForCode, codeFromLocation, normaliseJoinCode, isValidJoinCode } from '../net/join-code.js';
 import { installSessionToken } from '../net/session-token.js';
+import { loadSavedName, saveName } from '../net/name-storage.js';
 import { identify } from '../net/wire.js';
 import { sendCommand } from '../net/command-gateway.js';
 import { ClientState } from './client-state.js';
@@ -72,9 +73,13 @@ export async function startPlayerApp({ location = window.location } = {}) {
   });
 
   // --- the name -------------------------------------------------------------
+  // Prefilled from whoever last typed one on this machine, so a returning
+  // player is not retyping their name every game.
+  $('player-name').value = loadSavedName();
   $('name-form').addEventListener('submit', (event) => {
     event.preventDefault();
     name = $('player-name').value.trim() || 'Someone';
+    saveName(name);
     connect();
     show('lobby');
   });

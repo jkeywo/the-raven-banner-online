@@ -18,6 +18,7 @@ import {
 } from './persistence.js';
 import { PrimarySession, CoFacilitatorSession } from './session.js';
 import { installSessionToken } from '../net/session-token.js';
+import { loadSavedName, saveName } from '../net/name-storage.js';
 import {
   mintJoinCode, mintFacilitatorPin, playerLink, normaliseJoinCode, isValidJoinCode,
 } from '../net/join-code.js';
@@ -75,6 +76,9 @@ export async function startHostApp({ location = window.location } = {}) {
     $('resume').hidden = false;
   }
 
+  // Prefilled from whoever last typed one on this machine.
+  $('co-name').value = loadSavedName();
+
   $('join-as-co').addEventListener('submit', (event) => {
     event.preventDefault();
     const code = normaliseJoinCode($('co-code').value);
@@ -90,10 +94,12 @@ export async function startHostApp({ location = window.location } = {}) {
       return;
     }
     $('start-error').textContent = '';
+    const coName = $('co-name').value.trim() || 'Co-facilitator';
+    saveName(coName);
     take(new CoFacilitatorSession({
       joinCode: code,
       pin: enteredPin,
-      name: $('co-name').value.trim() || 'Co-facilitator',
+      name: coName,
       token: installSessionToken(code),
       data,
       onChange,

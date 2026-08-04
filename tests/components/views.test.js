@@ -95,6 +95,18 @@ describe('<rb-map>', () => {
     expect(map.querySelector('img').getAttribute('src')).toBe('assets/maps/eastern.png');
   });
 
+  it('trims "England" off its own sheet tabs, being already inside the board', () => {
+    // A player who has already opened the board should not read "Northern
+    // England" beside a sibling top-level tab that is also just "England"
+    // but shows something else entirely (the Aftermath tracker).
+    const { view } = seatedView();
+    const map = mount('rb-map');
+    map.data = data;
+    map.view = view;
+    const labels = [...map.querySelectorAll('.rb-map-tabs button')].map((b) => b.textContent);
+    expect(labels).toEqual(['Northern', 'Western', 'Eastern']);
+  });
+
   it('points at the shires an action was given to target, and nowhere else', () => {
     const { view } = seatedView();
     const map = mount('rb-map');
