@@ -333,19 +333,19 @@ entities:
       confidence: confirmed
       title: Facilitator Override Inspector
       summary: >-
-        One card per role in human-readable terms -- resources as adjustments,
-        claims, a mercenary card, an initiative token -- with a searchable tree
-        of the whole game underneath for whatever a card does not cover.
+        One card per role in human-readable terms -- resources as
+        adjustments, claims, a mercenary card, an initiative token, and which
+        shires they steward.
       rationale:
         - It exists because the app will get something wrong during a game, and the alternative to fixing it is a room of sixteen people watching an apology. A paper megagame never had this problem -- the umpire crosses out a number.
         - Every edit travels the same admission and reducer as a player's command, so it lands in the log tagged as an override and a replay reproduces it. Otherwise "the facilitator can change anything" would mean "the history is a polite fiction".
         - The seed, the cursor and the log itself are not editable. Changing one of those would make the record disagree with the game it describes, which is worse than any bug it could paper over.
         - Values keep their type on the way back in. A castle count that quietly became the string "3" would compare wrong everywhere afterwards and nobody would know why.
-        - "A card started as a search box over dotted paths, which is complete but assumes the facilitator already knows the path to what they want. The cards name the sixteen things that actually come up in the words a sheet already uses, and a number is adjusted by an amount rather than replaced outright -- see numeric-adjustment -- so a facilitator's edit cannot silently undo a player's in the time between reading the value and committing a change to it."
-        - Renders the search-only view exactly as before when the static dataset is not supplied, which is what lets every earlier test of the raw path search keep passing unmodified.
+        - "A card started as a search box over dotted paths, which was complete but assumed the facilitator already knew the path to what they wanted. The cards name the things that actually come up in the words a sheet already uses, and a number is adjusted by an amount rather than replaced outright -- see numeric-adjustment -- so a facilitator's edit cannot silently undo a player's in the time between reading the value and committing a change to it. The search box is gone now that the cards, the shire editor and the Foreign Influence note between them cover everything it used to reach."
       references:
         - numeric-adjustment
         - mid-game-roster-edit
+        - facilitator-map-editor
     architecture:
       kind: client-interface
       authority: non-authoritative
@@ -359,8 +359,6 @@ entities:
         - gui/components/rb-state-inspector.js
       symbols:
         - RbStateInspector
-        - collectLeaves
-        - coerce
       tests:
         - npm test
 

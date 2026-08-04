@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>The Raven Banner — Facilitator</title>
+  <link rel="icon" href="favicon.ico">
   <link rel="stylesheet" href="gui/console.css">
   <script src="vendor/peerjs.min.js"></script>
 </head>
@@ -97,6 +98,7 @@
         <button type="button" role="tab" data-pane="envoys" id="tab-fac-envoys" aria-selected="false">Envoys</button>
         <button type="button" role="tab" data-pane="debrief" id="tab-fac-debrief" aria-selected="false">Debrief</button>
         <button type="button" role="tab" data-pane="inspector" aria-selected="false">Inspector</button>
+        <button type="button" role="tab" data-pane="game" aria-selected="false">Game &amp; roster</button>
       </nav>
 
       <div data-pane-body="map" class="rb-pane rb-pane-map">
@@ -136,6 +138,16 @@
             Each wants something; none of them gives anything away.
           </p>
           <rb-envoy-queue id="envoy-queue"></rb-envoy-queue>
+        </section>
+
+        <section class="rb-foreign-influence">
+          <h2>Foreign Influence</h2>
+          <p class="rb-meta">
+            The counter itself is a facilitator's judgement, not a number the
+            game keeps — write the note the debrief should read from.
+          </p>
+          <textarea id="foreign-influence-note" rows="4"></textarea>
+          <button id="foreign-influence-commit" type="button">Save note</button>
         </section>
       </div>
 
@@ -177,44 +189,46 @@
         </section>
       </div>
 
-      <div class="rb-columns">
-        <div>
-          <h1>Game <span id="join-code" class="rb-code"></span></h1>
-          <p class="rb-lede">Read the code out. Paste the link.</p>
+      <div data-pane-body="game" class="rb-pane" hidden>
+        <div class="rb-columns">
+          <div>
+            <h1>Game <span id="join-code" class="rb-code"></span></h1>
+            <p class="rb-lede">Read the code out. Paste the link.</p>
 
-          <label for="player-link">Player link</label>
-          <div class="rb-row">
-            <input id="player-link" readonly>
-            <button id="copy-link" type="button">Copy</button>
+            <label for="player-link">Player link</label>
+            <div class="rb-row">
+              <input id="player-link" readonly>
+              <button id="copy-link" type="button">Copy</button>
+            </div>
+
+            <p class="rb-pin">
+              Facilitator PIN <strong id="facilitator-pin"></strong>
+              <span class="rb-meta">
+                Only the other facilitator gets this. Anyone with it can edit the game.
+              </span>
+            </p>
+
+            <h2>Keeping the game</h2>
+            <p class="rb-meta">
+              Saved automatically as you go. Download one before anything
+              important — it is the only copy that survives this machine.
+            </p>
+            <button id="download-save" type="button">Download save</button>
+            <p id="save-warning" class="rb-error" role="alert" hidden>
+              Could not save to this browser — storage is full or blocked.
+              Download a save instead.
+            </p>
+            <p id="replay-warning" class="rb-error" role="alert" hidden></p>
           </div>
 
-          <p class="rb-pin">
-            Facilitator PIN <strong id="facilitator-pin"></strong>
-            <span class="rb-meta">
-              Only the other facilitator gets this. Anyone with it can edit the game.
-            </span>
-          </p>
+          <div>
+            <h2>Who is here</h2>
+            <p id="seated-count" class="rb-meta"></p>
+            <rb-seat-roster id="roster"></rb-seat-roster>
 
-          <h2>Keeping the game</h2>
-          <p class="rb-meta">
-            Saved automatically as you go. Download one before anything
-            important — it is the only copy that survives this machine.
-          </p>
-          <button id="download-save" type="button">Download save</button>
-          <p id="save-warning" class="rb-error" role="alert" hidden>
-            Could not save to this browser — storage is full or blocked.
-            Download a save instead.
-          </p>
-          <p id="replay-warning" class="rb-error" role="alert" hidden></p>
-        </div>
-
-        <div>
-          <h2>Who is here</h2>
-          <p id="seated-count" class="rb-meta"></p>
-          <rb-seat-roster id="roster"></rb-seat-roster>
-
-          <h2>Connections</h2>
-          <pre id="host-log" class="rb-log"></pre>
+            <h2>Connections</h2>
+            <pre id="host-log" class="rb-log"></pre>
+          </div>
         </div>
       </div>
     </section>

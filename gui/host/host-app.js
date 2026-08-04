@@ -246,6 +246,11 @@ export async function startHostApp({ location = window.location } = {}) {
     $('tab-fac-crowns').dataset.live = String(consentsPending || rebellionsPending);
     $('inspector').data = data;
     $('inspector').state = session.state;
+    // Left alone while the facilitator is mid-sentence: a render landing
+    // between keystrokes must not overwrite what they are typing.
+    if (document.activeElement !== $('foreign-influence-note')) {
+      $('foreign-influence-note').value = session.state.aftermath.foreignInfluence;
+    }
     const waiting = Object.values(session.state.envoys).filter((t) => t.open
       && t.messages.at(-1)?.from === t.roleId).length;
     $('envoy-count').textContent = waiting
@@ -335,6 +340,11 @@ export async function startHostApp({ location = window.location } = {}) {
     if (globalThis.confirm?.('End the game and freeze the board for the debrief?') !== false) {
       asFacilitator('facilitator:end-game');
     }
+  });
+
+  $('foreign-influence-commit').addEventListener('click', () => {
+    asFacilitator('facilitator:set',
+      { path: ['aftermath', 'foreignInfluence'], value: $('foreign-influence-note').value });
   });
 
   $('print-epilogue').addEventListener('click', () => globalThis.print?.());

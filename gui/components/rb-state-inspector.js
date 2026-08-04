@@ -7,32 +7,22 @@
  * crosses out a number. This is that pencil.
  *
  * One card per role for the things that actually come up — resources, wounds,
- * claims, a mercenary card, an initiative token — each with a human-readable
- * name rather than a dotted path. A number is adjusted rather than replaced:
- * type how much to change it by and commit, and the change lands against
- * whatever the value actually is at that moment, not whatever it was when the
- * facilitator opened the panel. That is what keeps an edit from quietly
- * undoing something a player did in between — an absolute "set it to 40"
- * cannot tell the difference between "was 12, should be 40" and "was 12, a
- * player just spent 8 of it, should now be 32"; an adjustment of "+28" can,
- * because it does not need to know which one it started from.
+ * claims, a mercenary card, an initiative token, and which shires they steward
+ * — each with a human-readable name rather than a dotted path. A number is
+ * adjusted rather than replaced: type how much to change it by and commit,
+ * and the change lands against whatever the value actually is at that
+ * moment, not whatever it was when the facilitator opened the panel. That is
+ * what keeps an edit from quietly undoing something a player did in between
+ * — an absolute "set it to 40" cannot tell the difference between "was 12,
+ * should be 40" and "was 12, a player just spent 8 of it, should now be 32";
+ * an adjustment of "+28" can, because it does not need to know which one it
+ * started from.
  *
- * Below the cards, the same raw path search this always had, for the rest of
- * the state that has no card of its own. Every edit from either surface goes
- * out through the ordinary command pipeline, so it lands in the log tagged as
- * an override and a replay reproduces it. That is what stops "the facilitator
- * can change anything" from meaning "the history is a polite fiction".
+ * Every edit goes out through the ordinary command pipeline, so it lands in
+ * the log tagged as an override and a replay reproduces it. That is what
+ * stops "the facilitator can change anything" from meaning "the history is a
+ * polite fiction".
  */
-
-/** Paths worth offering first, because they are what actually gets fixed. */
-const SUGGESTED = [
-  'roles.*.silver', 'roles.*.food', 'roles.*.soldiers', 'roles.*.momentum',
-  'roles.*.wounds', 'shires.*.castles', 'shires.*.stewardRoleId',
-  'aftermath.foreignInfluence',
-];
-
-/** Never editable here: changing one breaks replay rather than the game. */
-const OFF_LIMITS = ['seed', 'rngCursor', 'log', 'schemaVersion', 'joinCode', 'seatByToken'];
 
 /** The numbers a role card offers to adjust, in the order a sheet lists them. */
 const STATS = [
@@ -41,8 +31,6 @@ const STATS = [
 ];
 
 const TOKENS = ['white', 'black', 'bonus'];
-
-const isBranch = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 
 export class RbStateInspector extends HTMLElement {
   set state(value) {
@@ -61,24 +49,7 @@ export class RbStateInspector extends HTMLElement {
       this._built = true;
       this.innerHTML = `
         <div class="rb-inspector-cards"></div>
-        <div class="rb-inspector-addrole"></div>
-        <div class="rb-inspector-head">
-          <h4>Anything else</h4>
-          <label>Find
-            <input type="search" id="rb-inspector-find"
-                   placeholder="silver, wiltshire, wounds…">
-          </label>
-          <p class="rb-meta">
-            Every change here is logged as an override and replays with the
-            game. The seed and the history are not editable — changing those
-            would make the record disagree with the game it describes.
-          </p>
-        </div>
-        <div class="rb-inspector-rows"></div>`;
-      this.querySelector('#rb-inspector-find').addEventListener('input', (event) => {
-        this._query = event.target.value.trim().toLowerCase();
-        this._renderRows();
-      });
+        <div class="rb-inspector-addrole"></div>`;
     }
     this._render();
   }
@@ -89,8 +60,6 @@ export class RbStateInspector extends HTMLElement {
 
   _render() {
     if (!this.isConnected || !this._built || !this._state) return;
-    this._leaves = collectLeaves(this._state);
-    this._renderRows();
     this._renderCards();
     this._renderAddRole();
   }
@@ -148,6 +117,10 @@ export class RbStateInspector extends HTMLElement {
     const printed = this._data.roles.roles[role.id] ?? {};
     const crowns = Object.keys(this._data.factions.crownLetter ?? {});
     const available = crowns.filter((c) => !role.claims.includes(c));
+    const steward = Object.entries(this._state.shires)
+      .filter(([, s]) => s.stewardRoleId === role.id)
+      .map(([id]) => this._data.shires.shires[id]?.name ?? id)
+      .sort((a, b) => a.localeCompare(b));
 
     return `
       <article class="rb-inspector-card">
@@ -164,6 +137,13 @@ export class RbStateInspector extends HTMLElement {
             <button type="button" data-commit-adjust="roles.${role.id}.${key}">Commit</button>
             <span class="rb-inspector-error" data-error-for="roles.${role.id}.${key}"></span>
           </div>`).join('')}
+        </div>
+
+        <div class="rb-inspector-stewardship">
+          <span class="rb-inspector-stat-label">Stewards</span>
+          <ul class="rb-inspector-steward-list">${steward.map((name) => `
+            <li>${escape(name)}</li>`).join('') || '<li class="rb-empty">no shires</li>'}
+          </ul>
         </div>
 
         <div class="rb-inspector-claims">
@@ -289,92 +269,6 @@ export class RbStateInspector extends HTMLElement {
       this._addRoleId = null;
     };
   }
-
-  // --- the raw path search, unchanged --------------------------------------
-
-  _renderRows() {
-    const query = this._query ?? '';
-    const matches = query
-      ? this._leaves.filter(({ path }) => path.toLowerCase().includes(query))
-      : this._leaves.filter(({ path }) => SUGGESTED.some((pattern) => matchesPattern(pattern, path)));
-
-    const rows = this.querySelector('.rb-inspector-rows');
-    if (!matches.length) {
-      rows.innerHTML = `<p class="rb-empty">${query
-        ? 'Nothing matches that.' : 'Nothing to show.'}</p>`;
-      return;
-    }
-
-    // Capped, because an unfiltered game state is a few thousand leaves and a
-    // facilitator hunting through all of them mid-turn is not helped by more.
-    const shown = matches.slice(0, 60);
-    rows.innerHTML = `${shown.map(({ path, value }) => `
-      <label class="rb-inspector-row">
-        <span class="rb-inspector-path">${path}</span>
-        ${renderInput(path, value)}
-      </label>`).join('')}
-      ${matches.length > shown.length
-    ? `<p class="rb-meta">${matches.length - shown.length} more — narrow the search.</p>` : ''}`;
-
-    for (const input of rows.querySelectorAll('[data-path]')) {
-      input.onchange = () => this._commit(input);
-    }
-  }
-
-  _commit(input) {
-    const path = input.dataset.path;
-    const raw = input.type === 'checkbox' ? input.checked : input.value;
-    const value = coerce(raw, input.dataset.kind);
-    this._emit('facilitator:set', { path: path.split('.'), value });
-  }
-}
-
-/** Every editable leaf, as dotted paths. */
-export function collectLeaves(state, prefix = [], out = []) {
-  for (const [key, value] of Object.entries(state)) {
-    const path = [...prefix, key];
-    if (prefix.length === 0 && OFF_LIMITS.includes(key)) continue;
-    if (isBranch(value)) collectLeaves(value, path, out);
-    else if (!Array.isArray(value)) out.push({ path: path.join('.'), value });
-  }
-  return out;
-}
-
-/** `roles.*.silver` against `roles.king_alfred.silver`. */
-export function matchesPattern(pattern, path) {
-  const p = pattern.split('.');
-  const s = path.split('.');
-  return p.length === s.length && p.every((part, i) => part === '*' || part === s[i]);
-}
-
-/**
- * Read a typed value back out of a form field.
- *
- * A `castles` that silently became the string "3" would compare wrong
- * everywhere afterwards and nobody would know why, so the original type is
- * carried on the input and restored here.
- */
-export function coerce(raw, kind) {
-  if (kind === 'number') {
-    const n = Number(raw);
-    return Number.isFinite(n) ? n : 0;
-  }
-  if (kind === 'boolean') return Boolean(raw);
-  if (kind === 'null') return raw === '' ? null : raw;
-  return raw;
-}
-
-function renderInput(path, value) {
-  const kind = value === null ? 'null' : typeof value;
-  if (kind === 'boolean') {
-    return `<input type="checkbox" data-path="${path}" data-kind="boolean"
-              ${value ? 'checked' : ''}>`;
-  }
-  if (kind === 'number') {
-    return `<input type="number" data-path="${path}" data-kind="number" value="${value}">`;
-  }
-  return `<input type="text" data-path="${path}" data-kind="${kind}"
-            value="${String(value ?? '').replace(/"/g, '&quot;')}">`;
 }
 
 const title = (text) => String(text ?? '').replace(/_/g, ' ')

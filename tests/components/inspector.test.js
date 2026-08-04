@@ -3,7 +3,6 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { loadData } from '../helpers/load-data.js';
 import { createInitialState } from '../../gui/rules/state.js';
 import { apply } from '../../gui/rules/reducer.js';
-import { collectLeaves, matchesPattern, coerce } from '../../gui/components/rb-state-inspector.js';
 import '../../gui/components/rb-state-inspector.js';
 import '../../gui/components/rb-envoy-channel.js';
 
@@ -20,99 +19,11 @@ const mount = (tag) => {
 
 beforeEach(() => { document.body.innerHTML = ''; });
 
-describe('what the inspector will show', () => {
-  const leaves = collectLeaves(fresh());
-  const paths = leaves.map((l) => l.path);
-
-  it('reaches every leaf of the board', () => {
-    expect(paths).toContain('roles.king_alfred.silver');
-    expect(paths).toContain('shires.wiltshire.castles');
-    expect(paths).toContain('shires.wiltshire.settlements.wiltshire_town_1.defended');
-  });
-
-  it('refuses to offer the things that would break replay', () => {
-    // Editing the seed or the history would make the record disagree with the
-    // game it describes, which is worse than any bug it could paper over.
-    for (const forbidden of ['seed', 'rngCursor', 'schemaVersion', 'joinCode']) {
-      expect(paths, forbidden).not.toContain(forbidden);
-    }
-    expect(paths.some((p) => p.startsWith('log'))).toBe(false);
-    expect(paths.some((p) => p.startsWith('seatByToken'))).toBe(false);
-  });
-
-  it('matches a suggestion pattern against a real path', () => {
-    expect(matchesPattern('roles.*.silver', 'roles.king_alfred.silver')).toBe(true);
-    expect(matchesPattern('roles.*.silver', 'roles.king_alfred.food')).toBe(false);
-    expect(matchesPattern('roles.*.silver', 'roles.king_alfred.perTurn.silver')).toBe(false);
-  });
-});
-
-describe('values keep their type', () => {
-  it('reads a number back as a number', () => {
-    // A castles that quietly became the string "3" would compare wrong
-    // everywhere afterwards and nobody would know why.
-    expect(coerce('3', 'number')).toBe(3);
-    expect(coerce('', 'number')).toBe(0);
-    expect(coerce('nonsense', 'number')).toBe(0);
-  });
-
-  it('reads a boolean back as a boolean, and a blank as null', () => {
-    expect(coerce(true, 'boolean')).toBe(true);
-    expect(coerce(false, 'boolean')).toBe(false);
-    expect(coerce('', 'null')).toBe(null);
-    expect(coerce('cenred', 'null')).toBe('cenred');
-  });
-});
-
-describe('the inspector in the page', () => {
-  it('shows the fields a facilitator actually reaches for', () => {
-    const inspector = mount('rb-state-inspector');
-    inspector.state = fresh();
-    const paths = [...inspector.querySelectorAll('.rb-inspector-path')].map((e) => e.textContent);
-    expect(paths).toContain('roles.king_alfred.silver');
-    expect(paths.some((p) => p.endsWith('.wounds'))).toBe(true);
-  });
-
-  it('finds anything by name', () => {
-    const inspector = mount('rb-state-inspector');
-    inspector.state = fresh();
-    inspector.querySelector('#rb-inspector-find').value = 'wiltshire';
-    inspector.querySelector('#rb-inspector-find')
-      .dispatchEvent(new Event('input', { bubbles: true }));
-    const paths = [...inspector.querySelectorAll('.rb-inspector-path')].map((e) => e.textContent);
-    expect(paths.length).toBeGreaterThan(0);
-    expect(paths.every((p) => p.includes('wiltshire'))).toBe(true);
-  });
-
-  it('raises an override that the reducer actually accepts', () => {
-    // The end-to-end claim: what the control emits is a command the rules
-    // admit, so the pencil really does write on the board.
-    const state = fresh();
-    const inspector = mount('rb-state-inspector');
-    inspector.state = state;
-
-    let raised = null;
-    inspector.addEventListener('rb-facilitate', (event) => { raised = event.detail; });
-
-    const field = inspector.querySelector('[data-path="roles.king_alfred.silver"]');
-    field.value = '40';
-    field.dispatchEvent(new Event('change', { bubbles: true }));
-
-    expect(raised.verb).toBe('facilitator:set');
-    expect(raised.payload).toEqual({ path: ['roles', 'king_alfred', 'silver'], value: 40 });
-
-    const result = apply(state, data, raised, FACILITATOR, { ts: 0 });
-    expect(result.ok).toBe(true);
-    expect(result.state.roles.king_alfred.silver).toBe(40);
-  });
-});
-
 describe('one card per role', () => {
-  it('does nothing without the static dataset — the raw search still works alone', () => {
+  it('does nothing without the static dataset', () => {
     const inspector = mount('rb-state-inspector');
     inspector.state = fresh();
     expect(inspector.querySelector('.rb-inspector-card')).toBeNull();
-    expect(inspector.querySelector('.rb-inspector-path')).toBeTruthy();
   });
 
   it('shows a card per role, named for a human rather than by id', () => {
@@ -122,6 +33,33 @@ describe('one card per role', () => {
     const cards = inspector.querySelectorAll('.rb-inspector-card');
     expect(cards.length).toBe(16);
     expect(inspector.textContent).toContain('King Alfred');
+  });
+
+  it('shows which shires a role stewards', () => {
+    const inspector = mount('rb-state-inspector');
+    inspector.data = data;
+    const state = fresh();
+    inspector.state = state;
+
+    const stewarded = Object.entries(state.shires)
+      .filter(([, s]) => s.stewardRoleId === 'king_alfred')
+      .map(([id]) => data.shires.shires[id].name);
+    expect(stewarded.length).toBeGreaterThan(0);
+
+    const cards = [...inspector.querySelectorAll('.rb-inspector-card')];
+    const card = cards.find((c) => c.textContent.includes('King Alfred'));
+    const list = card.querySelector('.rb-inspector-steward-list').textContent;
+    for (const name of stewarded) expect(list).toContain(name);
+  });
+
+  it('says nothing to steward when a role holds no shires', () => {
+    const inspector = mount('rb-state-inspector');
+    inspector.data = data;
+    inspector.state = fresh();
+
+    const cards = [...inspector.querySelectorAll('.rb-inspector-card')];
+    const card = cards.find((c) => c.textContent.includes('Frida'));
+    expect(card.querySelector('.rb-inspector-steward-list').textContent).toContain('no shires');
   });
 
   it('commits an adjustment as a delta, not a replacement', () => {

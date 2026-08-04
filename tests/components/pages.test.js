@@ -67,7 +67,8 @@ describe('the facilitator console', () => {
       'advance-phase', 'pause-clock', 'download-save', 'rules-gaps',
       'facilitator-tabs', 'tab-fac-battle', 'tab-fac-crowns', 'tab-fac-envoys',
       'tab-fac-debrief', 'battle-panel', 'consent-panel', 'epilogue-panel',
-      'debrief-waiting', 'fac-map', 'shire-editor']) {
+      'debrief-waiting', 'fac-map', 'shire-editor',
+      'foreign-influence-note', 'foreign-influence-commit']) {
       expect(document.getElementById(id), id).toBeTruthy();
     }
   });
@@ -122,6 +123,32 @@ describe('the facilitator console', () => {
     expect(document.getElementById('consent-panel').closest('[data-pane-body]').hidden).toBe(false);
     expect(document.getElementById('tab-fac-crowns').getAttribute('aria-selected')).toBe('true');
     expect(document.getElementById('tab-fac-battle').getAttribute('aria-selected')).toBe('false');
+  });
+
+  it('keeps the game code and roster off screen until their own tab is picked', async () => {
+    // The join code, PIN, save button and roster used to sit below every
+    // pane as a permanent footer. They are their own tab now, same as
+    // battle or crowns — hidden until picked, not a fixture at the bottom.
+    await loadPage('host.html');
+    const { startHostApp } = await import('../../gui/host/host-app.js');
+    await startHostApp({ location: { hash: '', href: 'http://x/host.html' } });
+
+    expect(document.getElementById('join-code').closest('[data-pane-body]').hidden).toBe(true);
+    document.querySelector('[data-pane="game"]').click();
+    expect(document.getElementById('join-code').closest('[data-pane-body]').hidden).toBe(false);
+  });
+
+  it('does not call the primary host a co-facilitator', async () => {
+    // A class on .rb-co-banner set its own `display`, which in CSS beats the
+    // `hidden` attribute on specificity alone — so the banner announcing
+    // "you are the co-facilitator" rendered even for whoever was actually
+    // hosting. jsdom does not run the stylesheet, so this checks the
+    // property the render loop actually sets rather than a computed style.
+    await loadPage('host.html');
+    const { startHostApp } = await import('../../gui/host/host-app.js');
+    await startHostApp({ location: { hash: '', href: 'http://x/host.html' } });
+    document.getElementById('new-game').click();
+    expect(document.getElementById('co-banner').hidden).toBe(true);
   });
 });
 
