@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { loadData } from '../helpers/load-data.js';
-import { createInitialState } from '../../gui/rules/state.js';
+import { createInitialState, rosterFor } from '../../gui/rules/state.js';
 import { apply, replay } from '../../gui/rules/reducer.js';
 import { admit } from '../../gui/rules/admission.js';
 import { toSave } from '../../gui/rules/command-log.js';
@@ -60,6 +60,49 @@ describe('a crown nobody wears', () => {
     expect(counters.paganism.value).toBe(3);
     expect(counters.danelaw.value).toBe(3);
     expect(counters.disorder.value).toBe(3);
+  });
+});
+
+describe('two crowns are already worn', () => {
+  it('seeds Wessex to Alfred and Northumbria to Ecgberht, and nobody else', () => {
+    // Unlike Mercia's minor claims, these are not up for grabs at turn zero —
+    // Alfred inherited Wessex from his brother, and Ecgberht already answers
+    // for Northumbria, whatever he owes Halfdan for it.
+    const state = playing();
+    expect(state.crownHolders).toMatchObject({
+      wessex: 'king_alfred', northumbria: 'king_ecgberht',
+    });
+    expect(state.crownHolders.mercia).toBeUndefined();
+  });
+
+  it('refuses to reopen either as an election', () => {
+    const state = playing();
+    expect(refusal(state, as('king_alfred'), 'claim-crown', { crown: 'wessex' }))
+      .toContain('already has a king');
+    expect(refusal(state, as('king_ecgberht'), 'claim-crown', { crown: 'northumbria' }))
+      .toContain('already has a king');
+  });
+
+  it('is not seeded for a role who was dropped from a short-handed game', () => {
+    // Ecgberht is droppable at thirteen players; a crown nobody in the game
+    // holds should not survive the roster that removed him.
+    const state = createInitialState({
+      joinCode: 'RAVEN7Z', seed: 1, data,
+      roleIds: rosterFor(data, 13),
+    });
+    expect(state.crownHolders.northumbria).toBeUndefined();
+    expect(state.crownHolders.wessex).toBe('king_alfred');
+  });
+
+  it('is lost by the heir, exactly like a won election', () => {
+    let state = playing();
+    state.roles.king_alfred.wounds = 3;
+    state.roles.king_alfred.dead = true;
+    state = run(state, FACILITATOR, 'facilitator:heir-arrives', { roleId: 'king_alfred' });
+    expect(state.crownHolders.wessex).toBeUndefined();
+    // And the throne is open again, to be contested like any other.
+    expect(admit(state, data, { verb: 'claim-crown', payload: { crown: 'wessex' } },
+      as('king_alfred')).ok).toBe(true);
   });
 });
 
@@ -297,12 +340,15 @@ describe('rebellion', () => {
   });
 
   it('frees him to claim a crown of his own', () => {
+    // Kent, not Wessex: Wessex is Alfred's outright from the start, and
+    // rebelling against a king does not dethrone him. An unheld claim they
+    // share is what the liege-block actually gates.
     const state = playing();
-    state.roles.cenred.claims = ['wessex'];
-    expect(refusal(state, as('cenred'), 'claim-crown', { crown: 'wessex' }))
+    state.roles.cenred.claims = ['kent'];
+    expect(refusal(state, as('cenred'), 'claim-crown', { crown: 'kent' }))
       .toBe('you cannot claim a crown your liege claims');
     const after = run(state, as('cenred'), 'rebel', { shireId: shiresOf(state, 'cenred')[0] });
-    expect(admit(after, data, { verb: 'claim-crown', payload: { crown: 'wessex' } },
+    expect(admit(after, data, { verb: 'claim-crown', payload: { crown: 'kent' } },
       as('cenred')).ok).toBe(true);
   });
 

@@ -127,12 +127,17 @@ describe('<rb-crown-panel>', () => {
     expect(sent).toEqual([{ verb: 'facilitator:close-vote', payload: { voteId: id } }]);
   });
 
-  it('shows every crown as still a claim before an election', () => {
+  it('shows the crowns already worn at the start, and Mercia as still a claim', () => {
+    // Wessex and Northumbria are already somebody's; Mercia genuinely starts
+    // the game without a king, so the election fixture's crown has not been
+    // decided yet.
     const { state } = election();
     const panel = mount('rb-crown-panel');
     panel.data = data;
     panel.state = state;
-    expect(panel.textContent).toContain('still a claim');
+    expect(panel.textContent).toContain('Wessex');
+    expect(panel.textContent).toContain('Northumbria');
+    expect(panel.textContent).not.toContain('Mercia:');
   });
 
   it('sets what a rebellion costs a named vassal', () => {
@@ -172,9 +177,14 @@ describe('the chooser', () => {
   it('offers homage only to a crowned Saxon or a Dane', () => {
     const { state } = election();
     const before = fieldsFor('request-allegiance', viewFor(state, 'abbess_wenyld'), data);
-    // No kings yet, so only the Danes can take a vassal.
+    // Nobody wears Mercia's crown yet, so only the Danes and the two who
+    // already have a throne — Alfred in Wessex, Ecgberht in Northumbria —
+    // can take a vassal.
     expect(before[0].options.every(({ value }) => state.roles[value]
-      && ['danish_warrior', 'danish_trader'].includes(data.roles.roles[value].archetype))).toBe(true);
+      && (['danish_warrior', 'danish_trader'].includes(data.roles.roles[value].archetype)
+        || Object.values(state.crownHolders).includes(value)))).toBe(true);
+    expect(before[0].options.map((o) => o.value)).toContain('king_alfred');
+    expect(before[0].options.map((o) => o.value)).not.toContain('ceowulf');
 
     state.crownHolders.mercia = 'ceowulf';
     const after = fieldsFor('request-allegiance', viewFor(state, 'abbess_wenyld'), data);

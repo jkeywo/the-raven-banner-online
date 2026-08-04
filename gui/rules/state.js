@@ -211,10 +211,14 @@ export function createInitialState({ joinCode, seed, data, roleIds }) {
     // swearing homage to somebody who has to accept it. The first things in
     // the game that make one player wait on another.
     consents: {},
-    // Who wears which crown. Empty at the start: "Mercia starts the game
-    // without a king", and every other crown is a claim rather than a
-    // coronation until an election settles it.
-    crownHolders: {},
+    // Who wears which crown. "Mercia starts the game without a king", and
+    // every minor claim is a claim rather than a coronation until an election
+    // settles it — but Wessex and Northumbria are already worn, and are
+    // seeded here rather than left implicit so an heir has an actual crown to
+    // lose and a fresh election has an actual throne to contest.
+    crownHolders: Object.fromEntries(
+      Object.entries(data.meta.startingCrowns ?? {})
+        .filter(([, roleId]) => inPlay.includes(roleId))),
     // What a rebellion costs this vassal, where the facilitator has ruled that
     // their liege has lost the favour of God and it should cost them less.
     rebellionRelief: {},

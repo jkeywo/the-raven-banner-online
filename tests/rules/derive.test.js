@@ -99,9 +99,12 @@ describe('income', () => {
     town.defended = true;
     const supported = incomeFor(state, data, 'king_alfred').silver;
 
-    // Strip Alfred of Wessex and put him on the wrong side of the war. The
-    // defended town now pays him nothing; the undefended ones still pay.
+    // Strip Alfred of Wessex — claim and crown both, since he wears it
+    // outright at the start rather than merely claiming it — and put him on
+    // the wrong side of the war. The defended town now pays him nothing; the
+    // undefended ones still pay.
     state.roles.king_alfred.claims = [];
+    delete state.crownHolders.wessex;
     state.roles.king_alfred.teamId = 'great_summer_army';
     expect(hasSupport(state, data, 'wiltshire')).toBe(false);
     expect(incomeFor(state, data, 'king_alfred').silver).toBe(supported - 2);
