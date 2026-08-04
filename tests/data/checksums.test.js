@@ -152,6 +152,28 @@ describe.runIf(HAVE_DATA)('map geometry', () => {
     expect(strays).toEqual([]);
   });
 
+  it('does not let one shire swallow another’s settlements', async () => {
+    // The outlines come from labelled regions, so they cannot overlap by
+    // construction — unless one escapes its drawn borders, which is what the
+    // coastal shires did while the pale shallows read as land. Ribble reached
+    // seventeen per cent of the sheet and out past two neighbours' shores.
+    //
+    // Not a proof: a region can leak into open water without touching another
+    // shire's pips, and only looking at the artwork catches that. It is the
+    // part of the failure that can be caught without the PDFs to hand.
+    const geometry = await load('geometry.json');
+    const trespass = [];
+    for (const [id, g] of Object.entries(geometry.shires)) {
+      for (const [other, h] of Object.entries(geometry.shires)) {
+        if (other === id || h.sheet !== g.sheet) continue;
+        for (const at of h.settlements) {
+          if (pointInPath(g.polygon, at)) trespass.push(`${id} covers ${other}'s pip at ${at}`);
+        }
+      }
+    }
+    expect(trespass).toEqual([]);
+  });
+
   it('gives every shire an outline and one anchor per settlement', async () => {
     const { shires } = await load('shires.json');
     const geometry = await load('geometry.json');
