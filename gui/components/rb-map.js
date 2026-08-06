@@ -113,8 +113,17 @@ export class RbMap extends HTMLElement {
     }
   }
 
+  /**
+   * The sheet row, unless the page around it provides its own.
+   *
+   * The player console promotes these three into its main tab bar, where they
+   * replace what used to be a single "The board" tab — so the map must not
+   * also draw them underneath. The facilitator's map has no such bar and keeps
+   * them. `tabs="off"` is the seam.
+   */
   _renderTabs() {
     const tabs = this.querySelector('.rb-map-tabs');
+    if (this.getAttribute('tabs') === 'off') { tabs.hidden = true; return; }
     const sheets = this._data.shires.sheets ?? [];
     if (tabs.childElementCount === sheets.length) {
       for (const button of tabs.children) {

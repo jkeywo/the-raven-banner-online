@@ -294,6 +294,47 @@ describe('the player console', () => {
     }
   });
 
+  it('offers the three printed sheets as three buttons, not one board tab', async () => {
+    await loadPage('index.html');
+    const { startPlayerApp } = await import('../../gui/client/player-app.js');
+    await startPlayerApp({ location: { hash: '' } });
+
+    const labels = [...document.querySelectorAll('#map-buttons button')]
+      .map((b) => b.textContent.trim());
+    expect(labels).toEqual(['Northern', 'Western', 'Eastern']);
+    // And the tab they replaced is gone.
+    expect(document.querySelector('#game-tabs [data-pane="map"]')).toBeNull();
+  });
+
+  it('switches the map to the sheet clicked, and shows the board to do it', async () => {
+    await loadPage('index.html');
+    const { startPlayerApp } = await import('../../gui/client/player-app.js');
+    await startPlayerApp({ location: { hash: '' } });
+
+    // Away on another pane first, so this proves the button brings the board
+    // back rather than only moving a map already in view.
+    document.querySelector('#game-tabs [data-pane="aftermath"]').click();
+    expect(document.getElementById('map').closest('[data-pane-body]').hidden).toBe(true);
+
+    document.querySelector('#map-buttons [data-sheet="eastern"]').click();
+
+    expect(document.getElementById('map').getAttribute('sheet')).toBe('eastern');
+    expect(document.getElementById('map').closest('[data-pane-body]').hidden).toBe(false);
+    expect(document.querySelector('#map-buttons [data-sheet="eastern"]')
+      .getAttribute('aria-selected')).toBe('true');
+    expect(document.querySelector('#map-buttons [data-sheet="northern"]')
+      .getAttribute('aria-selected')).toBe('false');
+  });
+
+  it('does not draw the sheet row twice', async () => {
+    // The map renders its own row for the facilitator, who has no tab bar to
+    // put it in. The player's console provides one, so the map's is off.
+    await loadPage('index.html');
+    const { startPlayerApp } = await import('../../gui/client/player-app.js');
+    await startPlayerApp({ location: { hash: '' } });
+    expect(document.getElementById('map').getAttribute('tabs')).toBe('off');
+  });
+
   it('starts on the code screen when there is no code in the link', async () => {
     await loadPage('index.html');
     const { startPlayerApp } = await import('../../gui/client/player-app.js');

@@ -401,6 +401,13 @@ a { color: var(--rb-blood); text-underline-offset: 0.15em; }
 
 .rb-tabs { display: flex; gap: 0.3rem; }
 
+/* The three sheets sit together and read as one control, set a little apart
+   from the panes beside them. Dimmed while the board is not the pane in
+   front, because then they are a way back to it rather than a choice within
+   it. */
+.rb-map-buttons { display: flex; gap: 0.3rem; margin-right: 0.6rem; }
+.rb-map-buttons[data-active="false"] button { opacity: 0.6; }
+
 .rb-tabs button,
 .rb-map-tabs button {
   border-bottom-left-radius: 0;

@@ -123,18 +123,51 @@ export async function startPlayerApp({ location = window.location } = {}) {
   });
 
   // --- the game -------------------------------------------------------------
+  buildMapButtons();
   $('game-tabs').addEventListener('click', (event) => {
+    const sheet = event.target.closest('[data-sheet]');
+    if (sheet) { selectSheet(sheet.dataset.sheet); return; }
     const button = event.target.closest('[data-pane]');
     if (button) selectPane(button.dataset.pane);
   });
 
   function selectPane(pane) {
-    for (const button of $('game-tabs').children) {
+    // The sheet buttons live in the same bar and answer a different question —
+    // "which corner of England?" rather than "which of these three screens?" —
+    // so they carry their own selected state, set in selectSheet.
+    for (const button of $('game-tabs').querySelectorAll('[data-pane]')) {
       button.setAttribute('aria-selected', String(button.dataset.pane === pane));
     }
     for (const section of document.querySelectorAll('[data-pane-body]')) {
       section.hidden = section.dataset.paneBody !== pane;
     }
+    // Only one of the three is the board, so the sheet row is lit only there.
+    $('map-buttons').dataset.active = String(pane === 'map');
+  }
+
+  /**
+   * The three printed sheets, as three buttons rather than one "The board" tab.
+   *
+   * England is the thing being looked at; which corner of it you want is the
+   * question actually being asked. Built from `shires.json` so the row cannot
+   * name a sheet that does not exist, and clicking one both opens the board
+   * and moves the map to it — a player choosing "Eastern" from the battle tab
+   * means "show me the east", not "show me the east once I have found my way
+   * back".
+   */
+  function buildMapButtons() {
+    $('map-buttons').innerHTML = (data.shires.sheets ?? []).map((sheet) => `
+      <button type="button" role="tab" data-sheet="${sheet.id}"
+              aria-selected="${sheet.id === $('map').getAttribute('sheet')}">${
+  sheet.display_name.replace(/\s+England$/, '')}</button>`).join('');
+  }
+
+  function selectSheet(sheetId) {
+    $('map').setAttribute('sheet', sheetId);
+    for (const button of $('map-buttons').children) {
+      button.setAttribute('aria-selected', String(button.dataset.sheet === sheetId));
+    }
+    selectPane('map');
   }
 
   document.addEventListener('rb-shire', (event) => onShireClicked(event.detail.shireId));

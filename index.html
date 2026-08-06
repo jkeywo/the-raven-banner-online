@@ -71,8 +71,13 @@
     <!-- 4. the game ------------------------------------------------------- -->
     <section id="screen-game" class="rb-panel rb-full" hidden>
       <header class="rb-game-head">
+        <!-- The three printed sheets are three buttons rather than one "The
+             board" tab: England is the thing being looked at, and which
+             corner of it you want is the question actually being asked.
+             Filled from shires.json so the row cannot disagree with the maps
+             that exist. -->
         <nav id="game-tabs" class="rb-tabs" role="tablist">
-          <button type="button" role="tab" data-pane="map" aria-selected="true">The board</button>
+          <span id="map-buttons" class="rb-map-buttons"></span>
           <button type="button" role="tab" data-pane="battle" id="tab-battle" aria-selected="false">Battle</button>
           <button type="button" role="tab" data-pane="aftermath" aria-selected="false">Aftermath</button>
         </nav>
@@ -97,7 +102,7 @@
         <!-- the board, or how England is doing, or a battle -->
         <div class="rb-game-main">
           <div data-pane-body="map" class="rb-pane rb-pane-map">
-            <rb-map id="map" sheet="northern"></rb-map>
+            <rb-map id="map" sheet="northern" tabs="off"></rb-map>
             <aside id="shire-detail" class="rb-detail-panel">
               <p class="rb-empty">Choose a shire on the map.</p>
             </aside>
