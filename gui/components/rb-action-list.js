@@ -27,7 +27,6 @@ import { shireTargetsFor } from '../client/action-chooser.js';
 /** Player-facing names. The verb ids are for the wire, not for reading. */
 const LABELS = {
   'claim-role': 'Take a character',
-  'declare-initiative-target': 'Declare your target',
   'swear-allegiance': 'Swear allegiance',
   'transfer-stewardship': 'Hand over a shire',
   'collect-income': 'Collect income',
@@ -65,7 +64,6 @@ const NOTES = {
   reinforce: 'One momentum. Circles a settlement so it must be stormed.',
   trade: 'Three silver buys a food; a food sells for two silver.',
   give: 'Silver, food and ships only. Soldiers are yours alone.',
-  'declare-initiative-target': 'Only if you hold an initiative token.',
   'transfer-stewardship': 'They collect its income, and must hold it.',
   'swear-allegiance': 'Their crowns then count as support for you.',
   'raid-settlement': 'Two momentum, and two soldiers if it is defended.',
@@ -107,7 +105,7 @@ function dynamicNote(verb, view) {
 /** Verbs that need the player to say more before they mean anything. */
 export const NEEDS_CHOICE = new Set([
   'trade', 'give', 'reinforce', 'transfer-stewardship',
-  'swear-allegiance', 'declare-initiative-target',
+  'swear-allegiance',
   'raid-settlement', 'defensive-fleet', 'rebuild-settlement', 'send-envoy',
   'missionary-expedition', 'rousing-sermon', 'baptise',
   'request-settle', 'drive-out-missionaries',
@@ -136,7 +134,10 @@ export class RbActionList extends HTMLElement {
     // host's answer is the only one that counts.
     const actor = { seatId: this._view.viewer.seatId, kind: 'player', roleId };
     const actions = availableTo(this._view, this._data, actor)
-      .filter((action) => action.verb !== 'claim-role');
+      // Declaring an initiative target has its own control now — click the
+      // shire on the map, then Target — rather than a dropdown here that
+      // offered every shire in England regardless of the one just clicked.
+      .filter((action) => action.verb !== 'claim-role' && action.verb !== 'declare-initiative-target');
 
     if (!actions.length) {
       this.innerHTML = `<p class="rb-empty">Nothing to do in the

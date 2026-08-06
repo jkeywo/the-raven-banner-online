@@ -51,12 +51,26 @@ export class RbFacilitatorGrid extends HTMLElement {
     const targets = state.battle.targets ?? [];
 
     if (!targets.length) {
+      const shireOptions = Object.keys(state.shires)
+        .map((id) => `<option value="${id}">${this._data.shires.shires[id]?.name ?? id}</option>`)
+        .join('');
       this.innerHTML = `
         <p class="rb-meta">${declared.length
     ? `${declared.length} target${declared.length === 1 ? '' : 's'} declared but not announced.`
     : 'No targets declared yet.'}</p>
+        ${declared.length ? `
+          <ul class="rb-declared-targets">${declared.map(([token, d]) => `
+            <li>
+              <span class="rb-inspector-stat-label">${token} — ${this._name(d.roleId)}</span>
+              <select data-retarget="${token}">${shireOptions}</select>
+              <button type="button" data-commit-retarget="${token}">Change</button>
+            </li>`).join('')}</ul>` : ''}
         <button type="button" data-announce class="rb-primary"
           ${declared.length ? '' : 'disabled'}>Announce the targets</button>`;
+      for (const select of this.querySelectorAll('[data-retarget]')) {
+        const token = select.dataset.retarget;
+        select.value = declared.find(([t]) => t === token)?.[1]?.shireId ?? '';
+      }
       this._wire();
       return;
     }
@@ -121,6 +135,14 @@ export class RbFacilitatorGrid extends HTMLElement {
   _wire() {
     const announce = this.querySelector('[data-announce]');
     if (announce) announce.onclick = () => this._emit('facilitator:announce-targets', {});
+
+    for (const button of this.querySelectorAll('[data-commit-retarget]')) {
+      button.onclick = () => {
+        const token = button.dataset.commitRetarget;
+        const shireId = this.querySelector(`[data-retarget="${token}"]`).value;
+        this._emit('facilitator:set-initiative-target', { token, shireId });
+      };
+    }
 
     const end = this.querySelector('[data-end]');
     if (end) end.onclick = () => this._emit('facilitator:end-battles', {});

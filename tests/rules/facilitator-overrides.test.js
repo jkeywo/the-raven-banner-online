@@ -180,6 +180,59 @@ describe('initiative tokens', () => {
   });
 });
 
+describe('correcting a declared target', () => {
+  it('overrides even a turn-one target fixed by the rules', () => {
+    let state = fresh();
+    state = run(state, FACILITATOR, 'facilitator:advance-phase');   // lobby -> team
+    expect(state.initiative.declared.white.fixed).toBe(true);
+    const after = run(state, FACILITATOR, 'facilitator:set-initiative-target',
+      { token: 'white', shireId: 'wiltshire' });
+    expect(after.initiative.declared.white.shireId).toBe('wiltshire');
+    expect(after.initiative.declared.white.roleId).toBe(state.initiative.white);
+  });
+
+  it('leaves the other tokens alone', () => {
+    let state = fresh();
+    state = run(state, FACILITATOR, 'facilitator:advance-phase');
+    const blackBefore = state.initiative.declared.black;
+    const after = run(state, FACILITATOR, 'facilitator:set-initiative-target',
+      { token: 'white', shireId: 'wiltshire' });
+    expect(after.initiative.declared.black).toEqual(blackBefore);
+  });
+
+  it('refuses once the targets are already announced', () => {
+    let state = fresh();
+    state = run(state, FACILITATOR, 'facilitator:advance-phase');   // team
+    state = run(state, FACILITATOR, 'facilitator:advance-phase');   // battle
+    state = run(state, FACILITATOR, 'facilitator:announce-targets');
+    expect(refusal(state, FACILITATOR, 'facilitator:set-initiative-target',
+      { token: 'white', shireId: 'wiltshire' })).toBe('the targets are already announced');
+  });
+
+  it('refuses a token nobody holds', () => {
+    let state = fresh();
+    state = run(state, FACILITATOR, 'facilitator:advance-phase');
+    state = run(state, FACILITATOR, 'facilitator:assign-initiative', { token: 'bonus', roleId: null });
+    expect(refusal(state, FACILITATOR, 'facilitator:set-initiative-target',
+      { token: 'bonus', shireId: 'wiltshire' })).toBe('nobody holds that token');
+  });
+
+  it('refuses a shire that does not exist', () => {
+    let state = fresh();
+    state = run(state, FACILITATOR, 'facilitator:advance-phase');
+    expect(refusal(state, FACILITATOR, 'facilitator:set-initiative-target',
+      { token: 'white', shireId: 'atlantis' })).toBe('no such shire');
+  });
+
+  it('refuses a player, even for their own token', () => {
+    let state = fresh();
+    state = run(state, FACILITATOR, 'facilitator:advance-phase');
+    const holder = state.initiative.white;
+    expect(refusal(state, as(holder), 'facilitator:set-initiative-target',
+      { token: 'white', shireId: 'wiltshire' })).toBeTruthy();
+  });
+});
+
 describe('adding a role mid-game', () => {
   const at13 = () => createInitialState({
     joinCode: 'RAVEN7Z', seed: 1, data, roleIds: rosterFor(data, 13),

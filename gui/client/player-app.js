@@ -25,6 +25,7 @@ import { sendCommand } from '../net/command-gateway.js';
 import { ClientState } from './client-state.js';
 import { loadData } from './load-data.js';
 import { renderChooser, valuesFrom, payloadFrom, shireTargetsFor } from './action-chooser.js';
+import { availableTo } from '../rules/admission.js';
 import '../components/rb-connection-dot.js';
 import '../components/rb-seat-roster.js';
 import '../components/rb-map.js';
@@ -163,6 +164,16 @@ export async function startPlayerApp({ location = window.location } = {}) {
         + (defended ? ` (${defended} defended)` : '') : null;
     }).filter(Boolean);
 
+    // Holding an initiative token turns the shire just clicked into
+    // something that can be targeted directly, rather than picked a second
+    // time from a dropdown listing every shire in England. Asked of the same
+    // admission function the action list uses, so this never offers a Target
+    // button the host would go on to refuse.
+    const me = client.view?.viewer;
+    const canTarget = me && availableTo(client.view, data,
+      { seatId: me.seatId, kind: 'player', roleId: me.roleId })
+      .some((a) => a.verb === 'declare-initiative-target' && a.ok);
+
     $('shire-detail').innerHTML = `
       <h3>${printed.name}</h3>
       <p class="rb-meta">${printed.map} England</p>
@@ -177,7 +188,9 @@ export async function startPlayerApp({ location = window.location } = {}) {
         ${live.missionaryCross ? '<dt>Missionaries</dt><dd>a cross stands here</dd>' : ''}
         ${contract ? `<dt>Trade contract</dt><dd>with ${
   data.roles.roles[contract.traderRoleId]?.name ?? 'the Danish Trader'}</dd>` : ''}
-      </dl>`;
+      </dl>
+      ${canTarget ? `
+        <button type="button" class="rb-primary" data-target-shire="${shireId}">Target</button>` : ''}`;
   }
 
   client.subscribe(render);
@@ -282,6 +295,15 @@ export async function startPlayerApp({ location = window.location } = {}) {
     const chooser = renderChooser(verb, client.view, data);
     if (chooser) { openChooser(chooser); return; }
     dispatch(verb, {});
+  });
+
+  // The Target button on a clicked shire's own detail panel — the whole of
+  // declaring an initiative target, now that the click already said which
+  // shire is meant.
+  document.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-target-shire]');
+    if (!button) return;
+    dispatch('declare-initiative-target', { shireId: button.dataset.targetShire });
   });
 
   function openChooser(form) {

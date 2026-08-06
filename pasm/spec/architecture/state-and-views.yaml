@@ -254,6 +254,7 @@ entities:
         - envoy-negotiation
         - neighbour-consent
         - crown-election
+        - command-admission
     implementation:
       status: declared
       paths:

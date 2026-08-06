@@ -193,17 +193,6 @@ describe('<rb-action-list>', () => {
     expect(list.querySelectorAll('[data-relevant="true"]')).toHaveLength(0);
   });
 
-  it('never promotes a refused action, whatever it could target', () => {
-    // Declaring is a facilitator-only concern for a role with no initiative
-    // token, so it should never be marked relevant no matter what is clicked.
-    const list = mount('rb-action-list');
-    list.data = data;
-    list.view = seated('team');
-    list.focusShireId = 'wiltshire';
-    const row = list.querySelector('[data-verb="declare-initiative-target"]')?.closest('.rb-action');
-    if (row) expect(row.dataset.relevant).toBe('false');
-  });
-
   it('says a rebellion is waiting on the facilitator before it is priced', () => {
     const view = seated('team');
     view.rebellions = {

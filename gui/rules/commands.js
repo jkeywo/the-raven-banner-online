@@ -341,7 +341,10 @@ export const COMMANDS = {
       if (!token) return no('you do not hold an initiative token');
       // Turn one is written down for you. From turn two it is your problem,
       // which is exactly the moment the game hands the plan over.
-      if (state.initiative.declared[token]?.fixed) {
+      // `declared` itself, not just an entry in it, can be missing here: a
+      // player's own redacted view prunes an object down to nothing once it
+      // holds no key that player may see, rather than leaving an empty one.
+      if (state.initiative.declared?.[token]?.fixed) {
         return no('this turn\'s target is fixed by the rules');
       }
       if (!state.shires[cmd.payload?.shireId]) return no('no such shire');
@@ -2239,6 +2242,36 @@ export const COMMANDS = {
     },
     effects(draft, ctx) {
       draft.initiative[ctx.cmd.payload.token] = ctx.cmd.payload.roleId;
+    },
+  },
+
+  /**
+   * Correct a declared target, up until the moment it stops being one thing
+   * and becomes a battle.
+   *
+   * Once facilitator:announce-targets has run, the shires it named are
+   * public and the battle machinery is already standing on them — reaching
+   * back to move a target after that would be moving a fight, not fixing a
+   * plan. Before that moment, this overrides even a turn-one fixed target,
+   * same as any other facilitator edit.
+   */
+  'facilitator:set-initiative-target': {
+    phases: ['team', 'battle'],
+    actor: 'facilitator',
+    admit(ctx) {
+      const { token, shireId } = ctx.cmd.payload ?? {};
+      if (!['white', 'black', 'bonus'].includes(token)) return no('no such token');
+      if (!ctx.state.initiative[token]) return no('nobody holds that token');
+      if (ctx.state.battle.targets.length) return no('the targets are already announced');
+      if (!ctx.state.shires[shireId]) return no('no such shire');
+      return ok();
+    },
+    effects(draft, ctx) {
+      const { token, shireId } = ctx.cmd.payload;
+      const roleId = draft.initiative[token];
+      draft.initiative.declared[token] = {
+        roleId, shireId, revealed: draft.initiative.declared[token]?.revealed ?? false,
+      };
     },
   },
 
