@@ -33,9 +33,15 @@ import { toSave } from '../rules/command-log.js';
  * console can stop caring which side of the seam it is on.
  */
 export class PrimarySession {
-  constructor({ host, onChange, onStatus, onLog, Peer = globalThis.Peer }) {
+  /**
+   * @param {object} args
+   * @param {import('./event-pump.js').EventPump|null} [args.pump]  null in a
+   *   default game, which is what makes the pump cost nothing when it is off
+   */
+  constructor({ host, onChange, onStatus, onLog, pump = null, Peer = globalThis.Peer }) {
     this.kind = 'primary';
     this.host = host;
+    this.pump = pump;
     this._onChange = onChange;
     this.peer = new HostPeer({
       joinCode: host.state.joinCode,
@@ -50,12 +56,29 @@ export class PrimarySession {
     host._onChange = () => {
       this.peer.broadcast();
       onChange();
+      // Last, and only when a facilitator asked for one. The optional call
+      // short-circuits its own argument, so a game without a pump does not
+      // build the extra projection either — off is off rather than cheap.
+      //
+      // Everything the game needs has already happened by here, and the throw
+      // is caught a second time even though the pump catches its own: this tab
+      // is the game, and no integration with an outside service is worth a
+      // command failing in front of sixteen people. A dead bot gets a line in
+      // the host log and nothing else.
+      try {
+        this.pump?.observe(host.spectatorView());
+      } catch (error) {
+        onLog?.(`[events] the pump threw and was ignored: ${error?.message ?? error}`);
+      }
     };
   }
 
   start() { this.peer.start(); }
 
-  stop() { this.peer.stop(); }
+  stop() {
+    this.peer.stop();
+    this.pump?.close();
+  }
 
   get state() { return this.host.state; }
 
@@ -166,7 +189,7 @@ export class CoFacilitatorSession {
    * if the original is still alive this waits on a code it will never get and
    * says so, rather than quietly running a second copy of the game.
    */
-  takeOver({ onChange, onStatus, onLog }) {
+  takeOver({ onChange, onStatus, onLog, pump = null }) {
     const save = this.save();
     if (!save) return { ok: false, reason: 'nothing has arrived from the host yet' };
 
@@ -175,8 +198,11 @@ export class CoFacilitatorSession {
     // Built but not started: the caller adopts it, and adoption is what
     // claims the code. Starting here as well would leave two peers racing for
     // one address from the same tab.
+    // The pump follows the tab, not the game: this machine is the host now, so
+    // whatever this tab was opened with is what streams. Null unless the
+    // co-facilitator's own URL carried the parameter.
     const session = new PrimarySession({
-      host, onChange, onStatus, onLog, Peer: this._Peer,
+      host, onChange, onStatus, onLog, pump, Peer: this._Peer,
     });
     return { ok: true, session, refused };
   }

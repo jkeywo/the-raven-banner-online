@@ -19,6 +19,7 @@ entities:
         - authoritative-game-state
       depends_on:
         - game-host
+        - host-event-pump
         - host-peer-listener
         - client-connection-manager
         - client-command-gateway

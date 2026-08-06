@@ -20,6 +20,7 @@ uv run pasm scenario pasm/spec/scenarios/turn-one.yaml --spec-root pasm/spec
 | `spec/architecture/networking.yaml` | Transport components, the four wire messages, and the two connection failures |
 | `spec/architecture/state-and-views.yaml` | Authoritative state, the admission gate, the projector, and the restricted information sets |
 | `spec/architecture/clash-protocol.yaml` | The clash state machine and the Lead the Charge ratchet decision |
+| `spec/architecture/event-pump.yaml` | The optional outbound event stream, the spectator projection it is given, and why it is off unless a URL says otherwise |
 | `spec/design/turn-one-slice.yaml` | Roles, verbs, the phase clock, and the five resources |
 | `spec/scenarios/turn-one.yaml` | The vertical slice walked end to end, including a host loss and its recovery |
 

@@ -51,6 +51,11 @@ reason.
 See [AGENTS.md](AGENTS.md) for the architecture, the three invariants the
 codebase is built around, and where the rules of record actually live.
 
+The host can also stream a game's *public* events to a Discord bot that lives in
+its own repository. It is off in every default game and turned on per tab with a
+query parameter; [docs/discord-integration.md](docs/discord-integration.md) is
+the contract, and a test in this repo checks the code against its examples.
+
 ## Licence
 
 See [LICENSE](LICENSE).

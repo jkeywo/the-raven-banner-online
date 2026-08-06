@@ -1,0 +1,196 @@
+entities:
+  - component: pump-event-derivation
+    core:
+      status: implemented
+      confidence: confirmed
+      title: Pump Event Derivation
+      summary: >-
+        Pure functions turning two snapshots of the public board into a list of
+        higher-level events, and wrapping them in the envelope an outside
+        service reads. No socket, no clock, no host.
+      rationale:
+        - "Split from the sending so the whole contract can be asserted with plain equality in Node. What the stream says is a rules-shaped question; how it gets there is a transport-shaped one, and they fail for different reasons."
+        - "Its input is a spectator projection rather than state, which is what makes the redaction structural instead of careful: the private paths are absent from what it is handed, so there is nothing here to filter and no way to forget."
+        - "The digest is small, flat and diffable on purpose. Diffing whole states would mean holding two of them in the one tab that must not run out of memory, and would turn \"what changed\" into a question about structure rather than about the game."
+        - "Events carry what moved and what it moved from, so a bot never has to keep a copy of the game to make sense of one."
+    architecture:
+      kind: policy
+      authority: non-authoritative
+      runs_in:
+        - facilitator-browser-runtime
+    implementation:
+      status: declared
+      paths:
+        - gui/host/pump-events.js
+      symbols:
+        - publicDigest
+        - deriveEvents
+        - stampEvents
+        - encodeBatch
+        - EVENT_TYPES
+      tests:
+        - npm test
+    evidence:
+      - kind: test
+        reference: tests/host/pump-events.test.js
+        summary: >-
+          The digest comes out identical whether it is built from a spectator
+          projection or from raw state, which holds only while every field it
+          reads is PUBLIC; a board full of sentinel secrets yields events
+          containing none of them while still reporting the phase, the shire
+          and the targets.
+
+  - component: host-event-pump
+    core:
+      status: implemented
+      confidence: confirmed
+      title: Host Event Pump
+      summary: >-
+        An optional outbound tap on the host's "something changed" moment,
+        emitting newline-delimited JSON to a WebSocket or an HTTP endpoint so a
+        Discord bot in another repository can follow the game.
+      rationale:
+        - "Hung off the session rather than the reducer, so it observes a change that has already been admitted, logged, persisted and broadcast. It cannot write state, cannot make a command fail, and never runs during a replay."
+        - "Enabled by a query parameter on the facilitator's own page, so a default game constructs no pump at all — the optional call short-circuits its own argument and the extra projection is never even built. Off means nothing connects, nothing is computed and nothing is logged."
+        - "The parameter is per tab rather than per game on purpose. It is never written to state, never enters the command log and never reaches a save, so it cannot be replayed, restored, or carried onto somebody else's machine by a save file."
+        - "Every entry point swallows every failure. The facilitator's tab is the game, and no integration with an outside service is worth a command failing in front of sixteen people."
+        - "Delivery is best-effort with a bounded queue and a monotonic sequence number. An unbounded queue behind a bot that never came up is a three-hour memory leak in the one tab that must not die, and a gap the bot can see beats a gap it cannot."
+      references:
+        - event-pump-off-by-default
+    architecture:
+      kind: host-transport
+      authority: non-authoritative
+      reads:
+        - projected-spectator-view
+      sends:
+        - game-event-message
+      runs_in:
+        - facilitator-browser-runtime
+      trust_boundary: facilitator
+      depends_on:
+        - pump-event-derivation
+      must_not_depend_on:
+        - command-admission
+        - authoritative-game-state
+    implementation:
+      status: declared
+      paths:
+        - gui/host/event-pump.js
+      symbols:
+        - EventPump
+        - eventPumpFor
+        - pumpUrlFrom
+      tests:
+        - npm test
+    evidence:
+      - kind: test
+        reference: tests/host/event-pump.test.js
+        summary: >-
+          A game with no parameter opens no socket and builds no spectator
+          projection; a replayed save emits nothing; a pump that throws, a
+          socket that will not construct, a socket that throws mid-send, a
+          rejected POST and a nonsense view all leave the command accepted and
+          the state advanced.
+
+  - state: projected-spectator-view
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Projected Spectator View
+      summary: >-
+        The projection for a viewer with no seat, no role and no team — the
+        public board and nothing else. What the event pump is given instead of
+        state.
+      rationale:
+        - "The projector already refuses a spectator every owner, team and facilitator field, and refuses them a clash reveal as well, so this needed no new redaction code and no new manifest entry — only a viewer the manifest already knew how to answer."
+        - "Because it is built by the same projector as every other outbound copy, the second law still holds literally: nothing leaves the host except through projectView."
+    architecture:
+      classification: replica
+      derived_from:
+        - authoritative-game-state
+      owner: view-projector
+
+  - message: game-event-message
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Game Event
+      summary: >-
+        One newline-terminated JSON line carrying a schema version, a sequence
+        number, a host timestamp, the join code, a type and a per-type payload.
+        Eight types, covering the phase, the roster and movements on the board.
+      rationale:
+        - "The same bytes over both transports, so a bot shares one parser and a facilitator can capture a game to a file and develop against it without sixteen people in the room."
+        - "The sequence number exists because the pump is allowed to lose events. A bot that can see the gap can recover; one that cannot would silently believe a stale board."
+    architecture:
+      authority: broadcast
+      producer:
+        - host-event-pump
+      consumer:
+        - discord-bot
+      validator:
+        - host-event-pump
+      trust_boundary: facilitator
+      payload: public-game-event
+
+  - component: discord-bot
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Discord Bot
+      summary: >-
+        The consumer of the event stream. It lives in its own repository and
+        nothing about it — commands, configuration, permissions, deployment —
+        is decided here.
+      rationale:
+        - "Modelled as an entity only so the event message has a named consumer and the trust boundary it crosses is written down rather than implied."
+        - "Deliberately outside this system's boundary. This repository publishes a contract and a recommended mapping; the bot owns every choice about how to act on it."
+    architecture:
+      kind: external-service
+      authority: non-authoritative
+      receives:
+        - game-event-message
+
+  - decision: event-pump-off-by-default
+    core:
+      status: accepted
+      confidence: confirmed
+      title: The Event Pump Is Off Unless The URL Says Otherwise
+      summary: >-
+        The Discord integration is enabled per browser tab, by opening the
+        facilitator console with an events query parameter naming the sink. No
+        parameter means no pump object, no connection, no computation and no
+        log line.
+      rationale:
+        - "A facilitator control would need somewhere to keep its setting, and the only durable somewhere here is game state — which would mean a manifest entry, a reducer command, a log entry and a replay that reconnected to a bot that no longer exists. A tap on the game must not become part of the game."
+        - "A parameter cannot be left on by a previous game, cannot be pressed by accident with sixteen people watching, and cannot follow a save onto another machine."
+        - "The sink URL is deployment configuration, not history. Keeping it out of the save is what lets a save be opened a week later in a replay tab that talks to nothing."
+        - "Off had to mean off rather than \"on but pointed nowhere\", so the null pump is the default and the call site short-circuits — a default game does not build the projection it would have sent."
+      assumptions:
+        - The facilitator who wants the integration is the person who opens the console, and can be given a link with the parameter already in it.
+
+  - failure: event-sink-unreachable
+    core:
+      status: proposed
+      confidence: confirmed
+      title: The Event Sink Is Not There
+      summary: >-
+        The bot is not running, has restarted, has crashed, or the network
+        between the facilitator and it has gone. The pump is mid-game with
+        events to deliver.
+      rationale:
+        - "This is the failure the whole design is shaped around, because the process that would suffer is the process holding the only copy of the game."
+    game_design:
+      causes:
+        - the bot was never started, or was restarted mid-game
+        - the sink URL was mistyped, or names a host that does not resolve
+        - the facilitator's network dropped while the game carried on
+      consequences:
+        - events derived while the socket is down are queued and the oldest are dropped past a bounded limit
+        - a failed POST is not retried and its batch is lost
+        - the bot sees a discontinuity in the sequence number when it comes back
+      recovery_paths:
+        - the socket is redialled lazily on the next state change, at most once every five seconds, so a restarted bot is reconnected by the next thing that happens in the game
+        - the sequence number lets the bot detect the gap rather than trust a stale board
+        - the game itself is unaffected in every case, which is the only requirement that is not negotiable
+      terminal: false

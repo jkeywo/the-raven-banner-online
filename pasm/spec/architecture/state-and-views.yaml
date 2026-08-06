@@ -96,6 +96,7 @@ entities:
       depends_on:
         - facilitator-session
         - game-host
+        - host-event-pump
         - authoritative-game-state
         - command-admission
         - client-connection-manager

@@ -17,6 +17,7 @@ import {
   Persistence, saveFilename, downloadSave, downloadPage, epiloguePage, parseSave,
 } from './persistence.js';
 import { PrimarySession, CoFacilitatorSession } from './session.js';
+import { eventPumpFor } from './event-pump.js';
 import { installSessionToken } from '../net/session-token.js';
 import { loadSavedName, saveName } from '../net/name-storage.js';
 import {
@@ -52,6 +53,12 @@ export async function startHostApp({ location = window.location } = {}) {
   // Everything below this line reads `session` and never asks which it has.
   let session = null;
   let pin = null;
+
+  // Null unless this tab was opened with `?events=<url>`, which is the whole
+  // of the Discord integration's off-switch. Built once per tab rather than
+  // per game, because it is a property of how this console was launched and
+  // not of the game it happens to be running — see docs/discord-integration.md.
+  const pump = eventPumpFor({ location, onLog: (line) => appendLog(line) });
 
   // Fixed for the whole game, so it is written once rather than on every
   // projection.
@@ -132,6 +139,7 @@ export async function startHostApp({ location = window.location } = {}) {
       onChange,
       onStatus: (status) => $('connection').setAttribute('status', status),
       onLog: (line) => appendLog(line),
+      pump,
     });
     if (!result.ok) { appendLog(`[co] ${result.reason}`); return; }
     if (result.refused?.length) {
@@ -210,6 +218,7 @@ export async function startHostApp({ location = window.location } = {}) {
       onChange,
       onStatus: (status) => $('connection').setAttribute('status', status),
       onLog: (line) => appendLog(line),
+      pump,
     }));
   }
 

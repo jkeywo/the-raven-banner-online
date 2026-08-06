@@ -164,6 +164,23 @@ export class GameHost {
     });
   }
 
+  /**
+   * The game as somebody watching from outside the table may see it.
+   *
+   * A spectator is a viewer the projector already knows how to refuse: it
+   * grants them PUBLIC and nothing else — not an owner's field, not a team's,
+   * not a facilitator's, and not a clash secret that a reveal condition has
+   * opened to the players. So this is the whole board and none of the hands.
+   *
+   * It exists for the event pump, which must be able to describe the game to
+   * an outside service without being trusted to leave anything out. Handing it
+   * this rather than state is what makes that structural: the manifest does
+   * the redacting, at the one send site the second law allows.
+   */
+  spectatorView() {
+    return projectView(this.state, this.data, { kind: 'spectator' });
+  }
+
   /** What gets written to storage or downloaded: a seed and a history. */
   save() {
     return { ...toSave(this.state), facilitatorPin: this.facilitatorPin, savedAt: this._now() };
