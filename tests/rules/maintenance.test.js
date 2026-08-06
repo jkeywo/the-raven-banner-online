@@ -275,4 +275,53 @@ describe('giving', () => {
     expect(refusal(state, actor, 'give', { toRoleId: 'cenred', what: 'silver', amount: 99 }))
       .toContain('not enough silver');
   });
+
+  it('stays inside the team during the Team Phase', () => {
+    // The teams are sitting apart. A gift across the room is a conversation
+    // for the Encounter Phase, when the room is back together.
+    const { state, actor } = playing('king_alfred', 'team');
+    expect(state.roles.halfdan_ragnarsson.factionId)
+      .not.toBe(state.roles.king_alfred.factionId);
+    expect(refusal(state, actor, 'give',
+      { toRoleId: 'halfdan_ragnarsson', what: 'silver', amount: 1 }))
+      .toContain('own team');
+
+    // Cenred is Wessex, and so is Alfred.
+    const after = run(state, actor, 'give', { toRoleId: 'cenred', what: 'silver', amount: 1 });
+    expect(after.roles.cenred.silver).toBe(state.roles.cenred.silver + 1);
+  });
+
+  it('follows homage rather than the printed team', () => {
+    // Ubba swears to Alfred, and Wessex silver may pass to him in the Team
+    // Phase — his faction is his liege's now, wherever he started.
+    const { state, actor } = playing('king_alfred', 'team');
+    const sworn = run(state, { seatId: 's2', kind: 'player', roleId: 'ubba_ragnarsson' },
+      'swear-allegiance', { liegeId: 'king_alfred' });
+    expect(sworn.roles.ubba_ragnarsson.factionId).toBe(sworn.roles.king_alfred.factionId);
+    const after = run(sworn, actor, 'give',
+      { toRoleId: 'ubba_ragnarsson', what: 'silver', amount: 1 });
+    expect(after.roles.ubba_ragnarsson.silver).toBe(sworn.roles.ubba_ragnarsson.silver + 1);
+  });
+
+  it('minds nobody’s allegiance in the Maintenance or Encounter Phase', () => {
+    for (const phaseName of ['maintenance', 'encounter']) {
+      const { state, actor } = playing('king_alfred', phaseName);
+      const after = run(state, actor, 'give',
+        { toRoleId: 'halfdan_ragnarsson', what: 'silver', amount: 1 });
+      expect(after.roles.halfdan_ragnarsson.silver, phaseName)
+        .toBe(state.roles.halfdan_ragnarsson.silver + 1);
+    }
+  });
+
+  it('leaves no mark on the game when it refuses one', () => {
+    const { state, actor } = playing('king_alfred', 'team');
+    const before = { log: state.log.length, silver: state.roles.halfdan_ragnarsson.silver };
+    const result = apply(state, data, {
+      verb: 'give', payload: { toRoleId: 'halfdan_ragnarsson', what: 'silver', amount: 1 },
+    }, actor, { ts: 0 });
+    expect(result.ok).toBe(false);
+    expect(result.state).toBe(state);
+    expect(state.log).toHaveLength(before.log);
+    expect(state.roles.halfdan_ragnarsson.silver).toBe(before.silver);
+  });
 });

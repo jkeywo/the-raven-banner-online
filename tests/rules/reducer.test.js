@@ -98,6 +98,44 @@ describe('commands', () => {
       .toContain('as often as you may');
   });
 
+  it('shuts the market during the Team Phase', () => {
+    // The Team Phase is time given to a team to talk to itself. Nobody walks
+    // to the traders' table during it, so the bank is not open.
+    const state = seated();
+    state.phase.name = 'team';
+    const verdict = admit(state, data, { verb: 'trade', payload: { give: 'food' } }, PLAYER);
+    expect(verdict.ok).toBe(false);
+    expect(verdict.reason).toContain('team');
+    expect(verdict.reason).toContain('maintenance');
+    // And so it is not offered on the action list at all, the way every other
+    // out-of-phase action is not.
+    const list = availableTo(state, data, PLAYER);
+    expect(list.map((c) => c.verb)).not.toContain('trade');
+    // Giving is still offered — it is the market that is shut, not the
+    // players, and the probe finds Alfred a teammate to give to.
+    expect(list.find((c) => c.verb === 'give')).toMatchObject({ ok: true });
+  });
+
+  it('refuses a Team Phase trade without leaving a mark', () => {
+    const state = seated();
+    state.phase.name = 'team';
+    const before = { food: state.roles.king_alfred.food, log: state.log.length };
+    const result = apply(state, data, { verb: 'trade', payload: { give: 'food' } }, PLAYER, { ts: 0 });
+    expect(result.ok).toBe(false);
+    expect(result.state).toBe(state);
+    expect(state.roles.king_alfred.food).toBe(before.food);
+    expect(state.log).toHaveLength(before.log);
+  });
+
+  it('opens it again in the Maintenance and Encounter Phases', () => {
+    for (const phaseName of ['maintenance', 'encounter']) {
+      const state = seated();
+      state.phase.name = phaseName;
+      expect(admit(state, data, { verb: 'trade', payload: { give: 'food' } }, PLAYER).ok, phaseName)
+        .toBe(true);
+    }
+  });
+
   it('lets the Danish trader trade twice', () => {
     let state = seated();
     state.phase.name = 'maintenance';

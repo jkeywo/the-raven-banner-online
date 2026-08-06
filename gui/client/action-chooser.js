@@ -45,10 +45,23 @@ export function fieldsFor(verb, view, data) {
   const me = view.viewer?.roleId;
   const mine = view.roles?.[me] ?? {};
 
-  /** Everyone else who is in the game. */
-  const others = () => Object.values(view.roles ?? {})
-    .filter((role) => role.id !== me)
+  /** Everyone else who is in the game, or only those a filter keeps. */
+  const others = (keep = () => true) => Object.values(view.roles ?? {})
+    .filter((role) => role.id !== me && keep(role))
     .map((role) => ({ value: role.id, label: data.roles.roles[role.id]?.name ?? role.id }));
+
+  /** Whether the teams are currently sitting apart. */
+  const teamPhase = () => view.phase?.name === 'team';
+
+  /**
+   * Whether this character is one to strike a bargain with right now.
+   *
+   * The rules refuse a deal across the lines while the teams sit apart, so a
+   * dropdown offering one is offering a refusal. Cancelling a contract is
+   * exempt from that and so is exempt from this.
+   */
+  const dealable = (roleId) => !teamPhase()
+    || (Boolean(mine.factionId) && view.roles?.[roleId]?.factionId === mine.factionId);
 
   /** Shires this player stewards. */
   const held = () => Object.entries(view.shires ?? {})
@@ -69,7 +82,14 @@ export function fieldsFor(verb, view, data) {
 
     case 'give':
       return [
-        { name: 'toRoleId', label: 'To', kind: 'select', options: others() },
+        {
+          name: 'toRoleId',
+          label: 'To',
+          kind: 'select',
+          // In the Team Phase a gift stays inside the team, so offering the
+          // rest of the table is offering a refusal.
+          options: others((role) => dealable(role.id)),
+        },
         {
           name: 'what',
           label: 'What',
@@ -235,7 +255,9 @@ export function fieldsFor(verb, view, data) {
         label: 'Contract for',
         kind: 'select',
         options: (data.meta.tradeContractShires ?? [])
-          .filter((id) => !taken.has(id) && view.shires?.[id]?.stewardRoleId)
+          // A steward to sign it, and one the Team Phase would let her talk to.
+          .filter((id) => !taken.has(id) && view.shires?.[id]?.stewardRoleId
+            && dealable(view.shires[id].stewardRoleId))
           .map((id) => ({
             value: id,
             label: `${data.shires.shires[id]?.name ?? id} — ${
@@ -251,7 +273,11 @@ export function fieldsFor(verb, view, data) {
           label: 'Their offer',
           kind: 'select',
           options: Object.values(view.contracts ?? {})
-            .filter((c) => c.status === 'offered' && view.shires?.[c.shireId]?.stewardRoleId === me)
+            // Answering is dealing, so an offer from across the lines is not
+            // his to answer until the room is back together.
+            .filter((c) => c.status === 'offered'
+              && view.shires?.[c.shireId]?.stewardRoleId === me
+              && dealable(c.traderRoleId))
             .map((c) => ({
               value: c.id,
               label: `${data.shires.shires[c.shireId]?.name ?? c.shireId} — from ${

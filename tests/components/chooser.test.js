@@ -51,6 +51,20 @@ describe('what an action still needs asking', () => {
     expect(what.options[0].label).toContain('you have 4');
   });
 
+  it('offers only your own team to give to while the teams sit apart', () => {
+    // The rules refuse a gift across the lines in the Team Phase, so the
+    // dropdown should not invite one — and should invite everybody again in
+    // the phase where the room is back together.
+    const { view: apart } = view('king_alfred', 'team');
+    const inTeamPhase = fieldsFor('give', apart, data)[0].options.map((o) => o.value);
+    expect(inTeamPhase).toContain('cenred');                    // Wessex, as he is
+    expect(inTeamPhase).not.toContain('halfdan_ragnarsson');    // the Great Heathen Army
+
+    const { view: together } = view('king_alfred', 'encounter');
+    expect(fieldsFor('give', together, data)[0].options.map((o) => o.value))
+      .toContain('halfdan_ragnarsson');
+  });
+
   it('never offers you yourself as a recipient', () => {
     const { view: seen } = view('king_alfred', 'encounter');
     for (const verb of ['give', 'transfer-stewardship', 'swear-allegiance']) {
@@ -114,7 +128,9 @@ describe('trade contracts', () => {
   });
 
   it('offers the trader the three printed shires and their stewards', () => {
-    const [field] = fieldsFor('offer-contract', view(TRADER, 'team').view, data);
+    // The Maintenance Phase, because all three stewards are Saxons and the
+    // Team Phase is each team's own — see 'while the teams sit apart' below.
+    const [field] = fieldsFor('offer-contract', view(TRADER, 'maintenance').view, data);
     expect(field.options.map((o) => o.value))
       .toEqual(['wrekinsets', 'kent', 'west_country']);
     // Named, because who you are dealing with is the whole decision.
@@ -122,7 +138,7 @@ describe('trade contracts', () => {
   });
 
   it('drops a shire once a contract is running on it', () => {
-    const { state } = view(TRADER, 'team');
+    const { state } = view(TRADER, 'maintenance');
     state.contracts = [{
       id: 'c1', shireId: 'kent', traderRoleId: TRADER, status: 'active',
     }];
@@ -130,8 +146,18 @@ describe('trade contracts', () => {
     expect(field.options.map((o) => o.value)).toEqual(['wrekinsets', 'west_country']);
   });
 
+  it('offers only a shire she could deal with while the teams sit apart', () => {
+    // Kent in the hands of a Saxon riding with the Great Heathen Army. The
+    // other two would refuse to be approached at all in this phase, so
+    // offering them is offering a refusal.
+    const { state } = view(TRADER, 'team');
+    state.shires.kent.stewardRoleId = 'king_ecgberht';
+    const [field] = fieldsFor('offer-contract', seenBy(state, TRADER), data);
+    expect(field.options.map((o) => o.value)).toEqual(['kent']);
+  });
+
   it('shows a steward only the offers made to them', () => {
-    const { state } = view('king_alfred', 'team');
+    const { state } = view('king_alfred', 'maintenance');
     const steward = state.shires.west_country.stewardRoleId;
     state.contracts = [
       { id: 'c1', shireId: 'west_country', traderRoleId: TRADER, status: 'offered' },
@@ -139,6 +165,21 @@ describe('trade contracts', () => {
     ];
     const [which] = fieldsFor('answer-contract', seenBy(state, steward), data);
     expect(which.options.map((o) => o.value)).toEqual(['c1']);
+  });
+
+  it('shows a steward no offer he cannot answer yet', () => {
+    // A Dane's card in front of a Saxon, while the two of them are sitting at
+    // different tables. It comes back when the room does.
+    const offer = { id: 'c1', shireId: 'west_country', traderRoleId: TRADER, status: 'offered' };
+    const { state: apart } = view('king_alfred', 'team');
+    apart.contracts = [offer];
+    expect(fieldsFor('answer-contract', seenBy(apart, 'king_alfred'), data)[0].options)
+      .toEqual([]);
+
+    const { state: together } = view('king_alfred', 'maintenance');
+    together.contracts = [offer];
+    expect(fieldsFor('answer-contract', seenBy(together, 'king_alfred'), data)[0]
+      .options.map((o) => o.value)).toEqual(['c1']);
   });
 
   it('turns the answer into the boolean the command wants', () => {

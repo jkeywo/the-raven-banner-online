@@ -56,10 +56,13 @@ entities:
       summary: >-
         The card prints when a contract may be cancelled and not when it may be
         made, so the app allows offering and signing in the team, maintenance
-        and encounter phases.
+        and encounter phases — and in the team phase only between characters of
+        one faction.
       rationale:
         - A contract appears in no action box on any archetype sheet. It is a bargain rather than an action, and bargains happen whenever people are talking.
         - The battle is excluded because a soldier changing hands mid-fight would move a clash that is already being rolled.
+        - The team phase is the one stretch of the turn a team spends alone with itself, so a bargain aimed outside your own faction waits for a phase when both parties are in the same room. In practice that puts every printed contract in the maintenance or encounter phase, because all three shires are stewarded by Saxons and the trader is a Dane.
+        - Cancelling is exempt and keeps its team-phase-only window with no faction test. It is printed that way, a contract is cross-faction by nature, and gating it would make every contract in the game permanently uncancellable.
         - Recorded in the gaps table rather than left implicit, so the facilitator can see what was decided for them and overrule it.
     implementation:
       status: declared

@@ -91,11 +91,19 @@ export const KNOWN_GAPS = [
     silent:
       'The card prints when a contract may be cancelled — the Team Phase — but '
       + 'not when it may be made.',
-    ruling: 'Any phase but the battle, the lobby and the epilogue.',
+    ruling:
+      'Any phase but the battle, the lobby and the epilogue — and in the Team '
+      + 'Phase, only with somebody of your own faction.',
     because:
       'It is a bargain rather than an action: it appears in no action box on any '
       + 'sheet, and the trader\'s sheet mentions contracts only where it counts '
       + 'their income. The battle is excluded because a soldier changing hands '
-      + 'mid-fight would move a clash that is already being rolled.',
+      + 'mid-fight would move a clash that is already being rolled. The Team '
+      + 'Phase is excluded across factions because it is the one stretch of the '
+      + 'turn a team spends alone with itself, and a Dane cannot put a card in '
+      + 'front of a Saxon steward who is sitting at another table. Cancelling is '
+      + 'the exception: it is Team-Phase-only by printed rule and a contract is '
+      + 'cross-faction by nature, so gating it would make every contract in the '
+      + 'game permanently uncancellable.',
   },
 ];

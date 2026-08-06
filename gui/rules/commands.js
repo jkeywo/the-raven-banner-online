@@ -25,8 +25,20 @@ import {
 } from './clash.js';
 import { pairSides, defendedSettlements, settleBattle, seizeInitiative } from './battle.js';
 
-/** Phases in which resources may change hands. Not during a battle. */
+/**
+ * Phases in which resources may change hands between players. Not during a
+ * battle — and in the Team Phase, only within a team. See `dealingReason`.
+ */
 const TRADEABLE_PHASES = ['team', 'maintenance', 'encounter'];
+
+/**
+ * Phases in which the market will deal with you.
+ *
+ * The Team Phase is time given to a team to talk to itself. Nobody is walking
+ * to the traders' table during it, so the bank is shut: silver becomes food in
+ * the Maintenance Phase, or out among everybody else in the Encounter Phase.
+ */
+const MARKET_PHASES = ['maintenance', 'encounter'];
 
 /** What can pass between players. Momentum and soldiers are yours alone. */
 const TRADEABLE = ['silver', 'food', 'ships'];
@@ -292,6 +304,32 @@ function affordable(role, costs) {
 function spend(role, costs) {
   for (const [what, amount] of Object.entries(costs)) role[what] -= amount;
 }
+
+/**
+ * Whether two characters answer to the same faction, and so sit at one table.
+ *
+ * Faction rather than the printed team, because homage moves it: a vassal's
+ * lands and loyalties follow their liege, and so does who they may deal with
+ * while the teams are sitting apart.
+ */
+const sameFaction = (state, roleId, otherId) => {
+  const faction = state.roles[roleId]?.factionId;
+  return Boolean(faction) && faction === state.roles[otherId]?.factionId;
+};
+
+/**
+ * Why a deal with this person cannot be struck right now, or null.
+ *
+ * The Team Phase is the one stretch of the turn a team spends alone with
+ * itself, which is what makes the Encounter Phase worth anything: crossing the
+ * lines is supposed to cost you the walk. So a gift or a bargain aimed outside
+ * your own faction waits until the room is back together, while anything
+ * inside it is the whole point of the phase.
+ */
+const dealingReason = (state, roleId, otherId) =>
+  (state.phase.name === 'team' && !sameFaction(state, roleId, otherId)
+    ? no('the Team Phase is your own team\'s — deal with them in the maintenance or encounter phase')
+    : null);
 
 export const COMMANDS = {
   // --- lobby ---------------------------------------------------------------
@@ -734,13 +772,19 @@ export const COMMANDS = {
    * emphatic that this is a negotiating game and the currency of a promise is
    * being able to keep it on the spot. Momentum and soldiers are yours alone
    * and never move.
+   *
+   * The one qualification is the Team Phase, where a gift stays inside the
+   * team, because that phase is the team's own.
    */
   give: {
     phases: TRADEABLE_PHASES,
     actor: 'player',
     // "Is there anyone to give anything to, and anything to give?"
     probe: (state, data, roleId) => {
-      const to = Object.keys(state.roles).find((id) => id !== roleId);
+      const others = Object.keys(state.roles).filter((id) => id !== roleId);
+      // A teammate first: in the Team Phase they are the only lawful answer,
+      // and in the other two they are as good an answer as anybody.
+      const to = others.find((id) => sameFaction(state, roleId, id)) ?? others[0];
       const what = TRADEABLE.find((kind) => (state.roles[roleId]?.[kind] ?? 0) > 0);
       return { toRoleId: to, what, amount: 1 };
     },
@@ -749,6 +793,8 @@ export const COMMANDS = {
       const { toRoleId, what, amount } = ctx.cmd.payload ?? {};
       if (!ctx.state.roles[toRoleId]) return no('no such character');
       if (toRoleId === roleId) return no('you already have it');
+      const across = dealingReason(ctx.state, roleId, toRoleId);
+      if (across) return across;
       if (!TRADEABLE.includes(what)) {
         return no(`${what ?? 'that'} cannot change hands — only ${TRADEABLE.join(', ')}`);
       }
@@ -909,7 +955,8 @@ export const COMMANDS = {
   },
 
   trade: {
-    phases: TRADEABLE_PHASES,
+    // The market, not another player: the bank is shut during the Team Phase.
+    phases: MARKET_PHASES,
     actor: 'player',
     // What "could you trade at all?" means, for an action list asking without
     // a player having chosen a direction yet. Selling food is the cheaper of
@@ -1168,7 +1215,22 @@ export const COMMANDS = {
   'offer-contract': {
     phases: TRADEABLE_PHASES,
     actor: 'player',
-    probe: (state, data) => ({ shireId: contractShires(data, state)[0] }),
+    // A card she could actually lay down, first. Asking after the first
+    // printed shire regardless would grey the whole verb out over a Mercian
+    // she may not deal with this phase, or over a contract she has already
+    // offered, while the card still in her hand is perfectly legal — so the
+    // probe has to answer "is there any offer at all?", not "is this one
+    // particular offer good?".
+    probe: (state, data, roleId) => {
+      const shires = contractShires(data);
+      const offerable = shires.find((id) => {
+        const steward = state.shires[id]?.stewardRoleId;
+        return steward && steward !== roleId
+          && !dealingReason(state, roleId, steward)
+          && !contractOn(state, id);
+      });
+      return { shireId: offerable ?? shires[0] };
+    },
     admit(ctx) {
       const roleId = subjectOf(ctx);
       if (ctx.data.roles.roles[roleId]?.archetype !== 'danish_trader') {
@@ -1181,6 +1243,10 @@ export const COMMANDS = {
       const steward = ctx.state.shires[shireId]?.stewardRoleId;
       if (!steward) return no('nobody stewards it, so there is nobody to sign');
       if (steward === roleId) return no('you cannot contract with yourself');
+      // Usually a Saxon on the other side of the table, so usually a bargain
+      // for a phase when the two of you are in the same room.
+      const across = dealingReason(ctx.state, roleId, steward);
+      if (across) return across;
       const existing = contractOn(ctx.state, shireId);
       if (existing?.status === 'active') return no('that contract is already running');
       if (existing?.status === 'offered') return no('you have already offered that one');
@@ -1213,12 +1279,15 @@ export const COMMANDS = {
     phases: TRADEABLE_PHASES,
     actor: 'player',
     // An offer on a shire this player stewards, so the action does not appear
-    // on everybody's list refused for a reason about somebody else's deal.
-    probe: (state, data, roleId) => ({
-      contractId: state.contracts.find((c) => c.status === 'offered'
-        && state.shires[c.shireId]?.stewardRoleId === roleId)?.id,
-      accept: true,
-    }),
+    // on everybody's list refused for a reason about somebody else's deal —
+    // and one whose trader is his to answer today, so an offer from across the
+    // lines does not hide one from his own side during the Team Phase.
+    probe: (state, data, roleId) => {
+      const his = state.contracts.filter((c) => c.status === 'offered'
+        && state.shires[c.shireId]?.stewardRoleId === roleId);
+      const answerable = his.find((c) => !dealingReason(state, roleId, c.traderRoleId));
+      return { contractId: (answerable ?? his[0])?.id, accept: true };
+    },
     admit(ctx) {
       const roleId = subjectOf(ctx);
       const contract = findContract(ctx.state, ctx.cmd.payload?.contractId);
@@ -1227,6 +1296,10 @@ export const COMMANDS = {
       if (ctx.state.shires[contract.shireId]?.stewardRoleId !== roleId) {
         return no('it is not yours to sign');
       }
+      // Signing is dealing, and so is refusing to: both are answers given to
+      // the trader's face, which the Team Phase is not the time for.
+      const across = dealingReason(ctx.state, roleId, contract.traderRoleId);
+      if (across) return across;
       if (typeof ctx.cmd.payload?.accept !== 'boolean') return no('sign it or do not');
       if (!ctx.cmd.payload.accept) return ok();
       // Both sides pay a soldier, so a trader who has spent his since offering
@@ -1259,6 +1332,12 @@ export const COMMANDS = {
    * Cancellation rights follow the current steward rather than whoever signed.
    * A shire that changes hands takes its contract with it, which is also how
    * the income works.
+   *
+   * Alone among the deals, this one is not held to your own faction. It is
+   * Team-Phase-only by printed rule, and a contract is cross-faction by
+   * nature — a Dane's card in a Saxon's shire — so a faction gate here would
+   * make every contract in the game permanently uncancellable. Tearing one up
+   * is also not a bargain: nobody's agreement is being asked for.
    */
   'cancel-contract': {
     phases: ['team'],

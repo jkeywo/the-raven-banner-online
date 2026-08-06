@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { loadData } from '../helpers/load-data.js';
 import { createInitialState } from '../../gui/rules/state.js';
 import { apply, replay } from '../../gui/rules/reducer.js';
-import { admit } from '../../gui/rules/admission.js';
+import { admit, availableTo } from '../../gui/rules/admission.js';
 import { toSave } from '../../gui/rules/command-log.js';
 import { shipCost } from '../../gui/rules/derive.js';
 
@@ -12,14 +12,20 @@ const FACILITATOR = { seatId: 's9', kind: 'facilitator', roleId: null };
 const TRADER = 'frida_anundottir';
 const as = (roleId) => ({ seatId: `s-${roleId}`, kind: 'player', roleId });
 
-function playing(phaseName = 'team') {
-  let state = createInitialState({ joinCode: 'RAVEN7Z', seed: 1, data });
-  state.seats.s9 = { id: 's9', token: 'f', name: 'F', roleId: null, kind: 'facilitator', connected: true, lastSeen: 0 };
-  while (state.phase.name !== phaseName) {
-    state = apply(state, data, { verb: 'facilitator:advance-phase', payload: {} },
+/** Move the game on until it reaches a phase, through the log like anything else. */
+function toPhase(state, phaseName) {
+  let at = state;
+  while (at.phase.name !== phaseName) {
+    at = apply(at, data, { verb: 'facilitator:advance-phase', payload: {} },
       FACILITATOR, { ts: 0 }).state;
   }
-  return state;
+  return at;
+}
+
+function playing(phaseName = 'team') {
+  const state = createInitialState({ joinCode: 'RAVEN7Z', seed: 1, data });
+  state.seats.s9 = { id: 's9', token: 'f', name: 'F', roleId: null, kind: 'facilitator', connected: true, lastSeen: 0 };
+  return toPhase(state, phaseName);
 }
 
 function run(state, actor, verb, payload = {}) {
@@ -33,8 +39,13 @@ const refusal = (state, actor, verb, payload = {}) =>
 
 const stewardOf = (state, shireId) => state.shires[shireId].stewardRoleId;
 
-/** Frida offers the West Country contract. Returns the state and its id. */
-function offered(state = playing()) {
+/**
+ * Frida offers the West Country contract. Returns the state and its id.
+ *
+ * In the Maintenance Phase, because the stewards of all three printed shires
+ * are Saxons and the Team Phase is each team's own — see 'across the lines'.
+ */
+function offered(state = playing('maintenance')) {
   const after = run(state, as(TRADER), 'offer-contract', { shireId: 'west_country' });
   return { state: after, id: after.contracts.at(-1).id };
 }
@@ -42,7 +53,7 @@ function offered(state = playing()) {
 describe('offering', () => {
   it('is the Danish Trader’s alone', () => {
     // Three cards, and she holds all three.
-    const state = playing();
+    const state = playing('maintenance');
     expect(refusal(state, as('king_alfred'), 'offer-contract', { shireId: 'west_country' }))
       .toBe('only the Danish Trader holds the contracts');
     expect(admit(state, data, { verb: 'offer-contract', payload: { shireId: 'west_country' } },
@@ -50,7 +61,7 @@ describe('offering', () => {
   });
 
   it('is only for the three printed shires', () => {
-    const state = playing();
+    const state = playing('maintenance');
     expect(refusal(state, as(TRADER), 'offer-contract', { shireId: 'jorvik' }))
       .toContain('no contract for');
     for (const shireId of ['wrekinsets', 'kent', 'west_country']) {
@@ -60,7 +71,7 @@ describe('offering', () => {
   });
 
   it('costs nothing by itself', () => {
-    const before = playing();
+    const before = playing('maintenance');
     const { state } = offered(before);
     expect(state.roles[TRADER].soldiers).toBe(before.roles[TRADER].soldiers);
     expect(state.contracts.at(-1)).toMatchObject(
@@ -68,7 +79,7 @@ describe('offering', () => {
   });
 
   it('needs somebody on the other side of the table', () => {
-    const state = playing();
+    const state = playing('maintenance');
     state.shires.kent.stewardRoleId = null;
     expect(refusal(state, as(TRADER), 'offer-contract', { shireId: 'kent' }))
       .toContain('nobody to sign');
@@ -81,7 +92,7 @@ describe('offering', () => {
   });
 
   it('is refused when she has no soldier to send', () => {
-    const state = playing();
+    const state = playing('maintenance');
     state.roles[TRADER].soldiers = 0;
     expect(refusal(state, as(TRADER), 'offer-contract', { shireId: 'west_country' }))
       .toContain('not enough soldiers');
@@ -109,10 +120,7 @@ describe('signing', () => {
     let { state, id } = offered();
     const steward = stewardOf(state, 'west_country');
     state = run(state, as(steward), 'answer-contract', { contractId: id, accept: true });
-    while (state.phase.name !== 'maintenance') {
-      state = apply(state, data, { verb: 'facilitator:advance-phase', payload: {} },
-        FACILITATOR, { ts: 0 }).state;
-    }
+    state = toPhase(state, 'maintenance');
 
     const silver = (s, who) => s.roles[who].silver;
     const before = { trader: silver(state, TRADER), steward: silver(state, steward) };
@@ -174,13 +182,127 @@ describe('signing', () => {
   });
 });
 
+describe('dealing across the lines', () => {
+  // King Ecgberht is a Saxon riding with the Great Heathen Army, so he is the
+  // one steward in England Frida could deal with while the teams sit apart.
+  const OWN_SIDE = 'king_ecgberht';
+
+  /** The West Country in the hands of somebody on the trader's own side. */
+  function ownSideSteward(phaseName = 'team') {
+    const state = playing(phaseName);
+    state.shires.west_country.stewardRoleId = OWN_SIDE;
+    state.shires.west_country.factionId = state.roles[OWN_SIDE].factionId;
+    return state;
+  }
+
+  it('will not offer a contract across the lines in the Team Phase', () => {
+    const state = playing('team');
+    expect(state.roles[stewardOf(state, 'west_country')].factionId)
+      .not.toBe(state.roles[TRADER].factionId);
+    expect(refusal(state, as(TRADER), 'offer-contract', { shireId: 'west_country' }))
+      .toContain('own team');
+  });
+
+  it('leaves no mark on the game when it refuses one', () => {
+    const state = playing('team');
+    const result = apply(state, data, {
+      verb: 'offer-contract', payload: { shireId: 'west_country' },
+    }, as(TRADER), { ts: 0 });
+    expect(result.ok).toBe(false);
+    expect(result.state).toBe(state);
+    expect(state.contracts).toEqual([]);
+    expect(state.log.filter((entry) => entry.verb === 'offer-contract')).toEqual([]);
+  });
+
+  it('lets her deal with her own side even then', () => {
+    let state = ownSideSteward('team');
+    state = run(state, as(TRADER), 'offer-contract', { shireId: 'west_country' });
+    const id = state.contracts.at(-1).id;
+    state = run(state, as(OWN_SIDE), 'answer-contract', { contractId: id, accept: true });
+    expect(state.contracts.at(-1).status).toBe('active');
+  });
+
+  it('will not let a steward answer across the lines in the Team Phase', () => {
+    // Offered where it was lawful, and then the clock rolls round to a Team
+    // Phase before he has answered.
+    let { state, id } = offered();
+    const steward = stewardOf(state, 'west_country');
+    state = toPhase(state, 'team');
+    for (const accept of [true, false]) {
+      expect(refusal(state, as(steward), 'answer-contract', { contractId: id, accept }))
+        .toContain('own team');
+    }
+  });
+
+  it('keeps the offer on her action list when one of the three is a teammate’s', () => {
+    // Kent in her own side's hands, the other two Saxon. The action list asks
+    // "is there an offer she could make at all?" and the answer is yes, so the
+    // button must not grey out over the Mercian who happens to be printed
+    // first — the offer she can make would then be unreachable.
+    const state = playing('team');
+    state.shires.kent.stewardRoleId = OWN_SIDE;
+    expect(admit(state, data, { verb: 'offer-contract', payload: { shireId: 'kent' } },
+      as(TRADER))).toEqual({ ok: true });
+    expect(availableTo(state, data, as(TRADER)).find((c) => c.verb === 'offer-contract'))
+      .toMatchObject({ ok: true });
+  });
+
+  it('takes the offer off her list only when none of the three is', () => {
+    const offering = availableTo(playing('team'), data, as(TRADER))
+      .find((c) => c.verb === 'offer-contract');
+    expect(offering.ok).toBe(false);
+    expect(offering.reason).toContain('own team');
+  });
+
+  it('keeps the offer on her list once one of the three is already spoken for', () => {
+    // The same "is there any offer at all?" question along the other axis:
+    // the first printed shire already carries an offer, so asking after that
+    // one alone would grey out the two cards still in her hand.
+    const state = playing('maintenance');
+    const [first] = data.meta.tradeContractShires;
+    state.contracts = [
+      { id: 'c1', shireId: first, traderRoleId: TRADER, status: 'offered' },
+    ];
+    expect(availableTo(state, data, as(TRADER)).find((c) => c.verb === 'offer-contract'))
+      .toMatchObject({ ok: true });
+  });
+
+  it('keeps an answer on the steward’s list when one offer is his to answer', () => {
+    // Two offers on two shires Alfred holds, one of them from his own side.
+    // Only one trader is printed, so the second is hand-placed — but the list
+    // must still find the offer he could answer rather than stopping at the
+    // first on the pile.
+    const state = playing('team');
+    state.contracts = [
+      { id: 'c1', shireId: 'west_country', traderRoleId: TRADER, status: 'offered' },
+      { id: 'c2', shireId: 'wiltshire', traderRoleId: 'cenred', status: 'offered' },
+    ];
+    expect(availableTo(state, data, as('king_alfred'))
+      .find((c) => c.verb === 'answer-contract')).toMatchObject({ ok: true });
+  });
+
+  it('minds nobody’s allegiance in the Maintenance or Encounter Phase', () => {
+    for (const phaseName of ['maintenance', 'encounter']) {
+      const state = playing(phaseName);
+      const steward = stewardOf(state, 'west_country');
+      expect(state.roles[steward].factionId).not.toBe(state.roles[TRADER].factionId);
+      const after = run(state, as(TRADER), 'offer-contract', { shireId: 'west_country' });
+      expect(admit(after, data, {
+        verb: 'answer-contract',
+        payload: { contractId: after.contracts.at(-1).id, accept: true },
+      }, as(steward)).ok, phaseName).toBe(true);
+    }
+  });
+});
+
 describe('cancelling', () => {
-  /** A signed contract on the West Country, in the team phase. */
+  /** A signed contract on the West Country, moved on to the team phase. */
   function signed() {
     let { state, id } = offered();
     const steward = stewardOf(state, 'west_country');
     state = run(state, as(steward), 'answer-contract', { contractId: id, accept: true });
-    return { state, id, steward };
+    // Struck where the two of them could talk; torn up where the card says.
+    return { state: toPhase(state, 'team'), id, steward };
   }
 
   it('gives the shire its ship value back', () => {
@@ -224,21 +346,27 @@ describe('cancelling', () => {
 
   it('is a Team Phase matter, as printed on the card', () => {
     let { state, id, steward } = signed();
-    while (state.phase.name !== 'encounter') {
-      state = apply(state, data, { verb: 'facilitator:advance-phase', payload: {} },
-        FACILITATOR, { ts: 0 }).state;
-    }
+    state = toPhase(state, 'encounter');
     expect(refusal(state, as(steward), 'cancel-contract', { contractId: id }))
       .toContain('team');
+  });
+
+  it('is not held to your own faction, or no contract could ever be torn up', () => {
+    // The steward is a Saxon and the trader is a Dane — that is what a
+    // contract is — so the Team Phase's own-team rule cannot apply here.
+    const { state, id, steward } = signed();
+    expect(state.roles[steward].factionId).not.toBe(state.roles[TRADER].factionId);
+    expect(state.phase.name).toBe('team');
+    for (const party of [steward, TRADER]) {
+      expect(admit(state, data, { verb: 'cancel-contract', payload: { contractId: id } },
+        as(party)).ok, party).toBe(true);
+    }
   });
 
   it('stops the silver', () => {
     let { state, id, steward } = signed();
     state = run(state, as(TRADER), 'cancel-contract', { contractId: id });
-    while (state.phase.name !== 'maintenance') {
-      state = apply(state, data, { verb: 'facilitator:advance-phase', payload: {} },
-        FACILITATOR, { ts: 0 }).state;
-    }
+    state = toPhase(state, 'maintenance');
     const before = state.roles[TRADER].silver;
     const after = run(state, as(TRADER), 'collect-income', { upkeep: 'lose' });
     expect(after.roles[TRADER].silver).toBe(before);
@@ -250,6 +378,7 @@ describe('a contract replays', () => {
     let { state, id } = offered();
     const steward = stewardOf(state, 'west_country');
     state = run(state, as(steward), 'answer-contract', { contractId: id, accept: true });
+    state = toPhase(state, 'team');
     state = run(state, as(steward), 'cancel-contract', { contractId: id });
 
     const { state: rebuilt, refused } = replay(toSave(state), data);

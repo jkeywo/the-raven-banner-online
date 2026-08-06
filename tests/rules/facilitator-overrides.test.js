@@ -44,7 +44,8 @@ describe('adjusting a number', () => {
     // moment at all, because the addition happens against whatever the
     // reducer is holding when the command is actually applied.
     let state = fresh();
-    state = run(state, FACILITATOR, 'facilitator:advance-phase');   // lobby -> team
+    // lobby -> team -> battle -> maintenance, where the market is open.
+    for (let i = 0; i < 3; i += 1) state = run(state, FACILITATOR, 'facilitator:advance-phase');
     const before = state.roles.king_alfred.silver;
     state = run(state, as('king_alfred'), 'trade', { give: 'food' });   // silver +2
     state = run(state, FACILITATOR, 'facilitator:adjust',

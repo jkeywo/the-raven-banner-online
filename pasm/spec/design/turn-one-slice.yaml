@@ -179,10 +179,11 @@ entities:
       status: proposed
       confidence: confirmed
       title: Give Resources
-      summary: Silver, food or ships pass from one character to another, at any time except during a battle.
+      summary: Silver, food or ships pass from one character to another, at any time except during a battle, and in the team phase only within a faction.
       rationale:
         - This is a negotiating game, and the currency of a promise is being able to keep it on the spot.
         - Momentum and soldiers never move. They are what a character is rather than what they have.
+        - The team phase is a team's own, so a gift aimed across the lines waits for the encounter or maintenance phase. The market is shut in that phase for the same reason, which is why trading with the bank is not a team-phase action at all.
     game_design:
       owner_role: owning-player
       architecture_links:
@@ -323,7 +324,7 @@ entities:
       status: proposed
       confidence: confirmed
       title: Silver
-      summary: Income from towns. Buys ships, soldiers, envoys and rebuilt settlements. Freely tradeable outside the battle phase.
+      summary: Income from towns. Buys ships, soldiers, envoys and rebuilt settlements. Tradeable outside the battle phase, and within your own faction during the team phase.
     game_design:
       owner_role: owning-player
       sources:
@@ -344,7 +345,7 @@ entities:
       status: proposed
       confidence: confirmed
       title: Food
-      summary: Income from farms. Feeds soldiers after a clash. Freely tradeable outside the battle phase.
+      summary: Income from farms. Feeds soldiers after a clash. Tradeable outside the battle phase, and within your own faction during the team phase.
     game_design:
       owner_role: owning-player
       sources:
@@ -360,7 +361,7 @@ entities:
       status: proposed
       confidence: confirmed
       title: Ships
-      summary: Bought access to coastal shires, and the price of an amphibious attack. Freely tradeable outside the battle phase.
+      summary: Bought access to coastal shires, and the price of an amphibious attack. Tradeable outside the battle phase, and within your own faction during the team phase.
     game_design:
       owner_role: owning-player
       sources:
