@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -369,5 +369,20 @@ describe('the player console', () => {
     await startPlayerApp({ location: { hash: '' } });
     expect(document.getElementById('screen-code').hidden).toBe(false);
     expect(document.getElementById('screen-game').hidden).toBe(true);
+  });
+});
+
+describe('what actually reaches the live site', () => {
+  it('copies every page at the repo root into the published site', async () => {
+    // gh-pages is assembled from an explicit copy list rather than the whole
+    // repository, which is the point of publishing from a branch — but it
+    // means a page added here and not there is a 404 on the live site and
+    // nowhere else. Nothing else in the suite can see that, because every
+    // other test reads the files off disk.
+    const workflow = await readFile(join(ROOT, '.github', 'workflows', 'ci.yml'), 'utf8');
+    const pages = (await readdir(ROOT)).filter((name) => name.endsWith('.html'));
+
+    expect(pages.sort()).toEqual(['host.html', 'index.html', 'replay.html']);
+    for (const page of pages) expect(workflow, page).toContain(page);
   });
 });

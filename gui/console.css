@@ -1524,3 +1524,151 @@ rb-shire-editor { display: block; }
 
 .rb-editor-settlements li[data-destroyed="true"] { opacity: 0.6; text-decoration: line-through; }
 .rb-editor-settlements label { display: flex; align-items: center; gap: 0.25rem; }
+
+/* --- the replay: the whole country, and the whole log --------------------- */
+
+/* Wider than any other panel, for a plain reason: it is three printed sheets
+   side by side with a rail either side of them. At the running console's width
+   England comes out as three thumbnails, which is not a view of anything. */
+.rb-panel.rb-replay { max-width: 110rem; }
+
+/* Three columns, and the middle one is the point. The history is narrow
+   because an action is one line, and the aftermath rail is narrow because four
+   counters are four counters — everything else goes to England. */
+.rb-replay-body {
+  display: grid;
+  grid-template-columns: minmax(14rem, 0.8fr) minmax(0, 3fr) minmax(14rem, 0.8fr);
+  gap: 1.2rem;
+  align-items: start;
+}
+
+.rb-replay-head { margin-bottom: 1rem; }
+.rb-replay-head h1 { margin-bottom: 0.2rem; }
+
+.rb-replay-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+}
+
+.rb-replay-controls button { font-size: 1rem; padding: 0.25rem 0.7rem; }
+.rb-replay-controls input[type="range"] { flex: 1; min-width: 8rem; accent-color: var(--rb-blood); }
+.rb-replay-close { margin-left: auto; font-size: 0.85rem !important; }
+
+/* The rails scroll inside themselves rather than making the page as long as
+   the log — a five-turn game is a few thousand actions, and a scroll bar three
+   screens tall is not a control anybody uses. */
+.rb-replay-rail, .rb-replay-side { max-height: 78vh; }
+
+/* --- all three sheets at once --------------------------------------------- */
+
+.rb-england {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.8rem;
+  align-items: start;
+}
+
+.rb-england-sheet { margin: 0; }
+
+.rb-england-sheet figcaption {
+  font-family: var(--rb-serif);
+  font-size: 0.85rem;
+  color: var(--rb-muted);
+  margin-bottom: 0.2rem;
+}
+
+/* Side by side, a card sized for a full-width map would cover its neighbour,
+   so it is told to be a small one. `anchor()` measures whatever it is given
+   and picks its side from that, so nothing else has to change. */
+.rb-england .rb-map-card { max-width: 14rem; font-size: 0.8rem; }
+.rb-replay-shire h3 { margin: 0 0 0.3rem; font-size: 0.95rem; }
+.rb-replay-shire .rb-detail { margin-top: 0.4rem; gap: 0.15rem 0.6rem; }
+
+/* --- the log, step by step ------------------------------------------------ */
+
+.rb-replay-history { list-style: none; margin: 0.4rem 0 0; padding: 0; display: grid; gap: 1px; }
+
+.rb-replay-history button {
+  display: grid;
+  grid-template-columns: 2.4rem 1fr;
+  gap: 0.1rem 0.5rem;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+  padding: 0.2rem 0.35rem;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.rb-replay-history button:hover { background: var(--rb-paper); }
+
+.rb-replay-seq { color: var(--rb-muted); font-variant-numeric: tabular-nums; font-size: 0.75rem; }
+.rb-replay-who { grid-column: 2; color: var(--rb-muted); font-size: 0.75rem; }
+
+/* Not yet. Everything after the cursor is faded rather than absent, so the
+   length of what is still to come is visible while you are watching it. */
+.rb-replay-history li[data-applied="false"] { opacity: 0.4; }
+
+.rb-replay-history li[aria-current] button {
+  background: var(--rb-paper);
+  box-shadow: inset 3px 0 0 var(--rb-gold);
+}
+
+/* An umpire's hand, marked wherever the log is read. The whole point of
+   putting overrides through the reducer is being able to answer "what did the
+   facilitator change?", which needs them to look different from what the
+   players did. */
+.rb-replay-override, .rb-replay-refused {
+  grid-column: 2;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.rb-replay-override { color: var(--rb-gold); }
+.rb-replay-refused { color: var(--rb-blood); text-transform: none; letter-spacing: 0; }
+
+.rb-replay-history li[data-override="true"] button { box-shadow: inset 3px 0 0 var(--rb-gold); }
+.rb-replay-history li[data-refused="true"] .rb-replay-label { text-decoration: line-through; }
+
+@media (max-width: 80rem) {
+  /* England first and whole: on a narrow window the two rails stack under the
+     map rather than squeezing it, because the map is what this page is. */
+  .rb-replay-body { grid-template-columns: 1fr; }
+  .rb-replay-main { order: -1; }
+  .rb-replay-rail, .rb-replay-side { max-height: none; }
+  .rb-england { grid-template-columns: 1fr; }
+}
+
+/* --- the replay's role rail ----------------------------------------------- */
+
+/* One column, not the lobby's auto-fill grid: this lives in a rail a quarter
+   of the screen wide, and sixteen names two-up there are unreadable. */
+.rb-replay-roles {
+  grid-template-columns: 1fr;
+  gap: 0.25rem;
+  margin-top: 0.5rem;
+}
+
+.rb-replay-roles .rb-role { padding: 0.35rem 0.6rem; cursor: pointer; }
+.rb-replay-roles .rb-role-name { font-size: 0.9rem; }
+
+/* Which sheet is open. A pressed toggle rather than a selected tab, because
+   clicking it again puts it away. */
+.rb-replay-roles [aria-pressed="true"] {
+  background: var(--rb-parchment);
+  border-color: var(--rb-blood);
+  box-shadow: inset 3px 0 0 var(--rb-blood);
+}
+
+.rb-replay-role-panel {
+  margin-top: 0.7rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--rb-rule);
+}
+
+.rb-replay-role-panel rb-private-sheet { max-width: none; }

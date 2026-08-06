@@ -1,0 +1,92 @@
+entities:
+  - component: replay-cursor
+    core:
+      status: implemented
+      confidence: confirmed
+      title: Replay Cursor
+      summary: >-
+        The game as it stood at any point in its own history. Snapshots the
+        state every N log entries and reaches any position by taking the
+        nearest snapshot at or before it and walking forward the remainder.
+      rationale:
+        - "Rebuilding from the seed answers the question once, which is the right shape for a host coming back from a crash. A scrub bar asks it several times a second, and a five-turn sixteen-player log replayed per frame is what makes a replay screen stutter."
+        - "The snapshots are the only thing it adds. Every state it hands out comes out of the reducer's own `step` — the same function `replay` folds over — so a scrubbed board and a rebuilt one cannot describe two different games. That matters more here than the speed does: a replay showing a subtly different game from the one that was played would be worse than no replay."
+        - "The snapshot interval is a performance dial and never a correctness one, which is asserted rather than assumed: the same positions are checked at four different intervals, so tuning it cannot rewrite history."
+        - Pure and DOM-free like the rest of the rules core, so the whole equivalence — stepping forward one at a time, jumping to the end, and replaying from the seed all agreeing — is a Node test rather than something asserted through a browser.
+    architecture:
+      kind: rules-derivation
+      authority: non-authoritative
+      reads:
+        - authoritative-game-state
+      depends_on:
+        - command-admission
+      must_not_depend_on:
+        - client-connection-manager
+        - host-peer-listener
+        - view-projector
+    implementation:
+      status: declared
+      paths:
+        - gui/rules/replay-cursor.js
+      symbols:
+        - ReplayCursor
+        - CHECKPOINT_EVERY
+      tests:
+        - npm test
+    evidence:
+      - kind: test
+        reference: tests/rules/replay-cursor.test.js
+        summary: >-
+          Every position of a log containing dice agrees with a replay from the
+          seed, forwards and backwards, at four snapshot intervals; a walk to
+          the end and a jump to the end land on the same board.
+
+  - component: replay-console
+    core:
+      status: implemented
+      confidence: confirmed
+      title: Replay Console
+      summary: >-
+        A page of its own that opens a save and walks its log action by action:
+        all three printed sheets up at once, the Aftermath counters moving with
+        the cursor, and the whole history listed beside them under the command
+        labels.
+      rationale:
+        - "The whole of England at once, rather than the console's one sheet at a time. During the game a player is deciding something about one corner of the country; afterwards the question is the opposite one — where did the war go — so the three sheets are up together and the map's own sheet row is off."
+        - "Nothing is redacted, because whoever opened the file already holds every secret in the game: the save *is* the secrets. Hiding one behind a page that could be handed the file instead would be theatre. The per-role sheets are the exception and are projected properly, for a different reason — a panel that invented its own summary of a role could disagree with the sheet that player was actually reading."
+        - It hosts nothing and connects to nothing. No peer, no clock, no commands; the only state it holds is where the cursor is, which is why it is a third runtime rather than the player console with the buttons taken off. What it borrows from the player console is the three view components and the data loader, not the transport underneath them — but the dependency is declared at entity granularity, so that is a fact about the page rather than a rule the model can hold it to.
+        - "It reuses the save-opening flow from the host rather than a second reader of the same format, so a file that opens in one opens in the other."
+        - The history list is built once and thereafter only has attributes flipped on it. Re-rendering a few thousand entries per step would hand back exactly the stutter the checkpointed cursor exists to prevent.
+        - "The role rail mounts one sheet at a time and rebuilds it on every move, rather than keeping sixteen and hiding fifteen. Two private sheets on screen at once is the one thing a sheet called private should never be, and building on demand makes that a property of the code rather than something it has to remember."
+      references:
+        - blank-until-it-differs
+    architecture:
+      kind: client-interface
+      authority: non-authoritative
+      reads:
+        - projected-facilitator-view
+      runs_in:
+        - replay-browser-runtime
+      depends_on:
+        - replay-cursor
+        - view-projector
+        - command-admission
+        - game-host
+        - player-console
+    implementation:
+      status: declared
+      paths:
+        - gui/client/replay-app.js
+      symbols:
+        - startReplayApp
+      tests:
+        - npm test
+    evidence:
+      - kind: test
+        reference: tests/components/replay.test.js
+        summary: >-
+          The page opens a stored save and an imported one, draws all three
+          sheets, moves the counters and the overlay in step with the cursor,
+          and reaches the same board by walking as by jumping. The role rail
+          lists the dealt roster, mounts exactly one private sheet, and redraws
+          it for the state wherever the cursor is.

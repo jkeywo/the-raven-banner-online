@@ -71,7 +71,7 @@ jobs:
           mkdir -p _site
           # The runtime, and nothing else. Anything not listed here is not
           # served, which is the point of publishing from a branch at all.
-          cp index.html host.html .nojekyll _site/
+          cp index.html host.html replay.html .nojekyll _site/
           cp -r gui data assets vendor _site/
           # A marker so a confusing bug report can be tied to a revision.
           printf '%s\n%s\n' "$GITHUB_SHA" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > _site/VERSION

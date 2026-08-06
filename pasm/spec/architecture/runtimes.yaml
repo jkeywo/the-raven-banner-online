@@ -27,3 +27,18 @@ entities:
     architecture:
       kind: runtime
       trust_boundary: client-to-host
+
+  - component: replay-browser-runtime
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Replay Browser Runtime
+      summary: >-
+        A browser tab opened on the replay page. Holds a save file and a cursor
+        into its log, and talks to nothing.
+      rationale:
+        - "Named as a third runtime rather than folded into the player's, because the two share no assumption worth sharing: this one has no peer, no clock, no seat and no commands, and it rebuilds state locally instead of being sent one."
+        - Offline in the strong sense — a save opened here needs neither the host nor the game to still exist, which is what makes it usable the week after.
+    architecture:
+      kind: runtime
+      trust_boundary: local-file

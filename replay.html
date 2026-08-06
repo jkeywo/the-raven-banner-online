@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Raven Banner — Replay</title>
+  <link rel="icon" href="favicon.ico">
+  <link rel="stylesheet" href="gui/console.css">
+  <!-- No PeerJS. Nothing on this page connects to anything: it reads a save
+       file and draws it. -->
+</head>
+<body class="rb-shell">
+  <header class="rb-bar">
+    <span class="rb-brand">The Raven Banner <span class="rb-tag">replay</span></span>
+  </header>
+
+  <main class="rb-main">
+    <!-- opening a game ----------------------------------------------------- -->
+    <section id="screen-open" class="rb-panel" hidden>
+      <h1>Watch a game back</h1>
+      <p class="rb-lede">
+        A save is the seed and every action taken, so the whole evening is
+        still in it. Open one and walk it.
+      </p>
+      <p id="open-error" class="rb-error" role="alert"></p>
+
+      <div id="resume" hidden>
+        <h2>Games on this machine</h2>
+        <ul id="resume-list" class="rb-resumes"></ul>
+      </div>
+
+      <h2>Or open a saved game</h2>
+      <p class="rb-meta">
+        The file a facilitator downloaded. It opens on any machine — nothing
+        here needs the game, or the host, to still exist.
+      </p>
+      <input id="import-file" type="file" accept="application/json,.json">
+    </section>
+
+    <!-- watching it -------------------------------------------------------- -->
+    <section id="screen-replay" class="rb-panel rb-replay" hidden>
+      <header class="rb-replay-head">
+        <h1>Game <span id="replay-code" class="rb-code"></span></h1>
+        <p id="replay-position" class="rb-meta"></p>
+        <p id="replay-warning" class="rb-error" role="alert" hidden></p>
+
+        <div class="rb-replay-controls">
+          <button id="to-start" type="button" aria-label="Back to the start">&#124;&laquo;</button>
+          <button id="skip-back" type="button" aria-label="Back ten actions">&laquo;</button>
+          <button id="step-back" type="button" aria-label="Back one action">&lsaquo;</button>
+          <input id="scrub" type="range" min="0" max="0" value="0" step="1"
+                 aria-label="How far through the game">
+          <button id="step-forward" type="button" aria-label="On one action">&rsaquo;</button>
+          <button id="skip-forward" type="button" aria-label="On ten actions">&raquo;</button>
+          <button id="to-end" type="button" aria-label="On to the end">&raquo;&#124;</button>
+          <button id="open-another" type="button" class="rb-replay-close">Open another game</button>
+        </div>
+      </header>
+
+      <div class="rb-replay-body">
+        <!-- what happened, in order, and which of it has happened yet -->
+        <aside class="rb-rail rb-replay-rail">
+          <h2>What happened</h2>
+          <p class="rb-meta">Click any action to stand just after it.</p>
+          <ol id="history" class="rb-replay-history"></ol>
+        </aside>
+
+        <!-- all three printed sheets together: the whole country at once -->
+        <div class="rb-replay-main">
+          <div id="england" class="rb-england"></div>
+        </div>
+
+        <aside class="rb-rail rb-replay-side">
+          <h2>England in the aftermath</h2>
+          <rb-aftermath id="aftermath"></rb-aftermath>
+
+          <!-- Their own sheet, not a summary of it. Whatever a role could see
+               at this point in the game is what they saw at this point in the
+               game, so nothing here can disagree with what was in front of
+               them at the table. -->
+          <h2>Who was playing</h2>
+          <p class="rb-meta">
+            Open anybody's own sheet, as it stood wherever the cursor is.
+          </p>
+          <div id="role-rail" class="rb-roles rb-replay-roles"></div>
+          <div id="role-panel" class="rb-replay-role-panel" hidden></div>
+        </aside>
+      </div>
+    </section>
+  </main>
+
+  <script type="module">
+    import { startReplayApp } from './gui/client/replay-app.js';
+    startReplayApp();
+  </script>
+</body>
+</html>

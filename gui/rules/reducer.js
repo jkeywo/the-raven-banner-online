@@ -65,6 +65,68 @@ export function apply(state, data, cmd, actor, meta = {}) {
 }
 
 /**
+ * The board a save opens on, before anybody in it did anything.
+ *
+ * Named rather than inlined because a replay is no longer the only thing that
+ * needs it: a scrub cursor starts here and rewinds to here, and a second
+ * reconstruction of the opening position is a second place for a short-handed
+ * roster to be got wrong.
+ *
+ * @returns {object}
+ */
+export function openingPosition(save, data, { roleIds } = {}) {
+  // The save's own roster wins over anything passed in: it is what the game
+  // was actually dealt, and a caller guessing at a head count is how a
+  // short-handed game comes back with a player who was never there.
+  return createInitialState({
+    joinCode: save.joinCode,
+    seed: save.seed,
+    data,
+    roleIds: save.roleIds ?? roleIds,
+  });
+}
+
+/**
+ * Re-apply one recorded entry.
+ *
+ * The single place a log entry turns back into a state change. A replay from
+ * the seed and a scrub that rewinds to a checkpoint therefore cannot
+ * reconstruct the actor differently between them, which would quietly show
+ * two different games from one history.
+ *
+ * A refusal returns the state with the seat in it rather than the state that
+ * arrived, because the seat is not part of what was refused.
+ *
+ * @returns {{state: object, ok: boolean, reason?: string}}
+ */
+export function step(state, data, entry) {
+  const actor = {
+    seatId: entry.seatId,
+    kind: entry.override ? 'facilitator' : 'player',
+    roleId: entry.roleId,
+  };
+  // A seat must exist for its commands to be admissible; the log records
+  // what a seat did, not that it existed, so recreate it on first sight.
+  const seated = state.seats[entry.seatId] ? state : {
+    ...state,
+    seats: {
+      ...state.seats,
+      [entry.seatId]: {
+        id: entry.seatId, token: null, name: null,
+        roleId: actor.kind === 'facilitator' ? null : entry.roleId,
+        kind: actor.kind, connected: false, lastSeen: entry.ts,
+      },
+    },
+  };
+
+  const result = apply(seated, data, { verb: entry.verb, payload: entry.payload }, actor,
+    { ts: entry.ts });
+  return result.ok
+    ? { state: result.state, ok: true }
+    : { state: seated, ok: false, reason: result.reason };
+}
+
+/**
  * Rebuild a game from its seed and its log.
  *
  * Every entry is re-admitted rather than trusted, so a tampered log fails
@@ -73,41 +135,13 @@ export function apply(state, data, cmd, actor, meta = {}) {
  * @returns {{state: object, refused: {seq: number, verb: string, reason: string}[]}}
  */
 export function replay(save, data, { roleIds } = {}) {
-  const { joinCode, seed, log } = save;
-  // The save's own roster wins over anything passed in: it is what the game
-  // was actually dealt, and a caller guessing at a head count is how a
-  // short-handed game comes back with a player who was never there.
-  let state = createInitialState({
-    joinCode, seed, data, roleIds: save.roleIds ?? roleIds,
-  });
+  let state = openingPosition(save, data, { roleIds });
   const refused = [];
 
-  for (const entry of log) {
-    const actor = {
-      seatId: entry.seatId,
-      kind: entry.override ? 'facilitator' : 'player',
-      roleId: entry.roleId,
-    };
-    // A seat must exist for its commands to be admissible; the log records
-    // what a seat did, not that it existed, so recreate it on first sight.
-    if (!state.seats[entry.seatId]) {
-      state = {
-        ...state,
-        seats: {
-          ...state.seats,
-          [entry.seatId]: {
-            id: entry.seatId, token: null, name: null,
-            roleId: actor.kind === 'facilitator' ? null : entry.roleId,
-            kind: actor.kind, connected: false, lastSeen: entry.ts,
-          },
-        },
-      };
-    }
-
-    const result = apply(state, data, { verb: entry.verb, payload: entry.payload }, actor,
-      { ts: entry.ts });
-    if (result.ok) state = result.state;
-    else refused.push({ seq: entry.seq, verb: entry.verb, reason: result.reason });
+  for (const entry of save.log) {
+    const result = step(state, data, entry);
+    state = result.state;
+    if (!result.ok) refused.push({ seq: entry.seq, verb: entry.verb, reason: result.reason });
   }
 
   return { state, refused };
