@@ -11,7 +11,7 @@
  * rather than guessing and being confidently wrong.
  */
 
-import { COMMANDS, subjectOf } from './commands.js';
+import { COMMANDS, subjectOf, probeFor } from './commands.js';
 
 /** @typedef {{seatId: string, kind: 'player'|'facilitator', roleId: string|null}} Actor */
 
@@ -71,12 +71,12 @@ export function availableTo(state, data, actor) {
         // direction, giving needs somebody to give to. Probing those with an
         // empty payload reports them refused for a reason about the message
         // rather than about the game, which reads to a player as "you can't"
-        // when the answer is "which?". So a command can describe a
-        // representative legal instance of itself, and the question this
-        // answers becomes "is there any way to do this at all?".
-        const probe = typeof spec.probe === 'function'
-          ? spec.probe(state, data, subject) : spec.probe;
-        verdict = admit(state, data, { verb, payload: probe ?? {} }, actor);
+        // when the answer is "which?". So every command can describe a
+        // representative legal instance of itself — usually the first thing
+        // its own chooser would offer — and the question this answers becomes
+        // "is there any way to do this at all?".
+        verdict = admit(state, data,
+          { verb, payload: probeFor(verb, state, data, subject) }, actor);
       } catch {
         return { verb, ok: false, reason: 'cannot tell from here', hostOnly: true };
       }

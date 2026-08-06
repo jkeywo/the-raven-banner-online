@@ -5,9 +5,8 @@ import { createInitialState } from '../../gui/rules/state.js';
 import { projectView } from '../../gui/rules/views.js';
 import { apply } from '../../gui/rules/reducer.js';
 import { admit } from '../../gui/rules/admission.js';
-import {
-  fieldsFor, payloadFrom, renderChooser, valuesFrom, shireTargetsFor,
-} from '../../gui/client/action-chooser.js';
+import { fieldsFor, payloadFrom, shireTargetsFor } from '../../gui/rules/commands.js';
+import { renderChooser, valuesFrom } from '../../gui/client/action-chooser.js';
 
 const data = await loadData();
 const FACILITATOR = { seatId: 's9', kind: 'facilitator', roleId: null };

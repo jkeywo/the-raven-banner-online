@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { loadData } from '../helpers/load-data.js';
 import { createInitialState, rosterFor } from '../../gui/rules/state.js';
 import { projectView } from '../../gui/rules/views.js';
-import { fieldsFor } from '../../gui/client/action-chooser.js';
+import { fieldsFor } from '../../gui/rules/commands.js';
 import '../../gui/components/rb-crown-panel.js';
 
 const data = await loadData();

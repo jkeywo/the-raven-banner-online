@@ -4,7 +4,7 @@ import { loadData } from '../helpers/load-data.js';
 import { createInitialState } from '../../gui/rules/state.js';
 import { apply } from '../../gui/rules/reducer.js';
 import { projectView } from '../../gui/rules/views.js';
-import { fieldsFor } from '../../gui/client/action-chooser.js';
+import { fieldsFor } from '../../gui/rules/commands.js';
 import '../../gui/components/rb-consent-panel.js';
 import '../../gui/components/rb-consent-queue.js';
 

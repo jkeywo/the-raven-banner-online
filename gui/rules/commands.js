@@ -5,6 +5,11 @@
  * is legal right now (`admit`), and what it does (`effects`). Nothing mutates
  * state anywhere else.
  *
+ * It also declares what it is called and what it still needs asking —
+ * `label`, `note` and `fields`. A verb is one idea, and a console that had to
+ * be told separately what to write on the button was a second, worse copy of
+ * that idea. See the presentation block above `COMMANDS`.
+ *
  * `admit` returns a reason, not a boolean, because the reason is the whole
  * value of enforcing rules for players: "you cannot afford that" against the
  * button they pressed beats a control that silently does nothing.
@@ -199,6 +204,23 @@ export function openRebellion(state, roleId, statuses = ['pending', 'priced']) {
 }
 
 /**
+ * What breaking with your liege would cost, in words, or nothing yet.
+ *
+ * The one note that cannot be written in advance: what a rebellion costs is a
+ * number the facilitator has only just set about this one rebellion, not a
+ * fact about the verb. Nothing to say falls back to the verb's own silence
+ * rather than to a sentence that would be wrong.
+ */
+function rebellionNote(state, roleId) {
+  const mine = openRebellion(state, roleId);
+  if (!mine) return undefined;
+  if (mine.status === 'pending') return 'Waiting on the facilitator to set a price.';
+  const { shires, soldiers } = mine.cost;
+  return `Costs ${shires} shire${shires === 1 ? '' : 's'} and `
+    + `${soldiers} soldier${soldiers === 1 ? '' : 's'}.`;
+}
+
+/**
  * Count an election, if it can be counted yet.
  *
  * Most votes wins and a tie fails, leaving the crown unworn to be contested
@@ -358,6 +380,66 @@ const dealingReason = (state, roleId, otherId) =>
     ? no('the Team Phase is your own team\'s — deal with them in the maintenance or encounter phase')
     : null);
 
+/*
+ * -----------------------------------------------------------------------------
+ * Presentation, and why it lives here.
+ *
+ * What a verb is called, the line under its button, and the questions it still
+ * needs answered are all declared on the spec beside the `admit` they have to
+ * agree with. They used to be three tables and a hand-written `probe` in two
+ * other files, and they drifted: a verb could be added to the registry and
+ * render as its own id at a player, or send an empty payload to a rule that
+ * needed one, without a single test going red.
+ *
+ * `fields` is plain data — `{name, label, kind, options, min, max, value}` —
+ * so this is still a pure rules module. The DOM that renders it stays in
+ * `gui/client/action-chooser.js`, and nothing here knows that file exists.
+ *
+ * A field's options are always ones the game currently allows, which is what
+ * lets `probe` be derived from them rather than written twice.
+ */
+
+/**
+ * @typedef {object} Field
+ * @property {string} name
+ * @property {string} label
+ * @property {'select'|'number'} kind
+ * @property {{value: string, label: string}[]} [options]
+ * @property {number} [min]
+ * @property {number} [max]
+ * @property {number} [value]
+ */
+
+const roleName = (data, roleId) => data.roles.roles[roleId]?.name ?? roleId;
+
+const shireName = (data, shireId) => data.shires.shires[shireId]?.name ?? shireId;
+
+/** A settlement as a dropdown should name it: its kind, and whether it is circled. */
+const settlementLabel = (settlement) => {
+  const kind = settlement.type[0].toUpperCase() + settlement.type.slice(1);
+  return settlement.defended ? `${kind} (defended)` : kind;
+};
+
+/** Everyone else who is in the game, or only those a filter keeps. */
+const others = (state, data, roleId, keep = () => true) =>
+  Object.values(state.roles ?? {})
+    .filter((role) => role.id !== roleId && keep(role))
+    .map((role) => ({ value: role.id, label: roleName(data, role.id) }));
+
+/** The shires this player stewards, as options. */
+const stewarded = (state, data, roleId) => Object.entries(state.shires ?? {})
+  .filter(([, shire]) => shire.stewardRoleId === roleId)
+  .map(([id]) => ({ value: id, label: shireName(data, id) }));
+
+/**
+ * Whether this character is one to strike a bargain with right now.
+ *
+ * The same question `dealingReason` answers for the reducer, asked the other
+ * way round: a dropdown offering a deal the rules would refuse is a dropdown
+ * offering a refusal.
+ */
+const dealable = (state, roleId, otherId) => !dealingReason(state, roleId, otherId);
+
 export const COMMANDS = {
   // --- lobby ---------------------------------------------------------------
   'claim-role': {
@@ -366,6 +448,7 @@ export const COMMANDS = {
     // only be joined before it starts is not one that survives a real evening.
     phases: '*',
     actor: 'player',
+    label: 'Take a character',
     // The one command a seat issues before it has a role, so it is exempt
     // from the check that a player command must have one.
     roleless: true,
@@ -397,14 +480,24 @@ export const COMMANDS = {
   'declare-initiative-target': {
     phases: ['team'],
     actor: 'player',
-    // A shire this holder could actually name, not simply the first one on the
-    // map. The probe answers "is there any declaration available at all?", and
-    // asking after an unreachable shire would answer "you cannot reach that
-    // shire" and grey the Target button out for everybody — the first shire in
-    // the map is almost never one the token holder can attack.
-    probe: (state, data, roleId) => ({
-      shireId: reachableFrom(state, data, roleId)[0] ?? Object.keys(state.shires)[0],
-    }),
+    // The map's Target button is how a token holder declares now, so nothing
+    // renders these — rb-action-list filters the verb out. They stay as the
+    // answer to `shireTargetsFor`, which is what would highlight the legal
+    // shires if the verb ever came back to the list, and they are the derived
+    // probe's answer to "is there any declaration available at all?".
+    //
+    // Reach-filtered for the same reason raid-settlement is: a player should
+    // not be invited to attack the other side of England, and a probe that
+    // asked after an unreachable shire would grey the Target button out for
+    // everybody — the first shire on the map is almost never one the token
+    // holder can attack.
+    fields: (state, data, roleId) => [{
+      name: 'shireId',
+      label: 'Attack',
+      kind: 'select',
+      options: reachableFrom(state, data, roleId)
+        .map((id) => ({ value: id, label: shireName(data, id) })),
+    }],
     admit(ctx) {
       const { state, data, cmd } = ctx;
       const roleId = subjectOf(ctx);
@@ -468,8 +561,19 @@ export const COMMANDS = {
   'swear-allegiance': {
     phases: ['team'],
     actor: 'player',
-    // Standing alone is always an option, so it answers the question.
-    probe: { liegeId: null },
+    label: 'Swear allegiance',
+    note: 'Their crowns then count as support for you.',
+    // Standing alone comes first, and is always available — which is what
+    // makes the derived probe answer "is there any homage to swear at all?"
+    // with a yes.
+    fields: (state, data, roleId) => [{
+      name: 'liegeId',
+      label: 'Follow',
+      kind: 'select',
+      options: [{ value: '', label: 'nobody — stand alone' }, ...others(state, data, roleId)],
+    }],
+    // An empty choice is standing alone, and the rules spell that null.
+    toPayload: (values) => ({ liegeId: values.liegeId || null }),
     admit(ctx) {
       const roleId = subjectOf(ctx);
       if (ctx.actor.kind !== 'facilitator' && !isDanish(ctx.state, ctx.data, roleId)) {
@@ -497,9 +601,17 @@ export const COMMANDS = {
   'request-allegiance': {
     phases: ['team'],
     actor: 'player',
-    probe: (state, data) => ({
-      liegeId: Object.keys(state.roles).find((id) => isDanish(state, data, id)),
-    }),
+    label: 'Ask to swear allegiance',
+    note: 'They must agree, and must wear a crown or be a Dane.',
+    fields: (state, data, roleId) => [{
+      name: 'liegeId',
+      label: 'Follow',
+      kind: 'select',
+      // Only people who could actually take you: a crowned Saxon, or a Dane.
+      options: others(state, data, roleId, (role) =>
+        Object.values(state.crownHolders ?? {}).includes(role.id)
+        || isDanish(state, data, role.id)),
+    }],
     admit(ctx) {
       const roleId = subjectOf(ctx);
       if (isDanish(ctx.state, ctx.data, roleId)) {
@@ -558,7 +670,27 @@ export const COMMANDS = {
   'claim-crown': {
     phases: ['team'],
     actor: 'player',
-    probe: (state, data, roleId) => ({ crown: state.roles[roleId]?.claims?.[0] }),
+    label: 'Claim a crown',
+    note: 'Every shire that supports it gets a say.',
+    fields: (state, data, roleId) => [{
+      name: 'crown',
+      label: 'Claim',
+      kind: 'select',
+      options: (state.roles[roleId]?.claims ?? [])
+        .filter((crown) => !state.crownHolders?.[crown])
+        .map((crown) => ({ value: crown, label: pretty(crown) })),
+    }],
+    // A crown he claims that nobody wears, and failing that one he claims at
+    // all. The first half is what the chooser offers, and is why a king with a
+    // second claim keeps the verb — asking after his first claim regardless
+    // usually asks after the crown already on his own head. The second half is
+    // for the king whose every claim is spoken for: "Wessex already has a
+    // king" is the truth, where an empty dropdown would have him told he has
+    // no claim, which is not.
+    probe: (state, data, roleId) => {
+      const claims = state.roles[roleId]?.claims ?? [];
+      return { crown: claims.find((crown) => !state.crownHolders?.[crown]) ?? claims[0] };
+    },
     admit(ctx) {
       const roleId = subjectOf(ctx);
       const { crown } = ctx.cmd.payload ?? {};
@@ -610,6 +742,7 @@ export const COMMANDS = {
   'cast-vote': {
     phases: '*',
     actor: 'player',
+    label: 'Cast your vote',
     admit(ctx) {
       const roleId = subjectOf(ctx);
       const vote = ctx.state.votes[ctx.cmd.payload?.voteId];
@@ -669,9 +802,17 @@ export const COMMANDS = {
   'request-rebel': {
     phases: ['team'],
     actor: 'player',
-    probe: (state, data, roleId) => ({
-      shireId: Object.keys(state.shires).find((id) => state.shires[id].stewardRoleId === roleId),
-    }),
+    label: 'Ask to rebel',
+    note: 'The facilitator sets the price. You get the final say once you see it.',
+    // Named up front, whatever it ends up costing — the facilitator has not
+    // priced it yet, so this is what you would offer if a shire is part of the
+    // bill. A landless rebel is asked nothing, which is also what `admit` says.
+    fields: (state, data, roleId) => {
+      const held = stewarded(state, data, roleId);
+      return held.length
+        ? [{ name: 'shireId', label: 'Offer', kind: 'select', options: held }]
+        : [];
+    },
     admit(ctx) {
       const roleId = subjectOf(ctx);
       if (isDanish(ctx.state, ctx.data, roleId)) {
@@ -741,6 +882,8 @@ export const COMMANDS = {
   'confirm-rebel': {
     phases: '*',
     actor: 'player',
+    label: 'Go through with it',
+    note: (state, data, roleId) => rebellionNote(state, roleId),
     admit(ctx) {
       const roleId = subjectOf(ctx);
       const request = openRebellion(ctx.state, roleId, ['priced']);
@@ -778,6 +921,8 @@ export const COMMANDS = {
   'cancel-rebel': {
     phases: '*',
     actor: 'player',
+    label: 'Call off your rebellion',
+    note: (state, data, roleId) => rebellionNote(state, roleId),
     admit(ctx) {
       const request = openRebellion(ctx.state, subjectOf(ctx));
       return request ? ok() : no('nothing to call off');
@@ -798,11 +943,19 @@ export const COMMANDS = {
   'transfer-stewardship': {
     phases: ['team'],
     actor: 'player',
-    // "Do I hold a shire, and is there anyone to hand it to?"
-    probe: (state, data, roleId) => ({
-      shireId: Object.keys(state.shires).find((id) => state.shires[id].stewardRoleId === roleId),
-      toRoleId: Object.keys(state.roles).find((id) => id !== roleId),
-    }),
+    label: 'Hand over a shire',
+    note: 'They collect its income, and must hold it.',
+    // "Do I hold a shire, and is there anyone to hand it to?" — which is what
+    // the derived probe asks, off the first of each list.
+    fields: (state, data, roleId) => [
+      {
+        name: 'shireId',
+        label: 'Which shire',
+        kind: 'select',
+        options: stewarded(state, data, roleId),
+      },
+      { name: 'toRoleId', label: 'To', kind: 'select', options: others(state, data, roleId) },
+    ],
     admit(ctx) {
       const roleId = subjectOf(ctx);
       const shire = ctx.state.shires[ctx.cmd.payload?.shireId];
@@ -838,7 +991,39 @@ export const COMMANDS = {
   give: {
     phases: TRADEABLE_PHASES,
     actor: 'player',
-    // "Is there anyone to give anything to, and anything to give?"
+    label: 'Give to another player',
+    note: 'Silver, food and ships only. Soldiers are yours alone.',
+    fields: (state, data, roleId) => [
+      {
+        name: 'toRoleId',
+        label: 'To',
+        kind: 'select',
+        // In the Team Phase a gift stays inside the team, so offering the
+        // rest of the table is offering a refusal.
+        options: others(state, data, roleId, (role) => dealable(state, roleId, role.id)),
+      },
+      {
+        name: 'what',
+        label: 'What',
+        kind: 'select',
+        // Only what they actually hold: offering to give away nothing is a
+        // way of finding out you have none, but a slow one.
+        options: TRADEABLE
+          .filter((what) => (state.roles[roleId]?.[what] ?? 0) > 0)
+          .map((what) => ({
+            value: what,
+            label: `${what} (you have ${state.roles[roleId][what]})`,
+          })),
+      },
+      { name: 'amount', label: 'How much', kind: 'number', min: 1, max: 99, value: 1 },
+    ],
+    // A form hands back strings, and the rules count with this one.
+    toPayload: (values) => ({ ...values, amount: Number(values.amount) }),
+    // "Is there anyone to give anything to, and anything to give?" — written
+    // out rather than derived, because the fields offer only people this phase
+    // allows a deal with. With nobody left the derived probe would report "no
+    // such character" where the true answer is that the Team Phase is the
+    // team's own, which is the sentence a player needs.
     probe: (state, data, roleId) => {
       const others = Object.keys(state.roles).filter((id) => id !== roleId);
       // A teammate first: in the Team Phase they are the only lawful answer,
@@ -881,6 +1066,24 @@ export const COMMANDS = {
   'collect-income': {
     phases: ['maintenance'],
     actor: 'player',
+    label: 'Collect income',
+    note: 'Momentum, then whatever your lands pay.',
+    // Only a pagan Dane is asked; everyone else just collects.
+    fields: (state, data, roleId) => (isPagan(state, data, roleId)
+      ? [{
+        name: 'upkeep',
+        label: 'Your followers',
+        kind: 'select',
+        options: [
+          { value: 'pay', label: 'Pay five silver for two soldiers' },
+          { value: 'lose', label: 'Lose a soldier' },
+        ],
+      }]
+      : []),
+    // Losing a soldier, not paying for two: both are offered because both are
+    // choices, but only one of them is always affordable, and a probe that
+    // asked after the five silver would grey the whole action out for the
+    // pagan Dane who most needs to collect.
     probe: { upkeep: 'lose' },
     admit(ctx) {
       const roleId = subjectOf(ctx);
@@ -937,6 +1140,8 @@ export const COMMANDS = {
   'recruit-soldiers': {
     phases: ['maintenance'],
     actor: 'player',
+    label: 'Recruit soldiers',
+    note: 'Five silver for one soldier.',
     admit(ctx) {
       // Not on the Danish Warrior sheet: their soldiers come from upkeep and
       // from home, not from a purse.
@@ -955,6 +1160,8 @@ export const COMMANDS = {
   'build-ship': {
     phases: ['maintenance'],
     actor: 'player',
+    label: 'Build a ship',
+    note: 'Only where there is a yard, if you are a Saxon.',
     admit(ctx) {
       const roleId = subjectOf(ctx);
       // Saxons can only build where there is a yard to build in. Danes brought
@@ -979,7 +1186,31 @@ export const COMMANDS = {
   reinforce: {
     phases: ['maintenance'],
     actor: 'player',
-    // "Is there a settlement anywhere I could circle?"
+    label: 'Reinforce a settlement',
+    note: 'One momentum. Circles a settlement so it must be stormed.',
+    // Shires whose settlements this player may circle, and which still have
+    // one left uncircled.
+    fields: (state, data, roleId) => [{
+      name: 'target',
+      label: 'Which settlement',
+      kind: 'select',
+      options: Object.entries(state.shires ?? {})
+        .flatMap(([shireId, shire]) => Object.values(shire.settlements ?? {})
+          .filter((s) => !s.defended && !s.destroyed && shire.stewardRoleId === roleId)
+          .map((s) => ({
+            value: `${shireId}|${s.id}`,
+            label: `${shireName(data, shireId)} — ${settlementLabel(s)}`,
+          }))),
+    }],
+    toPayload: (values) => {
+      const [shireId, settlementId] = String(values.target ?? '').split('|');
+      return { shireId, settlementId };
+    },
+    // "Is there a settlement anywhere I could circle?" — a wider question than
+    // the dropdown answers, because `canReinforceIn` also lets a priest circle
+    // where his cross stands and the dropdown only offers his own shires. A
+    // derived probe would grey the verb out for a priest whose only ground is
+    // a mission, which the rules plainly allow.
     probe: (state, data, roleId) => {
       for (const [shireId, shire] of Object.entries(state.shires)) {
         if (!canReinforceIn(state, data, roleId, shire)) continue;
@@ -1017,10 +1248,20 @@ export const COMMANDS = {
     // The market, not another player: the bank is shut during the Team Phase.
     phases: MARKET_PHASES,
     actor: 'player',
-    // What "could you trade at all?" means, for an action list asking without
-    // a player having chosen a direction yet. Selling food is the cheaper of
-    // the two, so it is the one that answers the question honestly.
-    probe: { give: 'food' },
+    label: 'Trade at market',
+    note: 'Three silver buys a food; a food sells for two silver.',
+    // Selling food first, and so the probe's answer to "could you trade at
+    // all?": it is the cheaper of the two, so it answers the question
+    // honestly for a player who has not chosen a direction yet.
+    fields: () => [{
+      name: 'give',
+      label: 'Which way',
+      kind: 'select',
+      options: [
+        { value: 'food', label: 'Sell a food for two silver' },
+        { value: 'silver', label: 'Buy a food for three silver' },
+      ],
+    }],
     admit(ctx) {
       const role = ctx.state.roles[subjectOf(ctx)];
       const limit = ctx.data.roles.roles[subjectOf(ctx)].archetype === 'danish_trader' ? 2 : 1;
@@ -1050,6 +1291,8 @@ export const COMMANDS = {
   'raise-christian-banners': {
     phases: ['maintenance'],
     actor: 'player',
+    label: 'Raise Christian banners',
+    note: 'Once a game. Soldiers equal to the turn.',
     admit(ctx) {
       const roleId = subjectOf(ctx);
       if (isDanish(ctx.state, ctx.data, roleId) && !ctx.state.roles[roleId].baptised) {
@@ -1073,9 +1316,26 @@ export const COMMANDS = {
   'defensive-fleet': {
     phases: ['maintenance'],
     actor: 'player',
-    probe: (state, data, roleId) => ({
-      shireId: Object.keys(state.shires).find((id) => state.shires[id].stewardRoleId === roleId),
-    }),
+    label: 'Station a defensive fleet',
+    note: 'Two ships. Makes the shire dearer to reach by sea.',
+    fields: (state, data, roleId) => [{
+      name: 'shireId',
+      label: 'Which shire',
+      kind: 'select',
+      // Coastal only: there is nothing to guard inland.
+      options: stewarded(state, data, roleId)
+        .filter(({ value }) => data.shires.shires[value]?.shipCost !== null),
+    }],
+    // A coastal shire he holds, and failing that any shire he holds — the same
+    // two halves as claim-crown, for the same two reasons. A steward of one
+    // inland shire and one coastal one had the verb greyed out over the inland
+    // one; a steward of nothing but inland shires should be told there is no
+    // coast to guard rather than that he holds no shire at all.
+    probe: (state, data, roleId) => {
+      const held = stewarded(state, data, roleId);
+      const coastal = held.find(({ value }) => data.shires.shires[value]?.shipCost !== null);
+      return { shireId: (coastal ?? held[0])?.value };
+    },
     admit(ctx) {
       const roleId = subjectOf(ctx);
       const shire = ctx.state.shires[ctx.cmd.payload?.shireId];
@@ -1097,13 +1357,24 @@ export const COMMANDS = {
   'rebuild-settlement': {
     phases: ['maintenance'],
     actor: 'player',
-    probe: (state, data, roleId) => {
-      for (const [shireId, shire] of Object.entries(state.shires)) {
-        if (shire.stewardRoleId !== roleId) continue;
-        const ruin = Object.values(shire.settlements).find((s) => s.destroyed);
-        if (ruin) return { shireId, settlementId: ruin.id };
-      }
-      return {};
+    label: 'Rebuild a settlement',
+    note: 'Six silver. It comes back undefended.',
+    fields: (state, data, roleId) => [{
+      name: 'target',
+      label: 'Which ruin',
+      kind: 'select',
+      options: Object.entries(state.shires ?? {})
+        .filter(([, shire]) => shire.stewardRoleId === roleId)
+        .flatMap(([shireId, shire]) => Object.values(shire.settlements ?? {})
+          .filter((s) => s.destroyed)
+          .map((s) => ({
+            value: `${shireId}|${s.id}`,
+            label: `${shireName(data, shireId)} — ${s.type}`,
+          }))),
+    }],
+    toPayload: (values) => {
+      const [shireId, settlementId] = String(values.target ?? '').split('|');
+      return { shireId, settlementId };
     },
     admit(ctx) {
       const roleId = subjectOf(ctx);
@@ -1146,9 +1417,24 @@ export const COMMANDS = {
   'request-settle': {
     phases: ['maintenance'],
     actor: 'player',
-    probe: (state, data, roleId) => ({
-      shireId: Object.keys(state.shires).find((id) => state.shires[id].stewardRoleId === roleId),
-    }),
+    label: 'Settle a shire',
+    note: 'Every neighbouring steward has to agree first.',
+    fields: (state, data, roleId) => [{
+      name: 'shireId',
+      label: 'Settle',
+      kind: 'select',
+      // Yours, and not already settled — asking twice about the same ground
+      // wastes everybody's evening.
+      options: stewarded(state, data, roleId)
+        .filter(({ value }) => !state.shires[value]?.danishSupport),
+    }],
+    // Same reason as missionary-expedition: with every held shire already
+    // settled the fields are empty, and "no such shire" is a worse answer
+    // than "you have already settled there".
+    probe: (state, data, roleId) => {
+      const held = stewarded(state, data, roleId).map(({ value }) => value);
+      return { shireId: held.find((id) => !state.shires[id]?.danishSupport) ?? held[0] };
+    },
     admit(ctx) {
       const roleId = subjectOf(ctx);
       if (!isDanish(ctx.state, ctx.data, roleId)) return no('only Danes settle');
@@ -1236,10 +1522,15 @@ export const COMMANDS = {
   'drive-out-missionaries': {
     phases: ['encounter'],
     actor: 'player',
-    probe: (state, data, roleId) => ({
-      shireId: Object.keys(state.shires).find(
-        (id) => state.shires[id].missionaryCross && state.shires[id].stewardRoleId === roleId),
-    }),
+    label: 'Drive out the missionaries',
+    note: 'One momentum. The cross comes down.',
+    fields: (state, data, roleId) => [{
+      name: 'shireId',
+      label: 'Which shire',
+      kind: 'select',
+      options: stewarded(state, data, roleId)
+        .filter(({ value }) => state.shires[value]?.missionaryCross),
+    }],
     admit(ctx) {
       const roleId = subjectOf(ctx);
       if (!isDanish(ctx.state, ctx.data, roleId)) return no('only Danes drive out missionaries');
@@ -1274,6 +1565,27 @@ export const COMMANDS = {
   'offer-contract': {
     phases: TRADEABLE_PHASES,
     actor: 'player',
+    label: 'Offer a trade contract',
+    note: 'A soldier each. Then two silver each, every turn.',
+    fields: (state, data, roleId) => {
+      const taken = new Set(Object.values(state.contracts ?? {})
+        .filter((c) => c.status === 'active' || c.status === 'offered')
+        .map((c) => c.shireId));
+      return [{
+        name: 'shireId',
+        label: 'Contract for',
+        kind: 'select',
+        options: (data.meta.tradeContractShires ?? [])
+          // A steward to sign it, and one the Team Phase would let her talk to.
+          .filter((id) => !taken.has(id) && state.shires?.[id]?.stewardRoleId
+            && dealable(state, roleId, state.shires[id].stewardRoleId))
+          .map((id) => ({
+            value: id,
+            label: `${shireName(data, id)} — ${
+              data.roles.roles[state.shires[id].stewardRoleId]?.name ?? 'its steward'}`,
+          })),
+      }];
+    },
     // A card she could actually lay down, first. Asking after the first
     // printed shire regardless would grey the whole verb out over a Mercian
     // she may not deal with this phase, or over a contract she has already
@@ -1337,6 +1649,36 @@ export const COMMANDS = {
   'answer-contract': {
     phases: TRADEABLE_PHASES,
     actor: 'player',
+    label: 'Answer a trade offer',
+    note: 'It costs you a soldier, and opens your port.',
+    fields: (state, data, roleId) => [
+      {
+        name: 'contractId',
+        label: 'Their offer',
+        kind: 'select',
+        options: Object.values(state.contracts ?? {})
+          // Answering is dealing, so an offer from across the lines is not
+          // his to answer until the room is back together.
+          .filter((c) => c.status === 'offered'
+            && state.shires?.[c.shireId]?.stewardRoleId === roleId
+            && dealable(state, roleId, c.traderRoleId))
+          .map((c) => ({
+            value: c.id,
+            label: `${shireName(data, c.shireId)} — from ${
+              data.roles.roles[c.traderRoleId]?.name ?? 'the trader'}`,
+          })),
+      },
+      {
+        name: 'accept',
+        label: 'Well?',
+        kind: 'select',
+        options: [
+          { value: 'yes', label: 'sign it — a soldier each' },
+          { value: '', label: 'no thank you' },
+        ],
+      },
+    ],
+    toPayload: (values) => ({ ...values, accept: values.accept === 'yes' }),
     // An offer on a shire this player stewards, so the action does not appear
     // on everybody's list refused for a reason about somebody else's deal —
     // and one whose trader is his to answer today, so an offer from across the
@@ -1401,11 +1743,18 @@ export const COMMANDS = {
   'cancel-contract': {
     phases: ['team'],
     actor: 'player',
-    probe: (state, data, roleId) => ({
-      contractId: state.contracts.find((c) => c.status === 'active'
-        && (c.traderRoleId === roleId
-          || state.shires[c.shireId]?.stewardRoleId === roleId))?.id,
-    }),
+    label: 'Cancel a trade contract',
+    note: 'Team Phase only. The ship value goes back up.',
+    fields: (state, data, roleId) => [{
+      name: 'contractId',
+      label: 'Tear up',
+      kind: 'select',
+      options: Object.values(state.contracts ?? {})
+        .filter((c) => c.status === 'active'
+          && (c.traderRoleId === roleId
+            || state.shires?.[c.shireId]?.stewardRoleId === roleId))
+        .map((c) => ({ value: c.id, label: shireName(data, c.shireId) })),
+    }],
     admit(ctx) {
       const roleId = subjectOf(ctx);
       const contract = findContract(ctx.state, ctx.cmd.payload?.contractId);
@@ -1435,9 +1784,26 @@ export const COMMANDS = {
   'missionary-expedition': {
     phases: ['maintenance'],
     actor: 'player',
-    probe: (state, data, roleId) => ({
-      shireId: Object.keys(state.shires).find((id) => isDanishHeld(state, data, id)),
-    }),
+    label: 'Send missionaries',
+    note: 'One momentum. The shire stops counting as pagan.',
+    fields: (state, data) => [{
+      name: 'shireId',
+      label: 'Which shire',
+      kind: 'select',
+      options: Object.keys(state.shires ?? {})
+        .filter((id) => isDanishHeld(state, data, id) && !state.shires[id].missionaryCross)
+        .map((id) => ({ value: id, label: shireName(data, id) })),
+    }],
+    // The fields offer only shires with no cross yet, so once every Danish
+    // shire is crossed they offer nothing and a derived probe would name no
+    // shire at all — earning "no such shire", which reads to a player as a
+    // broken app rather than as the game fact that the work is done. Falling
+    // back to a crossed one gets the true answer instead.
+    probe: (state, data) => {
+      const danish = Object.keys(state.shires ?? {})
+        .filter((id) => isDanishHeld(state, data, id));
+      return { shireId: danish.find((id) => !state.shires[id].missionaryCross) ?? danish[0] };
+    },
     admit(ctx) {
       const roleId = subjectOf(ctx);
       if (ctx.data.roles.roles[roleId]?.archetype !== 'saxon_priest') {
@@ -1467,10 +1833,14 @@ export const COMMANDS = {
   'rousing-sermon': {
     phases: ['encounter'],
     actor: 'player',
-    probe: (state, data, roleId) => ({
-      targetRoleId: Object.keys(state.roles).find(
-        (id) => id !== roleId && isChristian(state, data, id)),
-    }),
+    label: 'Preach a rousing sermon',
+    note: 'One momentum. They gain a soldier.',
+    fields: (state, data, roleId) => [{
+      name: 'targetRoleId',
+      label: 'Preach to',
+      kind: 'select',
+      options: others(state, data, roleId, (role) => isChristian(state, data, role.id)),
+    }],
     admit(ctx) {
       const roleId = subjectOf(ctx);
       if (ctx.data.roles.roles[roleId]?.archetype !== 'saxon_priest') {
@@ -1507,9 +1877,32 @@ export const COMMANDS = {
   baptise: {
     phases: ['encounter'],
     actor: 'player',
-    probe: (state, data, roleId) => ({
-      targetRoleId: Object.keys(state.roles).find((id) => isPagan(state, data, id)),
-    }),
+    label: 'Baptise a pagan',
+    note: 'Free, but they must agree. Ends their upkeep.',
+    fields: (state, data, roleId) => [
+      {
+        name: 'targetRoleId',
+        label: 'Baptise',
+        kind: 'select',
+        options: Object.keys(state.roles ?? {})
+          .filter((id) => isPagan(state, data, id))
+          .map((id) => ({ value: id, label: roleName(data, id) })),
+      },
+      // Not a formality. A conversion agreed out loud is the whole
+      // negotiation, and the app should never perform one without it — which
+      // is why "go and ask them" comes first and the derived probe therefore
+      // reports the verb refused until somebody has actually agreed.
+      {
+        name: 'willing',
+        label: 'Have they agreed?',
+        kind: 'select',
+        options: [
+          { value: '', label: 'not yet — go and ask them' },
+          { value: 'yes', label: 'yes, they are willing' },
+        ],
+      },
+    ],
+    toPayload: (values) => ({ ...values, willing: values.willing === 'yes' }),
     admit(ctx) {
       const roleId = subjectOf(ctx);
       if (ctx.data.roles.roles[roleId]?.archetype !== 'saxon_priest') {
@@ -1548,6 +1941,37 @@ export const COMMANDS = {
   'raid-settlement': {
     phases: ['encounter'],
     actor: 'player',
+    label: 'Raid a settlement',
+    note: 'Two momentum, and two soldiers if it is defended.',
+    // Only what the faction can actually reach, so a player is not invited
+    // to burn something on the other side of England. Defended settlements
+    // are offered too: burning one costs two soldiers on top and is often
+    // exactly what somebody wants to do.
+    fields: (state, data, roleId) => {
+      const reach = new Set(factionReach(state, data, state.roles?.[roleId]?.factionId));
+      return [{
+        name: 'target',
+        label: 'Which settlement',
+        kind: 'select',
+        options: Object.entries(state.shires ?? {})
+          .filter(([shireId]) => reach.has(shireId))
+          .flatMap(([shireId, shire]) => Object.values(shire.settlements ?? {})
+            .filter((s) => !s.destroyed)
+            .map((s) => ({
+              value: `${shireId}|${s.id}`,
+              label: `${shireName(data, shireId)} — ${settlementLabel(s)}`,
+            }))),
+      }];
+    },
+    toPayload: (values) => {
+      const [shireId, settlementId] = String(values.target ?? '').split('|');
+      return { shireId, settlementId };
+    },
+    // The cheapest raid there is, rather than the first the dropdown lists.
+    // A defended settlement costs two soldiers on top of the two momentum, so
+    // a probe that happened to land on one would answer "not enough soldiers"
+    // for a player who could perfectly well burn the undefended farm next
+    // door — which is a refusal about the wrong question.
     probe: (state, data, roleId) => {
       const role = state.roles[roleId];
       for (const shireId of factionReach(state, data, role?.factionId)) {
@@ -1605,9 +2029,15 @@ export const COMMANDS = {
   'send-envoy': {
     phases: ['encounter'],
     actor: 'player',
-    probe: (state, data, roleId) => ({
-      npcFaction: envoyRules(data, roleId)?.to?.[0],
-    }),
+    label: 'Send an envoy',
+    note: 'Buys a hearing, not a deal.',
+    fields: (state, data, roleId) => [{
+      name: 'npcFaction',
+      label: 'To',
+      kind: 'select',
+      options: (envoyRules(data, roleId)?.to ?? [])
+        .map((id) => ({ value: id, label: data.factions.npc[id]?.name ?? id })),
+    }],
     admit(ctx) {
       const roleId = subjectOf(ctx);
       const rules = envoyRules(ctx.data, roleId);
@@ -1792,7 +2222,15 @@ export const COMMANDS = {
   'use-mercenary': {
     phases: ['battle'],
     actor: 'player',
-    probe: (state) => ({ shireId: state.battle.targets[0] }),
+    label: 'Call in the mercenaries',
+    note: 'Once a game. Your side wins one more clash.',
+    fields: (state, data) => [{
+      name: 'shireId',
+      label: 'Which battle',
+      kind: 'select',
+      options: (state.battle?.targets ?? [])
+        .map((id) => ({ value: id, label: shireName(data, id) })),
+    }],
     admit(ctx) {
       const roleId = subjectOf(ctx);
       const role = ctx.state.roles[roleId];
@@ -2723,6 +3161,102 @@ export function shipPrice(state, data, roleId) {
   const built = state.roles[roleId].perTurn.shipsBuilt;
   if (isDanish(state, data, roleId)) return yard && built === 0 ? 2 : 3;
   return built === 0 ? 2 : 4;
+}
+
+/**
+ * What a verb is called, for the button that issues it.
+ *
+ * A verb nobody has named prints its own id, which is ugly enough that
+ * somebody notices — better than a blank button nobody can identify.
+ */
+export function labelFor(verb) {
+  return COMMANDS[verb]?.label ?? verb;
+}
+
+/**
+ * The line under the button, or nothing.
+ *
+ * A note may be a function of the game rather than a sentence, because a few
+ * of them are about a number somebody has only just set. See `rebellionNote`.
+ */
+export function noteFor(verb, state, data, roleId = state?.viewer?.roleId ?? null) {
+  const note = COMMANDS[verb]?.note;
+  return (typeof note === 'function' ? note(state, data, roleId) : note) ?? '';
+}
+
+/**
+ * What this action still needs answered, given the game as this player sees it.
+ *
+ * `roleId` defaults to the viewer of a projection: a client asking what its
+ * own player may choose is the common case, and a projection is state-shaped,
+ * so the same functions answer for the host — which passes the role it means.
+ *
+ * @returns {Field[]} empty when the action is just a button
+ */
+export function fieldsFor(verb, state, data, roleId = state?.viewer?.roleId ?? null) {
+  return COMMANDS[verb]?.fields?.(state, data, roleId) ?? [];
+}
+
+/**
+ * Turn a filled-in form into the payload the command expects.
+ *
+ * Most verbs want exactly what was chosen. The few that do not say so on their
+ * own spec, next to the fields whose values they are rewriting — a form hands
+ * back strings, and a settlement is chosen as one option but admitted as two
+ * keys.
+ */
+export function payloadFrom(verb, values) {
+  const spec = COMMANDS[verb];
+  return spec?.toPayload ? spec.toPayload(values) : values;
+}
+
+/**
+ * A representative legal instance of this command, for `availableTo`.
+ *
+ * Derived from the fields, because a field's options are by construction ones
+ * the game currently allows — so "is there any way to do this at all?" is
+ * answered off the same list the player would be picking from, and there is no
+ * second hand-written answer to drift away from it. It goes through
+ * `payloadFrom` for the same reason the form does: a probe the command's own
+ * `admit` would not recognise is worse than no probe at all.
+ *
+ * A spec may still write its own `probe` where the first option is not the
+ * representative one — where the cheapest instance is not the first, or where
+ * an empty dropdown should still be refused in the phase's own words rather
+ * than with "no such thing". Each of those says why where it is written.
+ */
+export function probeFor(verb, state, data, roleId) {
+  const spec = COMMANDS[verb];
+  if (!spec) return {};
+  if (spec.probe !== undefined) {
+    return (typeof spec.probe === 'function'
+      ? spec.probe(state, data, roleId) : spec.probe) ?? {};
+  }
+  const values = {};
+  for (const field of fieldsFor(verb, state, data, roleId)) {
+    values[field.name] = field.kind === 'number'
+      ? field.value ?? field.min ?? 1
+      : field.options?.[0]?.value;
+  }
+  return payloadFrom(verb, values);
+}
+
+/**
+ * The shires this action could land on, for pointing at them on the map.
+ *
+ * Reads the same options the chooser itself renders, so a highlighted shire
+ * can never disagree with what the dropdown actually offers — this has no
+ * knowledge of its own, only the fields' options split on `|` where a target
+ * names a settlement rather than a shire outright.
+ *
+ * @returns {string[]} shire ids, or empty for an action with no shire field
+ */
+export function shireTargetsFor(verb, state, data, roleId = state?.viewer?.roleId ?? null) {
+  const field = fieldsFor(verb, state, data, roleId)
+    .find((f) => f.name === 'shireId' || f.name === 'target');
+  if (!field) return [];
+  const ids = field.options.map((o) => String(o.value).split('|')[0]);
+  return [...new Set(ids.filter((id) => data.shires.shires[id]))];
 }
 
 /** Commands a role could issue in this phase, whether or not they can afford them. */

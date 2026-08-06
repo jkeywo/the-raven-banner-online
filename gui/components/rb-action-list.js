@@ -22,96 +22,7 @@
  */
 
 import { availableTo } from '../rules/admission.js';
-import { shireTargetsFor } from '../client/action-chooser.js';
-
-/** Player-facing names. The verb ids are for the wire, not for reading. */
-const LABELS = {
-  'claim-role': 'Take a character',
-  'swear-allegiance': 'Swear allegiance',
-  'transfer-stewardship': 'Hand over a shire',
-  'collect-income': 'Collect income',
-  'recruit-soldiers': 'Recruit soldiers',
-  'build-ship': 'Build a ship',
-  reinforce: 'Reinforce a settlement',
-  trade: 'Trade at market',
-  give: 'Give to another player',
-  'raid-settlement': 'Raid a settlement',
-  'raise-christian-banners': 'Raise Christian banners',
-  'defensive-fleet': 'Station a defensive fleet',
-  'rebuild-settlement': 'Rebuild a settlement',
-  'send-envoy': 'Send an envoy',
-  'missionary-expedition': 'Send missionaries',
-  'rousing-sermon': 'Preach a rousing sermon',
-  baptise: 'Baptise a pagan',
-  'request-settle': 'Settle a shire',
-  'drive-out-missionaries': 'Drive out the missionaries',
-  'offer-contract': 'Offer a trade contract',
-  'answer-contract': 'Answer a trade offer',
-  'cancel-contract': 'Cancel a trade contract',
-  'request-allegiance': 'Ask to swear allegiance',
-  'claim-crown': 'Claim a crown',
-  'cast-vote': 'Cast your vote',
-  'request-rebel': 'Ask to rebel',
-  'confirm-rebel': 'Go through with it',
-  'cancel-rebel': 'Call off your rebellion',
-  'use-mercenary': 'Call in the mercenaries',
-};
-
-const NOTES = {
-  'collect-income': 'Momentum, then whatever your lands pay.',
-  'recruit-soldiers': 'Five silver for one soldier.',
-  'build-ship': 'Only where there is a yard, if you are a Saxon.',
-  reinforce: 'One momentum. Circles a settlement so it must be stormed.',
-  trade: 'Three silver buys a food; a food sells for two silver.',
-  give: 'Silver, food and ships only. Soldiers are yours alone.',
-  'transfer-stewardship': 'They collect its income, and must hold it.',
-  'swear-allegiance': 'Their crowns then count as support for you.',
-  'raid-settlement': 'Two momentum, and two soldiers if it is defended.',
-  'raise-christian-banners': 'Once a game. Soldiers equal to the turn.',
-  'defensive-fleet': 'Two ships. Makes the shire dearer to reach by sea.',
-  'rebuild-settlement': 'Six silver. It comes back undefended.',
-  'send-envoy': 'Buys a hearing, not a deal.',
-  'missionary-expedition': 'One momentum. The shire stops counting as pagan.',
-  'rousing-sermon': 'One momentum. They gain a soldier.',
-  baptise: 'Free, but they must agree. Ends their upkeep.',
-  'request-settle': 'Every neighbouring steward has to agree first.',
-  'drive-out-missionaries': 'One momentum. The cross comes down.',
-  'offer-contract': 'A soldier each. Then two silver each, every turn.',
-  'answer-contract': 'It costs you a soldier, and opens your port.',
-  'cancel-contract': 'Team Phase only. The ship value goes back up.',
-  'request-allegiance': 'They must agree, and must wear a crown or be a Dane.',
-  'claim-crown': 'Every shire that supports it gets a say.',
-  'request-rebel': 'The facilitator sets the price. You get the final say once you see it.',
-  'use-mercenary': 'Once a game. Your side wins one more clash.',
-};
-
-/**
- * A few notes cannot be written in advance — what a rebellion actually costs
- * is a number the facilitator only just set, not a fact about the verb.
- * Falls through to the static NOTES above when there is nothing to compute.
- */
-function dynamicNote(verb, view) {
-  if (verb !== 'confirm-rebel' && verb !== 'cancel-rebel') return undefined;
-  const me = view.viewer?.roleId;
-  const mine = Object.values(view.rebellions ?? {})
-    .find((r) => r.roleId === me && (r.status === 'pending' || r.status === 'priced'));
-  if (!mine) return undefined;
-  if (mine.status === 'pending') return 'Waiting on the facilitator to set a price.';
-  const { shires, soldiers } = mine.cost;
-  return `Costs ${shires} shire${shires === 1 ? '' : 's'} and `
-    + `${soldiers} soldier${soldiers === 1 ? '' : 's'}.`;
-}
-
-/** Verbs that need the player to say more before they mean anything. */
-export const NEEDS_CHOICE = new Set([
-  'trade', 'give', 'reinforce', 'transfer-stewardship',
-  'swear-allegiance',
-  'raid-settlement', 'defensive-fleet', 'rebuild-settlement', 'send-envoy',
-  'missionary-expedition', 'rousing-sermon', 'baptise',
-  'request-settle', 'drive-out-missionaries',
-  'offer-contract', 'answer-contract', 'cancel-contract',
-  'request-allegiance', 'claim-crown', 'request-rebel', 'use-mercenary',
-]);
+import { fieldsFor, labelFor, noteFor, shireTargetsFor } from '../rules/commands.js';
 
 /**
  * Verbs a bespoke control already owns, so a generic row here would be a
@@ -169,14 +80,17 @@ export class RbActionList extends HTMLElement {
       .sort((a, b) => Number(relevant.has(b.verb)) - Number(relevant.has(a.verb)));
     const unavailable = actions.filter((a) => !a.ok);
 
+    // The ellipsis is a promise that clicking opens a form, so it is read off
+    // the same fields the form is built from rather than off a list kept here
+    // — a list which could, and did, disagree with what the chooser does.
     const row = (action) => `
       <li class="rb-action" data-ok="${action.ok}" data-relevant="${relevant.has(action.verb)}">
         <button type="button" data-verb="${action.verb}" ${action.ok ? '' : 'disabled'}>
-          ${LABELS[action.verb] ?? action.verb}${NEEDS_CHOICE.has(action.verb) ? '…' : ''}
+          ${labelFor(action.verb)}${
+  fieldsFor(action.verb, this._view, this._data).length ? '…' : ''}
         </button>
         <span class="rb-action-note">${
-  action.ok ? (dynamicNote(action.verb, this._view) ?? NOTES[action.verb] ?? '')
-    : escape(action.reason ?? '')}</span>
+  action.ok ? noteFor(action.verb, this._view, this._data) : escape(action.reason ?? '')}</span>
       </li>`;
 
     this.innerHTML = `
