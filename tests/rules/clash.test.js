@@ -8,7 +8,9 @@ import {
   createClash, advanceClash, amendLead, confirmLead, resolveClash,
   casualtiesFor, feed, battleScore, leadership,
 } from '../../gui/rules/clash.js';
-import { tally, settleBattle, pairSides } from '../../gui/rules/battle.js';
+import {
+  tally, settleBattle, pairSides, clashesIn, conqueringDeclaration,
+} from '../../gui/rules/battle.js';
 import { overrides } from '../../gui/rules/command-log.js';
 
 const data = await loadData();
@@ -268,6 +270,192 @@ describe('what a battle adds up to', () => {
     const result = tally(state, 'lindsey');
     expect(result.tokenChangesHands).toBe(true);
     expect(result.shireFalls).toBe(false);
+  });
+});
+
+describe('who takes a shire that falls', () => {
+  const HALFDAN = { seatId: 's1', kind: 'player', roleId: 'halfdan_ragnarsson' };
+  const UBBA = { seatId: 's2', kind: 'player', roleId: 'ubba_ragnarsson' };
+  const GAINBEALD = { seatId: 's3', kind: 'player', roleId: 'gainbeald' };
+  const FACILITATOR = { seatId: 's9', kind: 'facilitator', roleId: null };
+
+  const run = (state, actor, verb, payload = {}) => {
+    const result = apply(state, data, { verb, payload }, actor, { ts: 0 });
+    if (!result.ok) throw new Error(`${verb} refused: ${result.reason}`);
+    return result.state;
+  };
+  const refusal = (state, actor, verb, payload = {}) =>
+    admit(state, data, { verb, payload }, actor).reason;
+
+  /**
+   * Lindsey taken: two attackers, two castles, a clash won for each.
+   *
+   * Hand-built rather than driven through the dice, because what is under test
+   * is what happens after the fighting, and a seeded die that came up the
+   * wrong way would decide whether the test ran at all.
+   */
+  function taken({ castles = 2, declared, picks } = {}) {
+    const state = createInitialState({ joinCode: 'RAVEN7Z', seed: 1, data });
+    state.phase.name = 'battle';
+    state.shires.lindsey.castles = castles;
+    state.battle.targets = ['lindsey'];
+    state.battle.sides = {
+      lindsey: {
+        attackers: ['halfdan_ragnarsson', 'ubba_ragnarsson'],
+        defenders: ['gainbeald'],
+      },
+    };
+    state.initiative.declared = declared ?? {
+      white: { roleId: 'halfdan_ragnarsson', shireId: 'lindsey', revealed: true },
+    };
+    ['halfdan_ragnarsson', 'ubba_ragnarsson'].forEach((attacker, i) => {
+      const clash = createClash({
+        id: `lindsey:${i + 1}`,
+        shireId: 'lindsey',
+        attacker,
+        defender: i === 0 ? 'gainbeald' : null,
+      });
+      clash.stage = 'resolved';
+      clash.result = { winner: attacker };
+      state.battle.clashes[clash.id] = clash;
+    });
+    if (picks) state.battle.stewardPicks = picks;
+    return state;
+  }
+
+  it('is whoever the token holder named, ahead of the first attacker', () => {
+    // The default is "whoever the pairing happened to put first", which is an
+    // accident of the facilitator's clicking, not a decision anybody made.
+    const state = taken();
+    expect(clashesIn(state, 'lindsey')[0].attacker).toBe('halfdan_ragnarsson');
+
+    const after = run(state, HALFDAN, 'name-new-steward',
+      { shireId: 'lindsey', stewardRoleId: 'ubba_ragnarsson' });
+    settleBattle(after, data, 'lindsey');
+    expect(after.shires.lindsey.stewardRoleId).toBe('ubba_ragnarsson');
+    expect(after.shires.lindsey.factionId).toBe(after.roles.ubba_ragnarsson.factionId);
+  });
+
+  it('beats a taker the facilitator handed in by hand', () => {
+    // The whole point of the command: the umpire facilitates the choice, they
+    // do not make it. `newSteward` survives as the last resort for a shire
+    // whose holder has left the table, and it loses to a holder who has not.
+    const state = taken({ picks: { lindsey: 'ubba_ragnarsson' } });
+    settleBattle(state, data, 'lindsey', { newSteward: 'halfdan_ragnarsson' });
+    expect(state.shires.lindsey.stewardRoleId).toBe('ubba_ragnarsson');
+  });
+
+  it('falls back to the first attacker when nobody named anybody', () => {
+    const state = taken();
+    settleBattle(state, data, 'lindsey');
+    expect(state.shires.lindsey.stewardRoleId).toBe('halfdan_ragnarsson');
+  });
+
+  it('is not for a player whose token declared nothing there', () => {
+    const state = taken();
+    expect(refusal(state, UBBA, 'name-new-steward',
+      { shireId: 'lindsey', stewardRoleId: 'ubba_ragnarsson' }))
+      .toBe('only the holder whose token declared that attack names its steward');
+    // Nor for the defender, who has just lost it.
+    expect(refusal(state, GAINBEALD, 'name-new-steward',
+      { shireId: 'lindsey', stewardRoleId: 'ubba_ragnarsson' }))
+      .toBe('only the holder whose token declared that attack names its steward');
+  });
+
+  it('waits until the shire has actually fallen', () => {
+    const unfinished = taken();
+    unfinished.battle.clashes['lindsey:2'].stage = 'rolling';
+    unfinished.battle.clashes['lindsey:2'].result = null;
+    expect(refusal(unfinished, HALFDAN, 'name-new-steward',
+      { shireId: 'lindsey', stewardRoleId: 'ubba_ragnarsson' })).toBe('the fighting is not over');
+
+    // Fought to the end and held: there is nothing to give away.
+    const held = taken({ castles: 3 });
+    expect(refusal(held, HALFDAN, 'name-new-steward',
+      { shireId: 'lindsey', stewardRoleId: 'ubba_ragnarsson' })).toBe('the shire held');
+  });
+
+  it('names somebody who was actually there', () => {
+    const state = taken();
+    expect(refusal(state, HALFDAN, 'name-new-steward',
+      { shireId: 'lindsey', stewardRoleId: 'gainbeald' })).toBe('name somebody who attacked it');
+    expect(refusal(state, HALFDAN, 'name-new-steward',
+      { shireId: 'lindsey', stewardRoleId: 'nobody_at_all' })).toBe('no such role in this game');
+  });
+
+  it('is changeable right up until the facilitator settles', () => {
+    // The same bargain a tactic card gets: the commitment is the settling.
+    let state = taken();
+    state = run(state, HALFDAN, 'name-new-steward',
+      { shireId: 'lindsey', stewardRoleId: 'ubba_ragnarsson' });
+    state = run(state, HALFDAN, 'name-new-steward',
+      { shireId: 'lindsey', stewardRoleId: 'halfdan_ragnarsson' });
+    state = run(state, FACILITATOR, 'facilitator:settle-battle', { shireId: 'lindsey' });
+    expect(state.shires.lindsey.stewardRoleId).toBe('halfdan_ragnarsson');
+  });
+
+  it('goes with the battle when the phase ends', () => {
+    // Turn-scoped for free: a pick is about a battle on the board, and
+    // end-battles clears the board.
+    let state = run(taken(), HALFDAN, 'name-new-steward',
+      { shireId: 'lindsey', stewardRoleId: 'ubba_ragnarsson' });
+    state = run(state, FACILITATOR, 'facilitator:end-battles', {});
+    expect(state.battle.stewardPicks).toEqual({});
+  });
+
+  it('survives a replay, because it went through the reducer like everything else', () => {
+    let state = taken();
+    state = run(state, HALFDAN, 'name-new-steward',
+      { shireId: 'lindsey', stewardRoleId: 'ubba_ragnarsson' });
+    state = run(state, FACILITATOR, 'facilitator:settle-battle', { shireId: 'lindsey' });
+    expect(overrides(state.log).map((e) => e.verb)).not.toContain('name-new-steward');
+    expect(state.log.at(-2)).toMatchObject({
+      verb: 'name-new-steward', roleId: 'halfdan_ragnarsson',
+    });
+  });
+
+  describe('when two tokens declared the same shire', () => {
+    // Announce refuses while two live tokens name Lindsey, so this state
+    // never reaches a battle by the ordinary route — but it exists during the
+    // team phase, and can still arrive by a raw facilitator:set or an old
+    // save. So the tie-break is written down rather than left to whichever
+    // declaration happened to be recorded first.
+    const bothAtLindsey = (order) => Object.fromEntries(order.map((token) => [token, {
+      roleId: token === 'white' ? 'halfdan_ragnarsson' : 'ubba_ragnarsson',
+      shireId: 'lindsey',
+      revealed: true,
+    }]));
+
+    it('answers with the earlier token, whichever was written down first', () => {
+      for (const order of [['white', 'black'], ['black', 'white']]) {
+        const state = taken({ declared: bothAtLindsey(order) });
+        expect(conqueringDeclaration(state, 'lindsey'))
+          .toEqual({ token: 'white', roleId: 'halfdan_ragnarsson' });
+      }
+    });
+
+    it('lets only that holder name the steward', () => {
+      const state = taken({ declared: bothAtLindsey(['black', 'white']) });
+      expect(refusal(state, UBBA, 'name-new-steward',
+        { shireId: 'lindsey', stewardRoleId: 'ubba_ragnarsson' }))
+        .toBe('only the holder whose token declared that attack names its steward');
+      const after = run(state, HALFDAN, 'name-new-steward',
+        { shireId: 'lindsey', stewardRoleId: 'ubba_ragnarsson' });
+      expect(after.battle.stewardPicks.lindsey).toBe('ubba_ragnarsson');
+    });
+
+    it('moves the same token it let name the steward', () => {
+      // One declaration owns the battle. A defender who won twice takes the
+      // white token because white is who the steward pick answered to, rather
+      // than the two questions being settled by two different declarations.
+      const state = taken({ castles: 3, declared: bothAtLindsey(['black', 'white']) });
+      for (const clash of Object.values(state.battle.clashes)) {
+        clash.result = { winner: 'gainbeald' };
+      }
+      settleBattle(state, data, 'lindsey');
+      expect(state.initiative.white).toBe('gainbeald');
+      expect(state.initiative.black).toBe('guthrum_the_old');
+    });
   });
 });
 

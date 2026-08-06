@@ -48,6 +48,47 @@ import { TOKENS } from './state.js';
  */
 export const battleNoteKey = (turn, what) => `initiative:t${turn}:${what}`;
 
+/**
+ * The declaration a battle over this shire is being fought under, or null.
+ *
+ * Three things need to know it: which token passes to a defender who won
+ * twice, whether that token can actually move, and — now — who is entitled to
+ * name the shire's new steward. They must agree, so they ask here.
+ *
+ * **Two tokens may not end up attacking one shire.**
+ * `facilitator:announce-targets` refuses while any pair does, and asks the
+ * lower one's holder to name somewhere else. It is settled there rather than
+ * when a player declares, because until the targets are announced a
+ * declaration is its team's own business: refusing a player for colliding
+ * would tell them exactly which shire another team had secretly chosen.
+ *
+ * So a collision cannot survive into a battle — but it exists before one, and
+ * this function is read during the team phase too. It can also arrive by
+ * routes announce never sees: a raw `facilitator:set`, or a save written
+ * before the rule. Every reader used to settle that with
+ * `Object.entries(...).find(...)`, which answers with whichever declaration
+ * was written first: an order that depends on the sequence commands arrived
+ * in, differs between a live game and a replay of a re-ordered log, and was
+ * never chosen by anybody.
+ *
+ * So it is `TOKENS` order — white, then black, then bonus — the order the
+ * printed sheets name them in, and the same order announce enforces. White and
+ * black are the two counters the game starts with; the bonus is the temporary
+ * one handed to whoever sat the turn out, and it should not outrank a token
+ * somebody has held all game.
+ *
+ * @returns {{token: string, roleId: string|null}|null}
+ */
+export function conqueringDeclaration(state, shireId) {
+  for (const token of TOKENS) {
+    const declaration = state.initiative?.declared?.[token];
+    if (declaration && declaration.shireId === shireId) {
+      return { token, roleId: declaration.roleId ?? null };
+    }
+  }
+  return null;
+}
+
 /** How many defended settlements a shire currently has. */
 export function defendedSettlements(state, shireId) {
   return Object.values(state.shires[shireId]?.settlements ?? {})
@@ -210,11 +251,10 @@ export function heldBackToken(state, shireId) {
   if (!result.resolved || !result.tokenChangesHands || !steward) return null;
 
   // Whichever token was used to declare this attack is the one that would pass.
-  const used = Object.entries(state.initiative.declared ?? {})
-    .find(([, declaration]) => declaration.shireId === shireId);
+  const used = conqueringDeclaration(state, shireId);
   if (!used) return null;
 
-  const [token] = used;
+  const { token } = used;
   const alsoHolds = TOKENS.find((other) => other !== token
     && state.initiative[other] === steward);
   if (!alsoHolds) return null;
@@ -230,6 +270,13 @@ export function heldBackToken(state, shireId) {
  * is what exists. Returns what it did, so the log and the console can say —
  * including `tokenHeldBack`, because `tokenChangesHands` is what the tally
  * says should happen and is not always what did.
+ *
+ * @param {object} [options]
+ * @param {string|null} [options.newSteward] a taker named by whoever is
+ *   calling, which loses to the conqueror's own pick. It is the facilitator's
+ *   last resort — for a shire whose token holder has left the table — not
+ *   their choice: `<rb-facilitator-grid>` stopped offering the dropdown when
+ *   `name-new-steward` gave the holder the decision.
  */
 export function settleBattle(draft, data, shireId, { newSteward = null } = {}) {
   const result = tally(draft, shireId);
@@ -243,8 +290,13 @@ export function settleBattle(draft, data, shireId, { newSteward = null } = {}) {
 
   if (result.shireFalls) {
     // The token holder names who takes it — often not themselves, which is how
-    // a faction rewards whoever actually did the fighting.
-    const taker = newSteward ?? clashesIn(draft, shireId)[0]?.attacker ?? null;
+    // a faction rewards whoever actually did the fighting. Three answers in
+    // order of authority: what the conqueror actually said, then whatever the
+    // caller was told by hand, then the plain default. The holder's pick comes
+    // first because it is the only one of the three that is a decision — the
+    // other two are a stand-in for one nobody made.
+    const taker = draft.battle.stewardPicks?.[shireId]
+      ?? newSteward ?? clashesIn(draft, shireId)[0]?.attacker ?? null;
     if (taker) {
       shire.stewardRoleId = taker;
       shire.factionId = draft.roles[taker]?.factionId ?? null;
@@ -261,10 +313,11 @@ export function settleBattle(draft, data, shireId, { newSteward = null } = {}) {
   // question against the same board and says so itself, so there is no second
   // copy of the answer to go stale while the facilitator fixes it.
   if (result.tokenChangesHands && defendingSteward && !heldBack) {
-    // Whichever token was used to declare this attack passes to the defender.
-    const used = Object.entries(draft.initiative.declared)
-      .find(([, declaration]) => declaration.shireId === shireId);
-    if (used) draft.initiative[used[0]] = defendingSteward;
+    // Whichever token was used to declare this attack passes to the defender —
+    // the same declaration `heldBackToken` just asked about, and the same one
+    // that named the steward, because there is one answer to that question.
+    const used = conqueringDeclaration(draft, shireId);
+    if (used) draft.initiative[used.token] = defendingSteward;
   }
 
   return {

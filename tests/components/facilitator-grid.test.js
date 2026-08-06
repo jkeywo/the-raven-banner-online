@@ -314,6 +314,15 @@ describe('<rb-facilitator-grid> says what the rules could not do for themselves'
     expect(grid.querySelector('[data-token-held-back="lindsey"]')).toBeNull();
   });
 
+  it('says nothing about a steward for a shire that held', () => {
+    const grid = mount();
+    grid.data = data;
+    grid.state = heldAtLindsey();
+
+    expect(grid.querySelector('[data-steward-waiting="lindsey"]')).toBeNull();
+    expect(grid.querySelector('[data-steward-pick="lindsey"]')).toBeNull();
+  });
+
   it('says when ending the battles handed no spare token out', () => {
     // The button promises to hand one out, so a phase that could not has to
     // look different from a phase that did.
@@ -323,5 +332,91 @@ describe('<rb-facilitator-grid> says what the rules could not do for themselves'
 
     expect(grid.querySelector('[data-initiative-note="spare"]')?.textContent)
       .toContain('No spare initiative token was handed out');
+  });
+});
+
+describe('<rb-facilitator-grid> facilitates the steward rather than choosing one', () => {
+  /**
+   * Lindsey taken: Ubba walked in unopposed and Halfdan won the one clash
+   * there was, which is two wins against two castles.
+   *
+   * Ubba's clash is written first on purpose, so the man who would inherit the
+   * shire by default is somebody other than the token holder — otherwise the
+   * line about who settling would hand it to says the same name twice and
+   * proves nothing.
+   */
+  function takenAtLindsey() {
+    const state = run(atBattle(), 'facilitator:announce-targets');
+    state.shires.lindsey.castles = 2;
+    state.battle.sides = {
+      lindsey: {
+        attackers: ['ubba_ragnarsson', 'halfdan_ragnarsson'],
+        defenders: ['gainbeald'],
+      },
+    };
+    for (const [i, attacker] of ['ubba_ragnarsson', 'halfdan_ragnarsson'].entries()) {
+      const clash = createClash({
+        id: `lindsey:${i + 1}`,
+        shireId: 'lindsey',
+        attacker,
+        defender: i === 0 ? null : 'gainbeald',
+      });
+      clash.stage = 'resolved';
+      clash.result = { winner: attacker };
+      state.battle.clashes[clash.id] = clash;
+    }
+    return state;
+  }
+
+  it('offers no dropdown of its own to pick a new steward from', () => {
+    // The umpire used to make the most political decision of the battle phase
+    // out of a list of attackers, which is not theirs to make.
+    const grid = mount();
+    grid.data = data;
+    grid.state = takenAtLindsey();
+
+    expect(grid.querySelector('[data-steward]')).toBeNull();
+    expect(grid.querySelector('.rb-settle select')).toBeNull();
+  });
+
+  it('says it is waiting on the holder, and what settling anyway would do', () => {
+    const grid = mount();
+    grid.data = data;
+    grid.state = takenAtLindsey();
+
+    const line = grid.querySelector('[data-steward-waiting="lindsey"]')?.textContent;
+    expect(line).toContain('Waiting on Halfdan Ragnarsson');
+    expect(line).toContain('hands it to Ubba Ragnarsson');
+    expect(grid.querySelector('[data-steward-pick="lindsey"]')).toBeNull();
+  });
+
+  it('reads back the holder\'s pick once it lands', () => {
+    const grid = mount();
+    grid.data = data;
+    grid.state = run(takenAtLindsey(), 'name-new-steward',
+      { shireId: 'lindsey', stewardRoleId: 'halfdan_ragnarsson' }, as('halfdan_ragnarsson'));
+
+    expect(grid.querySelector('[data-steward-pick="lindsey"]')?.textContent)
+      .toBe('Halfdan Ragnarsson named Halfdan Ragnarsson to take it.');
+    expect(grid.querySelector('[data-steward-waiting="lindsey"]')).toBeNull();
+  });
+
+  it('settles without naming anybody, because it is not the umpire\'s to name', () => {
+    const grid = mount();
+    grid.data = data;
+    const state = run(takenAtLindsey(), 'name-new-steward',
+      { shireId: 'lindsey', stewardRoleId: 'halfdan_ragnarsson' }, as('halfdan_ragnarsson'));
+    grid.state = state;
+
+    let raised = null;
+    grid.addEventListener('rb-facilitate', (event) => { raised = event.detail; });
+    grid.querySelector('[data-settle="lindsey"]').click();
+
+    expect(raised).toEqual({
+      verb: 'facilitator:settle-battle', payload: { shireId: 'lindsey' },
+    });
+    // And pressing it does what the line above it said it would.
+    expect(run(state, raised.verb, raised.payload).shires.lindsey.stewardRoleId)
+      .toBe('halfdan_ragnarsson');
   });
 });

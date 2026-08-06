@@ -65,6 +65,16 @@ function loadedState() {
     },
   };
 
+  // Mercenary cards already handed in. Public, because spending the card is a
+  // public act — and populated here at all because the completeness check only
+  // sees a path once something is actually stored at it, so an empty
+  // `mercenaries: {}` in a fresh game hid this one from the manifest for a
+  // while.
+  state.battle.mercenaries = { essex: { attackers: 1, defenders: 0 } };
+  // Alfred's black token declared Lindsey, so the pick about Lindsey is his,
+  // and Wessex's — the same scope the declaration that won it has.
+  state.battle.stewardPicks = { lindsey: 'SECRET::battle.stewardPick.lindsey' };
+
   state.envoys = {
     e1: { roleId: 'king_alfred', npcFaction: 'franks', open: true,
       messages: ['SECRET::envoy.alfred.message'] },
@@ -120,13 +130,15 @@ describe('no sentinel reaches a seat the manifest does not grant it', () => {
 
   /** Exactly what each seat is entitled to. Everything else is a leak. */
   const OWN = {
-    // His envoy thread with the Franks, and nothing else in the fixture.
-    alfred: ['SECRET::envoy.alfred.message'],
+    // His envoy thread with the Franks, and the steward he named for the
+    // shire his own token took.
+    alfred: ['SECRET::envoy.alfred.message', 'SECRET::battle.stewardPick.lindsey'],
     // His own tactic card, his own die, and his team's target before it is
     // announced.
     guthrum: ['SECRET::clash.c1.tactic.guthrum', 'SECRET::clash.c2.roll.guthrum',
       'SECRET::initiative.white.target'],
-    cenred: [],
+    // Alfred's team-mate, so Alfred's steward pick and nothing else.
+    cenred: ['SECRET::battle.stewardPick.lindsey'],
     spectator: [],
   };
 
@@ -141,7 +153,8 @@ describe('no sentinel reaches a seat the manifest does not grant it', () => {
     // anything from them would only make adjudication harder.
     const json = JSON.stringify(projectView(state, data, { kind: 'facilitator' }));
     for (const secret of ['SECRET::clash.c1.tactic.guthrum', 'SECRET::facilitatorNotes.plan',
-      'SECRET::battleNotes.spare', 'SECRET::initiative.white.target', 'SECRET::log.entry']) {
+      'SECRET::battleNotes.spare', 'SECRET::initiative.white.target',
+      'SECRET::battle.stewardPick.lindsey', 'SECRET::log.entry']) {
       expect(json).toContain(secret);
     }
   });
@@ -207,6 +220,36 @@ describe('the specific things the game keeps quiet', () => {
     expect(view('cenred').initiative.declared.white).toBeUndefined();
     // Alfred's is already announced, so it is everybody's business.
     expect(view('guthrum').initiative.declared.black.shireId).toBe('lindsey');
+  });
+
+  it('scopes a conqueror\'s steward pick the way the declaration that won it is scoped', () => {
+    // The same person, at the same table, about the same shire. Alfred's black
+    // token declared Lindsey, so the pick is his and his team's; Guthrum, who
+    // declared somewhere else entirely, has no business in it.
+    expect(view('alfred').battle.stewardPicks.lindsey)
+      .toBe('SECRET::battle.stewardPick.lindsey');
+    expect(view('cenred').battle.stewardPicks.lindsey)
+      .toBe('SECRET::battle.stewardPick.lindsey');
+    expect(view('guthrum').battle.stewardPicks).toBeUndefined();
+  });
+
+  it('gives nobody the pick once the declaration behind it is gone', () => {
+    // Fails closed rather than open: with nothing naming Lindsey there is no
+    // owner to compare a viewer against, so the pick reaches only the
+    // facilitator — who can still see it and settle by hand.
+    const orphaned = loadedState();
+    orphaned.initiative.declared = {};
+    for (const who of ['alfred', 'cenred', 'guthrum']) {
+      expect(JSON.stringify(projectView(orphaned, data, VIEWERS[who])), who)
+        .not.toContain('SECRET::battle.stewardPick.lindsey');
+    }
+  });
+
+  it('shows a spent mercenary card to everybody, unlike an unspent one', () => {
+    // `roles.*.mercenary` is the card in your hand; this is the counter on the
+    // table once it has bought a clash nobody fought.
+    expect(view('cenred').battle.mercenaries.essex).toEqual({ attackers: 1, defenders: 0 });
+    expect(view('spectator').battle.mercenaries.essex.attackers).toBe(1);
   });
 
   it('never sends a seat token to a player, in a value or in a key', () => {

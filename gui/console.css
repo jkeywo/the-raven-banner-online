@@ -807,15 +807,26 @@ rb-clash-panel { display: block; }
 
 .rb-battles { display: grid; gap: 0.8rem; margin-bottom: 1.5rem; }
 
-.rb-battle, .rb-clash, .rb-other-clashes, .rb-battle-block {
+.rb-battle, .rb-clash, .rb-other-clashes, .rb-battle-block, .rb-steward {
   background: var(--rb-parchment);
   border: 1px solid var(--rb-rule);
   border-radius: 3px;
   padding: 0.9rem 1.1rem;
 }
 
-.rb-battle h3, .rb-clash h3, .rb-battle-block h3 { margin-top: 0; }
-.rb-side-buttons, .rb-lead-buttons { display: flex; gap: 0.5rem; margin-top: 0.6rem; }
+.rb-battle h3, .rb-clash h3, .rb-battle-block h3, .rb-steward h3 { margin-top: 0; }
+.rb-side-buttons, .rb-lead-buttons, .rb-steward-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+
+.rb-steward-buttons button.is-chosen {
+  background: var(--rb-blood);
+  border-color: var(--rb-blood);
+  color: #fff;
+}
 
 .rb-prompt { font-family: var(--rb-serif); font-size: 1.05rem; }
 
@@ -896,9 +907,11 @@ rb-clash-panel { display: block; }
 .rb-clash-row[data-stage="rolling"] { border-color: var(--rb-blood); }
 .rb-clash-row[data-stage="resolved"] { opacity: 0.65; }
 
-.rb-settle { display: flex; gap: 0.6rem; align-items: flex-end; margin-top: 0.6rem; }
-.rb-settle label { display: grid; gap: 0.2rem; }
-.rb-settle select { font: inherit; padding: 0.35rem; border: 1px solid var(--rb-rule); border-radius: 3px; }
+/* Two lines the facilitator has to read before pressing the button — a token
+   that will not move, and who the conqueror named — then the button. They get
+   a row each rather than being squeezed alongside it. */
+.rb-settle { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: flex-end; margin-top: 0.6rem; }
+.rb-settle > p { flex-basis: 100%; margin: 0; }
 
 #tab-battle[data-live="true"],
 #facilitator-tabs [data-live="true"] { border-color: var(--rb-blood); font-weight: 600; }

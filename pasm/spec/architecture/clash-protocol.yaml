@@ -13,8 +13,10 @@ entities:
         - The machine advances only inside the reducer. The amendment window's expiry is dispatched as a command rather than handled by a UI timer, so it appears in the log and replays identically.
         - Extra attackers with no opponent are seeded as already-resolved automatic wins at pairing time, so shire capture is one uniform tally rather than a special case.
         - "Each combatant throws their own die: rolls revealed is the stage the machine reaches the instant the second one lands, and it passes straight through it to resolved, so both the two-player path and a facilitator forcing a stalled clash forward reach the settlement through the same function."
+        - "Who takes a fallen shire is the token holder's to say, not the umpire's: settleBattle reads the holder's own pick before it reaches for the caller's argument or the first attacker in pairing order."
       references:
         - lead-the-charge-ratchet
+        - conquering-declaration-tie-break
     game_design:
       participating_roles:
         - attacking-combatant
@@ -36,6 +38,7 @@ entities:
         - tally
         - settleBattle
         - heldBackToken
+        - conqueringDeclaration
       tests:
         - npm test
     evidence:
@@ -93,6 +96,60 @@ entities:
         summary: >-
           One fighter hung back, the other led, and the first was offered
           "join the charge" with no way back out.
+
+  - decision: conquering-declaration-tie-break
+    core:
+      status: implemented
+      confidence: confirmed
+      title: One Declaration Owns A Battle, Chosen In Token Order
+      summary: >-
+        When more than one initiative token has declared the same shire, the
+        earliest in white-black-bonus order is the declaration the battle is
+        fought under — it takes the token a twice-winning defender seizes, and
+        its holder is the one who names the new steward.
+      rationale:
+        - "Announce refuses while two live tokens name one shire, so a collision never reaches a battle. It still exists before one — this is read during the team phase too — and can arrive by routes announce never sees: a raw facilitator:set, or a save written before the rule."
+        - "The collision is caught at announce rather than when a player declares, and the placement is the point: until targets are announced a declaration is its team's own business, so refusing a player for colliding would tell them which shire another team had secretly chosen. Announce is where declarations become public anyway, and where the facilitator — who can already see all three — is the one able to ask the loser to name somewhere else."
+        - Every reader used to settle it with a first-match scan over the declarations, which answers with whichever was recorded first — an order that depends on the sequence commands arrived in and that nobody chose.
+        - White and black are the counters the game starts with and the bonus is the temporary one handed to whoever sat the turn out, so the bonus should not outrank a token somebody has held all game.
+        - "The alternative considered was letting any declarer name the steward with last write winning. It was rejected twice over: a shire's fate would turn on who clicked last, and the visibility manifest names one owning role per path, so a pick with two owners could not be scoped at all."
+      assumptions:
+        - A declaration left behind by a token nobody holds is not a live claim. Announce ignores it, because blocking on it would point the facilitator at a retarget control that itself refuses "nobody holds that token".
+    implementation:
+      status: declared
+      paths:
+        - gui/rules/battle.js
+      symbols:
+        - conqueringDeclaration
+      tests:
+        - npm test
+    evidence:
+      - kind: test
+        reference: tests/rules/clash.test.js
+        summary: >-
+          White and black both declare Lindsey, written down in either order.
+          The answer is white both times, only white's holder may name the
+          steward, and white is the token that moves when the defence holds.
+
+  - message: name-new-steward-command
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Name New Steward
+      summary: The initiative token holder's choice of who takes a shire their attack has brought down, changeable until the facilitator settles it.
+      rationale:
+        - The spoils belong to whoever spent the token. The facilitator used to pick from a dropdown of attackers, which quietly moved the most political decision of the battle phase off the table it belongs on.
+        - Admitted only after the shire has actually fallen, because until the last clash is read there is nothing to give away, and only for somebody who attacked it, because a shire goes to somebody who was there for it.
+    architecture:
+      authority: request
+      producer:
+        - client-command-gateway
+      consumer:
+        - command-admission
+      validator:
+        - command-admission
+      trust_boundary: client-to-host
+      payload: shire-and-steward
 
   - message: submit-tactic-command
     core:

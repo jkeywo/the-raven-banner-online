@@ -119,3 +119,96 @@ describe('<rb-clash-panel> at the dice', () => {
     expect(panel.querySelector('[data-roll]')).toBeNull();
   });
 });
+
+describe('<rb-clash-panel> when the shire has fallen', () => {
+  /**
+   * Lindsey taken, with a second attacker to give away to.
+   *
+   * The clashes are written resolved rather than thrown for, because whether
+   * the shire falls is the premise of every test below and a seeded die is not
+   * a premise. Everything before that — the phase, the announcement, who is on
+   * which side — is the real reducer's doing.
+   */
+  function takenLindsey() {
+    const game = atTheDice();
+    const state = game.state;
+    state.shires.lindsey.castles = 2;
+    state.battle.sides.lindsey.attackers.push('ubba_ragnarsson');
+    const clashId = Object.keys(state.battle.clashes)[0];
+    state.battle.clashes[clashId].stage = 'resolved';
+    state.battle.clashes[clashId].result = { winner: 'halfdan_ragnarsson' };
+    state.battle.clashes['lindsey:2'] = {
+      id: 'lindsey:2', shireId: 'lindsey', stage: 'resolved', auto: true,
+      attacker: 'ubba_ragnarsson', defender: null,
+      tactic: {}, lead: {}, reinforcements: {}, rolls: {}, scouts: [],
+      result: { winner: 'ubba_ragnarsson', unopposed: true }, amendWindowEndsAt: null,
+    };
+    return game;
+  }
+
+  it('offers the conqueror the men who fought for it', () => {
+    const game = takenLindsey();
+    const panel = mount(seenBy(game.state, 'halfdan_ragnarsson'));
+
+    const offered = [...panel.querySelectorAll('[data-name-steward]')]
+      .map((button) => button.dataset.nameSteward);
+    expect(offered).toEqual(['halfdan_ragnarsson', 'ubba_ragnarsson']);
+    expect(panel.querySelector('[data-spoils="lindsey"]').textContent)
+      .toContain('is yours to give');
+  });
+
+  it('sends the pick as the holder\'s own command, not the facilitator\'s', () => {
+    const game = takenLindsey();
+    const panel = mount(seenBy(game.state, 'halfdan_ragnarsson'));
+
+    let raised = null;
+    panel.addEventListener('rb-command', (event) => { raised = event.detail; });
+    panel.querySelector('[data-name-steward="ubba_ragnarsson"]').click();
+
+    expect(raised).toEqual({
+      verb: 'name-new-steward',
+      payload: { shireId: 'lindsey', stewardRoleId: 'ubba_ragnarsson' },
+    });
+    // And the host takes it, which is the half a raised event cannot prove.
+    game.step('name-new-steward', raised.payload, HALFDAN);
+    expect(game.state.battle.stewardPicks.lindsey).toBe('ubba_ragnarsson');
+  });
+
+  it('marks the man already named, and says it can still change', () => {
+    const game = takenLindsey();
+    game.step('name-new-steward',
+      { shireId: 'lindsey', stewardRoleId: 'ubba_ragnarsson' }, HALFDAN);
+    const panel = mount(seenBy(game.state, 'halfdan_ragnarsson'));
+
+    expect(panel.querySelector('[data-name-steward="ubba_ragnarsson"]').className)
+      .toContain('is-chosen');
+    expect(panel.querySelector('[data-name-steward="halfdan_ragnarsson"]').className)
+      .not.toContain('is-chosen');
+    expect(panel.textContent).toContain('You may still change it');
+  });
+
+  it('offers nothing to a player whose token took nothing', () => {
+    // Gainbeald just lost the shire, and no control on his screen invites him
+    // to say who gets it. Nor is anybody else's pick in his copy of the game
+    // to draw one from.
+    const game = takenLindsey();
+    game.step('name-new-steward',
+      { shireId: 'lindsey', stewardRoleId: 'ubba_ragnarsson' }, HALFDAN);
+    const view = seenBy(game.state, 'gainbeald');
+    const panel = mount(view);
+
+    expect(panel.querySelector('[data-name-steward]')).toBeNull();
+    expect(panel.querySelector('[data-spoils]')).toBeNull();
+    expect(view.battle.stewardPicks).toBeUndefined();
+  });
+
+  it('offers nothing while the fighting is still going on', () => {
+    // The panel and the reducer read the same board through the same
+    // functions, so a control cannot appear before the command would take it.
+    const game = atTheDice();
+    game.state.shires.lindsey.castles = 2;
+    const panel = mount(seenBy(game.state, 'halfdan_ragnarsson'));
+
+    expect(panel.querySelector('[data-spoils]')).toBeNull();
+  });
+});

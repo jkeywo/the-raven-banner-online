@@ -452,3 +452,109 @@ describe('the spare-token note is written down because nothing could derive it',
     expect(after.facilitatorNotes).toEqual({});
   });
 });
+
+
+describe('two tokens cannot end up attacking one shire', () => {
+  /** Turn two, with black moved onto a Saxon whose reach overlaps Halfdan's. */
+  function contested() {
+    let state = turnTwo();
+    state = run(state, FACILITATOR, 'facilitator:assign-initiative',
+      { token: 'black', roleId: null });
+    state = run(state, FACILITATOR, 'facilitator:assign-initiative',
+      { token: 'black', roleId: 'gainbeald' });
+    // Both can march on Lindsey, which is what makes a collision possible at
+    // all — the two Danish holders the game starts with cannot reach one
+    // another's ground.
+    expect(reachableFrom(state, data, 'halfdan_ragnarsson')).toContain('lindsey');
+    expect(reachableFrom(state, data, 'gainbeald')).toContain('lindsey');
+    return state;
+  }
+
+  /** Both tokens named Lindsey, and the phase has rolled on to the battle. */
+  function bothOnLindsey() {
+    let state = contested();
+    state = run(state, as('gainbeald'), 'declare-initiative-target', { shireId: 'lindsey' });
+    state = run(state, as('halfdan_ragnarsson'), 'declare-initiative-target',
+      { shireId: 'lindsey' });
+    return run(state, FACILITATOR, 'facilitator:advance-phase');   // team -> battle
+  }
+
+  it('lets a player name a shire another token has secretly named', () => {
+    // The refusal belongs at announce, not here. Refusing a player for
+    // colliding would answer "has anyone secretly named this?" for anyone
+    // willing to try every shire in their reach — a phase before that is
+    // anybody's business, and free, because a declaration can be rewritten.
+    let state = contested();
+    state = run(state, as('halfdan_ragnarsson'), 'declare-initiative-target',
+      { shireId: 'lindsey' });
+    expect(admit(state, data, {
+      verb: 'declare-initiative-target', payload: { shireId: 'lindsey' },
+    }, as('gainbeald')).ok).toBe(true);
+  });
+
+  it('refuses to announce while two tokens are on one shire, naming who yields', () => {
+    const state = bothOnLindsey();
+    const reason = refusal(state, FACILITATOR, 'facilitator:announce-targets');
+    expect(reason).toContain('white');
+    expect(reason).toContain('black');
+    expect(reason).toContain('Lindsey');
+    expect(reason).toContain('white token takes it');
+  });
+
+  it('announces once the loser has named somewhere else', () => {
+    let state = bothOnLindsey();
+    // The facilitator can move it themselves rather than wait, which is the
+    // same control the grid already offers.
+    state = run(state, FACILITATOR, 'facilitator:set-initiative-target',
+      { token: 'black', shireId: 'north_mercia' });
+    state = run(state, FACILITATOR, 'facilitator:announce-targets');
+    expect(state.battle.targets.sort()).toEqual(['lindsey', 'north_mercia']);
+  });
+
+  it('does not care which of the two was declared first', () => {
+    let state = contested();
+    state = run(state, as('halfdan_ragnarsson'), 'declare-initiative-target',
+      { shireId: 'lindsey' });
+    state = run(state, as('gainbeald'), 'declare-initiative-target', { shireId: 'lindsey' });
+    state = run(state, FACILITATOR, 'facilitator:advance-phase');
+    expect(refusal(state, FACILITATOR, 'facilitator:announce-targets'))
+      .toContain('white token takes it');
+  });
+
+  it('ignores a declaration left behind by a token nobody holds', () => {
+    // Taking a token off its holder leaves its declaration standing — the
+    // grid labels that orphan. Blocking announce on it would point the
+    // facilitator at a retarget control that refuses "nobody holds that
+    // token", so it is not treated as a live claim.
+    let state = bothOnLindsey();
+    state = run(state, FACILITATOR, 'facilitator:assign-initiative',
+      { token: 'black', roleId: null });
+    expect(state.initiative.declared.black.shireId).toBe('lindsey');
+    expect(admit(state, data, { verb: 'facilitator:announce-targets', payload: {} },
+      FACILITATOR).ok).toBe(true);
+  });
+
+  it('leaves one answer to "which token took this shire?" once announced', () => {
+    // The whole reason for the rule: the token handover and the conqueror's
+    // steward pick both read that question, and two answers would split one
+    // battle between two owners.
+    let state = bothOnLindsey();
+    state = run(state, FACILITATOR, 'facilitator:set-initiative-target',
+      { token: 'black', shireId: 'north_mercia' });
+    state = run(state, FACILITATOR, 'facilitator:announce-targets');
+    const naming = Object.entries(state.initiative.declared)
+      .filter(([, d]) => d.shireId === 'lindsey');
+    expect(naming).toHaveLength(1);
+    expect(naming[0][0]).toBe('white');
+  });
+});
+
+describe('turn one never seeds two tokens onto one shire', () => {
+  it('names a different shire for each fixed target', () => {
+    // The one write path to initiative.declared with no collision check, and
+    // it comes from generated data — so the guard belongs here rather than in
+    // a rule nobody would think to run.
+    const fixed = Object.values(data.meta.fixedFirstTargets ?? {});
+    expect(new Set(fixed).size).toBe(fixed.length);
+  });
+});

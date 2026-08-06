@@ -12,7 +12,9 @@
  * travels the same pipeline as everything else, so it is in the log.
  */
 
-import { battleNoteKey, heldBackToken } from '../rules/battle.js';
+import {
+  battleNoteKey, heldBackToken, tally, clashesIn, conqueringDeclaration,
+} from '../rules/battle.js';
 import { TOKENS } from '../rules/state.js';
 
 const STAGE_LABEL = {
@@ -78,6 +80,38 @@ export class RbFacilitatorGrid extends HTMLElement {
       + `the ${held.alsoHolds} token, so the ${held.token} token stays with `
       + `${this._name(held.stays)}. Move a counter by hand if it should change hands.`;
     return `<p class="rb-meta rb-warn" data-token-held-back="${shireId}">${escape(line)}</p>`;
+  }
+
+  /**
+   * Who the conqueror named to take the shire, or that nobody has yet.
+   *
+   * This used to be a dropdown of attackers with the facilitator's hand on it,
+   * which made the most political decision of the battle phase the umpire's to
+   * make. It is the token holder's — `name-new-steward` — so what is left here
+   * is a read-out, and the facilitator's job is to wait for it and then press
+   * the button, which is what they do in the room.
+   *
+   * Waiting is said out loud rather than left as a blank, and it names what
+   * settling anyway would do, because "Settle the shire" is a button that
+   * moves a shire either way and a facilitator is entitled to know which way
+   * before they press it.
+   */
+  _stewardPick(state, shireId) {
+    // Nothing to name if the shire held: the pick is about who takes it.
+    if (!tally(state, shireId).shireFalls) return '';
+
+    const named = state.battle.stewardPicks?.[shireId] ?? null;
+    if (named) {
+      const by = conqueringDeclaration(state, shireId)?.roleId ?? null;
+      return `<p class="rb-meta" data-steward-pick="${shireId}">${escape(
+        `${this._name(by)} named ${this._name(named)} to take it.`)}</p>`;
+    }
+
+    const holder = conqueringDeclaration(state, shireId)?.roleId ?? null;
+    const fallback = clashesIn(state, shireId)[0]?.attacker ?? null;
+    const line = `Waiting on ${this._name(holder)} to name the new steward. `
+      + `Settling now hands it to ${this._name(fallback)}, who was simply paired first.`;
+    return `<p class="rb-meta rb-warn" data-steward-waiting="${shireId}">${escape(line)}</p>`;
   }
 
   /**
@@ -220,11 +254,7 @@ export class RbFacilitatorGrid extends HTMLElement {
         ${allDone ? `
           <div class="rb-settle">
             ${this._heldBack(state, shireId)}
-            <label>New steward if it falls
-              <select data-steward="${shireId}">
-                ${sides.attackers.map((r) => `<option value="${r}">${this._name(r)}</option>`).join('')}
-              </select>
-            </label>
+            ${this._stewardPick(state, shireId)}
             <button type="button" data-settle="${shireId}" class="rb-primary">Settle the shire</button>
           </div>` : ''}
       </section>`;
@@ -259,11 +289,11 @@ export class RbFacilitatorGrid extends HTMLElement {
       button.onclick = () => this._emit('facilitator:resolve-clash', { clashId: button.dataset.resolve });
     }
     for (const button of this.querySelectorAll('[data-settle]')) {
-      const shireId = button.dataset.settle;
-      button.onclick = () => this._emit('facilitator:settle-battle', {
-        shireId,
-        newSteward: this.querySelector(`[data-steward="${shireId}"]`)?.value ?? null,
-      });
+      // No `newSteward`: the conqueror names their own, and settleBattle reads
+      // the pick before it reaches for anything else. Sending one from here
+      // would be the free choice this console gave up.
+      button.onclick = () => this._emit('facilitator:settle-battle',
+        { shireId: button.dataset.settle });
     }
   }
 }

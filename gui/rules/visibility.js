@@ -17,6 +17,7 @@
  */
 
 import { STAGES, stageAtLeast } from './clash.js';
+import { conqueringDeclaration } from './battle.js';
 
 /** Everyone at the table. */
 export const PUBLIC = 'public';
@@ -136,7 +137,29 @@ export const FIELD_VISIBILITY = [
   { path: 'battle.sides.**', audience: PUBLIC },
   { path: 'battle.spare.**', audience: PUBLIC },
   { path: 'battle.scouts.**', audience: PUBLIC },
+  // A mercenary card is a secret while it is in your hand and a counter on the
+  // table once it is spent — `roles.*.mercenary` holds the first half, this
+  // holds the second. Public because handing it in is a public act: it buys
+  // the attackers or the defenders a clash nobody fought, and a battle whose
+  // count nobody could check would be a battle nobody could argue about.
+  { path: 'battle.mercenaries.**', audience: PUBLIC },
   { path: 'battle.pairingComplete', audience: PUBLIC },
+  // Who the conqueror named to take a fallen shire, before the facilitator
+  // settles it. Scoped exactly like the declaration that won it — the same
+  // person, at the same table, about the same shire — because scoping the two
+  // halves of one team-table decision differently would be arbitrary, and
+  // because a team-mate about to be handed a shire should see it coming.
+  //
+  // No `revealWhen`. The only thing one could open is a fact `shires.**`
+  // already publishes the instant it matters: settling writes the taker into
+  // `shire.stewardRoleId`, which is public to everybody. A reveal condition
+  // here would be a second statement of the same truth, with a second way to
+  // be wrong, guarding a window that closes on its own.
+  {
+    path: 'battle.stewardPicks.*',
+    audience: TEAM,
+    owner: (segments, state) => conqueringDeclaration(state, segments[2])?.roleId ?? null,
+  },
   { path: 'battle.clashes.*.id', audience: PUBLIC },
   { path: 'battle.clashes.*.shireId', audience: PUBLIC },
   { path: 'battle.clashes.*.stage', audience: PUBLIC },

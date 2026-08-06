@@ -462,3 +462,23 @@ entities:
         - facilitator
       reveal_conditions:
         - battle-phase-begun
+
+  - information: conquered-shire-steward-pick
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Conquered Shire Steward Pick
+      summary: Who the initiative token holder named to take a shire their attack has just brought down, before the facilitator settles it.
+      rationale:
+        - Scoped exactly like the declaration that won the shire, because it is the same person at the same table deciding about the same ground, and splitting the two halves of one team-table decision across two audiences would be arbitrary.
+        - "No reveal condition: settling writes the taker into the shire, which is public to everybody, so the only window this covers is the one that closes on its own. A reveal condition here would be a second statement of a truth the board already publishes."
+      references:
+        - conquering-declaration-tie-break
+    game_design:
+      visibility: team-visible
+      enforcement_links:
+        - view-projector
+      permitted_viewers:
+        - owning-player
+        - same-team-player
+        - facilitator

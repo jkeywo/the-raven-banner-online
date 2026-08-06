@@ -113,6 +113,13 @@ export const NEEDS_CHOICE = new Set([
   'request-allegiance', 'claim-crown', 'request-rebel', 'use-mercenary',
 ]);
 
+/**
+ * Verbs a bespoke control already owns, so a generic row here would be a
+ * second, worse way to do the same thing — and, unlabelled, would print its
+ * own verb at the player.
+ */
+const ELSEWHERE = new Set(['claim-role', 'declare-initiative-target', 'name-new-steward']);
+
 export class RbActionList extends HTMLElement {
   set data(value) { this._data = value; this._render(); }
 
@@ -137,7 +144,10 @@ export class RbActionList extends HTMLElement {
       // Declaring an initiative target has its own control now — click the
       // shire on the map, then Target — rather than a dropdown here that
       // offered every shire in England regardless of the one just clicked.
-      .filter((action) => action.verb !== 'claim-role' && action.verb !== 'declare-initiative-target');
+      // Naming the steward of a shire you have taken is the same story: the
+      // clash panel draws it beside the battle it is about, where the names on
+      // the buttons are the people who actually fought.
+      .filter((action) => !ELSEWHERE.has(action.verb));
 
     if (!actions.length) {
       this.innerHTML = `<p class="rb-empty">Nothing to do in the

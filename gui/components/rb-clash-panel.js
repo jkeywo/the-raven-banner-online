@@ -10,6 +10,8 @@
  * enforced by this file behaving itself.
  */
 
+import { tally, conqueringDeclaration } from '../rules/battle.js';
+
 const CARD_ORDER = ['A', '2', '3', '4', '5'];
 
 const STAGE_PROMPT = {
@@ -60,9 +62,52 @@ export class RbClashPanel extends HTMLElement {
     this.innerHTML = `
       ${this._battles(targets, me)}
       ${mine ? this._clash(mine, me) : ''}
-      ${this._otherClashes(mine, me)}`;
+      ${this._otherClashes(mine, me)}
+      ${this._spoils(targets, me)}`;
 
     this._wire();
+  }
+
+  /**
+   * A shire your token has just taken, and who you are giving it to.
+   *
+   * Only the holder whose token declared the attack sees this, and only once
+   * the shire has actually fallen — both of which are decided by the same
+   * functions the reducer decides them with, against the projection this
+   * console was sent. A control drawn from a different reading of the board
+   * than the one that admits the command is a control that lies.
+   *
+   * It reads off `_view` like everything else here, so a player who is not the
+   * holder is not merely shown no buttons: the pick is team-scoped in the
+   * manifest, so somebody else's is not in their copy of the game to draw.
+   */
+  _spoils(targets, me) {
+    const view = this._view;
+    // `me` first: a spectator has no role, and a declaration whose holder was
+    // removed has no roleId, and null matching null would hand the spoils of
+    // somebody else's battle to a screen with nobody behind it.
+    const taken = !me ? [] : targets.filter((shireId) =>
+      conqueringDeclaration(view, shireId)?.roleId === me && tally(view, shireId).shireFalls);
+
+    return taken.map((shireId) => {
+      const shire = this._data.shires.shires[shireId]?.name ?? shireId;
+      const attackers = view.battle.sides?.[shireId]?.attackers ?? [];
+      const named = view.battle.stewardPicks?.[shireId] ?? null;
+      return `
+        <section class="rb-steward" data-spoils="${shireId}">
+          <h3>${shire} is yours to give</h3>
+          <p class="rb-prompt">Your token took it. Name who holds it — and it
+            need not be you.</p>
+          <div class="rb-steward-buttons">${attackers.map((roleId) => `
+            <button type="button" class="${named === roleId ? 'is-chosen' : ''}"
+                    data-name-steward="${roleId}" data-shire="${shireId}">
+              ${this._data.roles.roles[roleId]?.name ?? roleId}
+            </button>`).join('')}</div>
+          <p class="rb-meta">${named
+    ? 'Named. You may still change it until the facilitator settles the shire.'
+    : `Until you name somebody, ${shire} goes to whoever was paired first.`}</p>
+        </section>`;
+    }).join('');
   }
 
   /** The battles being fought, and which side you are on. */
@@ -263,6 +308,11 @@ export class RbClashPanel extends HTMLElement {
     if (stay) stay.onclick = () => this._emit('confirm-lead', { clashId });
     const die = this.querySelector('[data-roll]');
     if (die) die.onclick = () => this._emit('submit-roll', { clashId });
+    for (const button of this.querySelectorAll('[data-name-steward]')) {
+      button.onclick = () => this._emit('name-new-steward', {
+        shireId: button.dataset.shire, stewardRoleId: button.dataset.nameSteward,
+      });
+    }
   }
 }
 

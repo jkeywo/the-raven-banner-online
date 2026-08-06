@@ -18,13 +18,25 @@ export const SCHEMA_VERSION = 1;
 export const PHASES = ['team', 'battle', 'maintenance', 'encounter'];
 
 /**
- * The three initiative tokens, in the order the sheets name them.
+ * The three initiative tokens, in the order the sheets name them — which is
+ * also their order of precedence.
  *
  * Each is a plain roleId-or-null on `state.initiative`, sitting alongside
  * `declared`. No role may be the value of more than one at a time — they are
  * three counters on a table, and nobody is handed two.
+ *
+ * Two tokens cannot name the same shire. White outranks black outranks the
+ * spare, and the loser of a collision has to choose somewhere else: their
+ * declaration is cleared rather than sitting behind one that will always beat
+ * it. That is what keeps "which token took this shire?" a question with one
+ * answer, which everything from the token handover to the conqueror's steward
+ * pick depends on.
  */
 export const TOKENS = ['white', 'black', 'bonus'];
+
+/** Does `token` outrank `other`? White, then black, then the spare. */
+export const outranks = (token, other) =>
+  TOKENS.indexOf(token) < TOKENS.indexOf(other);
 
 /**
  * Which token this role holds, or null. The one place that question is asked.
@@ -225,6 +237,10 @@ export function createInitialState({ joinCode, seed, data, roleIds }) {
       // Mercenary cards handed in, per shire and per side. They buy a clash
       // nobody fought, so they live beside the battle rather than in it.
       mercenaries: {},
+      // Who the conqueror of each fallen shire named to take it, by shire.
+      // Turn-scoped for free: `facilitator:end-battles` clears this whole
+      // object, and a pick is only ever about a battle currently on the board.
+      stewardPicks: {},
       pairingComplete: false,
     },
     // Requests waiting on other people's agreement — settling a shire, and

@@ -15,7 +15,7 @@
  * is what makes a crashed host recoverable.
  */
 
-import { PHASES, TOKENS, tokenHeldBy, seatHolding } from './state.js';
+import { PHASES, TOKENS, outranks, tokenHeldBy, seatHolding } from './state.js';
 import {
   incomeFor, isDanish, isPagan, isChristian, isDanishHeld, momentumGain,
   reachableFrom, factionReach, churchesHeld, electorate,
@@ -23,7 +23,9 @@ import {
 import {
   advanceClash, amendLead, confirmLead, sidesOf, stageAtLeast, MAX_REINFORCEMENT,
 } from './clash.js';
-import { pairSides, settleClash, settleBattle, seizeInitiative } from './battle.js';
+import {
+  pairSides, settleClash, settleBattle, seizeInitiative, tally, conqueringDeclaration,
+} from './battle.js';
 
 /**
  * Phases in which resources may change hands between players. Not during a
@@ -301,6 +303,31 @@ function affordable(role, costs) {
   return null;
 }
 
+/**
+ * Two tokens that have named one shire, if any: the one that keeps it and the
+ * one that has to choose again.
+ *
+ * White beats black beats the spare, so the answer never depends on who
+ * clicked first. Only tokens somebody actually holds count — a declaration
+ * left behind by a token taken off its holder is an orphan the grid already
+ * labels, and blocking on it would point the facilitator at a control that
+ * refuses ("nobody holds that token").
+ *
+ * @returns {{keeps: string, rechooses: string, shireId: string}|null}
+ */
+function clashingClaims(state) {
+  const declared = state.initiative?.declared ?? {};
+  const live = TOKENS.filter((token) => declared[token] && state.initiative[token]);
+  for (const [i, token] of live.entries()) {
+    for (const other of live.slice(i + 1)) {
+      if (declared[token].shireId !== declared[other].shireId) continue;
+      const [keeps, rechooses] = outranks(token, other) ? [token, other] : [other, token];
+      return { keeps, rechooses, shireId: declared[token].shireId };
+    }
+  }
+  return null;
+}
+
 function spend(role, costs) {
   for (const [what, amount] of Object.entries(costs)) role[what] -= amount;
 }
@@ -409,6 +436,15 @@ export const COMMANDS = {
       if (!reachableFrom(state, data, roleId).includes(cmd.payload.shireId)) {
         return no('you cannot reach that shire');
       }
+      // Deliberately NOT refused for naming a shire another token has already
+      // named. Two tokens may not end up attacking one shire — white beats
+      // black beats the spare, and the loser chooses again — but that
+      // collision is settled at `facilitator:announce-targets`, where every
+      // declaration is public anyway. Refusing here would answer "has anyone
+      // secretly named this shire?" for any player willing to try each shire
+      // in their reach, a whole phase before that is anybody's business, and
+      // at no cost, since a declaration is freely rewritable. An un-announced
+      // target is the one secret team scoping exists to keep.
       return ok();
     },
     effects(draft, ctx) {
@@ -1908,6 +1944,77 @@ export const COMMANDS = {
     },
   },
 
+  /**
+   * Name who takes a shire you have just taken.
+   *
+   * The spoils belong to whoever spent the token, not to the umpire. In the
+   * room the holder says "give it to Ubba" and the facilitator writes it down;
+   * the console used to skip the saying and let the facilitator pick from a
+   * dropdown of attackers, which quietly moved the most political decision in
+   * the battle phase off the table it belongs on. So this is the holder's own
+   * command, and `settleBattle` reads it before it reaches for any default.
+   *
+   * Only the declaring holder — `conqueringDeclaration` decides which one when
+   * two tokens named the same shire, and says there why. Not the whole team:
+   * an initiative token sits in front of one person, and a faction that wants
+   * a say has the same lever it has for everything else, which is talking to
+   * them.
+   *
+   * Only after the shire has actually fallen, because until the last clash is
+   * read there is nothing to give away — a pick taken earlier would be a
+   * promise about a battle, and the battle phase already has enough of those.
+   * Changeable until the facilitator settles, the same bargain a tactic card
+   * gets: the commitment is the settling, not the click.
+   *
+   * Only an attacker, because a shire goes to somebody who was there for it.
+   * That is also what the old dropdown offered, so the rule is not new — it
+   * has simply moved from being a thing the console happened to render into
+   * being a thing the reducer enforces.
+   */
+  'name-new-steward': {
+    phases: ['battle'],
+    actor: 'player',
+    // "Is there any shire I could be naming a steward for?" — so it probes the
+    // first one that has actually fallen rather than the first one on the
+    // board, which is usually still being fought over and would answer "the
+    // fighting is not over" for a battle two shires along that is finished.
+    probe: (state) => {
+      const shireId = (state.battle.targets ?? []).find((id) => tally(state, id).shireFalls)
+        ?? state.battle.targets?.[0];
+      return { shireId, stewardRoleId: state.battle.sides?.[shireId]?.attackers?.[0] };
+    },
+    admit(ctx) {
+      const roleId = subjectOf(ctx);
+      const { shireId, stewardRoleId } = ctx.cmd.payload ?? {};
+      if (!ctx.state.battle.targets.includes(shireId)) return no('no battle was fought there');
+
+      const declaration = conqueringDeclaration(ctx.state, shireId);
+      if (!declaration) return no('nobody declared an attack there');
+      if (declaration.roleId !== roleId) {
+        return no('only the holder whose token declared that attack names its steward');
+      }
+
+      const result = tally(ctx.state, shireId);
+      if (!result.resolved) return no('the fighting is not over');
+      if (!result.shireFalls) return no('the shire held');
+
+      if (!ctx.state.roles[stewardRoleId]) return no('no such role in this game');
+      if (ctx.state.roles[stewardRoleId].dead) return no('that character is dead');
+      if (!(ctx.state.battle.sides[shireId]?.attackers ?? []).includes(stewardRoleId)) {
+        return no('name somebody who attacked it');
+      }
+      return ok();
+    },
+    effects(draft, ctx) {
+      // `stewardPicks` can be missing rather than empty on a state loaded from
+      // a save written before this command existed, and `end-battles` writes a
+      // fresh battle object that has it — so this is about old files, not
+      // about the reducer's own output.
+      draft.battle.stewardPicks ??= {};
+      draft.battle.stewardPicks[ctx.cmd.payload.shireId] = ctx.cmd.payload.stewardRoleId;
+    },
+  },
+
   // --- facilitator ---------------------------------------------------------
   'facilitator:advance-phase': {
     phases: '*',
@@ -2001,7 +2108,21 @@ export const COMMANDS = {
   'facilitator:announce-targets': {
     phases: ['battle'],
     actor: 'facilitator',
-    admit: ok,
+    admit(ctx) {
+      // Where a collision between two tokens gets settled. Not earlier: until
+      // this moment a declaration is its team's own business, and a rule that
+      // refused a player for colliding would tell them what another team had
+      // secretly chosen. Here every declaration is about to be public anyway,
+      // and the facilitator — who can already see all three — is the one who
+      // can go and ask the loser to name somewhere else.
+      const clash = clashingClaims(ctx.state);
+      if (clash) {
+        return no(`the ${clash.keeps} and ${clash.rechooses} tokens have both named `
+          + `${pretty(clash.shireId)}. The ${clash.keeps} token takes it — ask the `
+          + `${clash.rechooses} holder to name somewhere else, then announce again.`);
+      }
+      return ok();
+    },
     effects(draft) {
       for (const declaration of Object.values(draft.initiative.declared)) {
         declaration.revealed = true;
@@ -2213,7 +2334,16 @@ export const COMMANDS = {
     },
   },
 
-  /** Count the clashes and move the board. */
+  /**
+   * Count the clashes and move the board.
+   *
+   * `newSteward` survives in the payload but is no longer a choice: it sits
+   * below the conqueror's own `name-new-steward` pick in `settleBattle`, and
+   * the grid stopped sending it when the holder gained the decision. What it
+   * is for is the shire whose token holder has walked out of the room — the
+   * facilitator can still name a taker rather than being stuck with "whoever
+   * was paired first", and the log records that they did.
+   */
   'facilitator:settle-battle': {
     phases: ['battle'],
     actor: 'facilitator',
@@ -2236,7 +2366,7 @@ export const COMMANDS = {
     effects(draft) {
       seizeInitiative(draft);
       draft.battle = { targets: [], sides: {}, clashes: {}, spare: {}, scouts: {},
-        mercenaries: {}, pairingComplete: false };
+        mercenaries: {}, stewardPicks: {}, pairingComplete: false };
     },
   },
 
@@ -2420,6 +2550,10 @@ export const COMMANDS = {
       if (also) return no(`${pretty(holder)} also holds the ${also} token — clear one first`);
       if (ctx.state.battle.targets.length) return no('the targets are already announced');
       if (!ctx.state.shires[shireId]) return no('no such shire');
+      // A collision with another token is not refused here either. The
+      // facilitator can see every declaration, so nothing leaks by letting
+      // them make one — and announce is where it gets settled, with a message
+      // aimed at the person who has to act on it.
       return ok();
     },
     effects(draft, ctx) {
