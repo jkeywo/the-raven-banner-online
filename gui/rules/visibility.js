@@ -16,6 +16,8 @@
  * and `*` beats `**`, then longer patterns beat shorter ones.
  */
 
+import { STAGES, stageAtLeast } from './clash.js';
+
 /** Everyone at the table. */
 export const PUBLIC = 'public';
 /** The owning role's seat, and nobody else's. */
@@ -29,6 +31,17 @@ export const NOBODY = 'nobody';
 
 /** `roles.<id>.…` and friends: the role id is the segment after the head. */
 const ownerAtIndex = (i) => (segments) => segments[i];
+
+/**
+ * The stages at or past a clash's reveal, derived rather than written out.
+ *
+ * A secret that is open must stay open, so each of these lists has to be a
+ * suffix of the stage order. Three hand-maintained arrays are three chances to
+ * insert a stage into two of them and leave a hole in the third — which is not
+ * hypothetical: adding `rolls_revealed` did exactly that, briefly re-hiding
+ * both tactic cards at the one stage where the dice were already public.
+ */
+const revealedFrom = (stage) => STAGES.filter((s) => stageAtLeast(s, stage));
 
 export const FIELD_VISIBILITY = [
   // --- housekeeping --------------------------------------------------------
@@ -134,11 +147,10 @@ export const FIELD_VISIBILITY = [
   // Whether a side has finished deciding is public; what they decided is not.
   { path: 'battle.clashes.*.confirmed.*', audience: PUBLIC },
   { path: 'battle.clashes.*.reinforcements.**', audience: PUBLIC },
-  { path: 'battle.clashes.*.rolls.**', audience: PUBLIC },
   { path: 'battle.clashes.*.result.**', audience: PUBLIC },
   { path: 'battle.clashes.*.amendWindowEndsAt', audience: PUBLIC },
 
-  // The two secrets of a clash. Both are keyed by role id, and both open to
+  // The three secrets of a clash. All are keyed by role id, and all open to
   // everyone once the machine has passed the stage that reveals them — which
   // is why a client cannot see an opponent's card early even if it misbehaves:
   // the host never sends it.
@@ -154,6 +166,17 @@ export const FIELD_VISIBILITY = [
     audience: OWNER,
     owner: ownerAtIndex(4),
     revealWhen: (segments, state) => LEAD_REVEALED.includes(
+      state.battle.clashes[segments[2]]?.stage),
+  },
+  // A die is the third, and the shortest-lived: each fighter throws their own,
+  // and the first one down would otherwise tell the second exactly what they
+  // had to beat. Exactly as long as the path to one die, so that removing the
+  // old public subtree rule leaves no `**` still matching underneath it.
+  {
+    path: 'battle.clashes.*.rolls.*',
+    audience: OWNER,
+    owner: ownerAtIndex(4),
+    revealWhen: (segments, state) => ROLLS_REVEALED.includes(
       state.battle.clashes[segments[2]]?.stage),
   },
 
@@ -186,11 +209,18 @@ export const FIELD_VISIBILITY = [
 ];
 
 /** Clash stages at or past the simultaneous reveal of tactic cards. */
-export const TACTICS_REVEALED = [
-  'tactics_revealed', 'awaiting_lead', 'lead_revealed', 'rolling', 'resolved',
-];
+export const TACTICS_REVEALED = revealedFrom('tactics_revealed');
 /** Clash stages at or past the reveal of leadership declarations. */
-export const LEAD_REVEALED = ['lead_revealed', 'rolling', 'resolved'];
+export const LEAD_REVEALED = revealedFrom('lead_revealed');
+/**
+ * Clash stages at or past the reveal of the dice.
+ *
+ * `rolls_revealed` is the stage the machine reaches the instant the second die
+ * lands, and `resolved` is where it is a moment later without anything else
+ * having happened — so in a projection a player ever actually receives, this
+ * list means "the clash is over".
+ */
+export const ROLLS_REVEALED = revealedFrom('rolls_revealed');
 
 const SEGMENT = /\./;
 

@@ -18,7 +18,7 @@ uv run pasm scenario pasm/spec/scenarios/turn-one.yaml --spec-root pasm/spec
 | `spec/core/foundation.yaml` | The system entity and the four decisions everything else follows from |
 | `spec/architecture/runtimes.yaml` | The two browser runtimes and their trust boundaries |
 | `spec/architecture/networking.yaml` | Transport components, the four wire messages, and the two connection failures |
-| `spec/architecture/state-and-views.yaml` | Authoritative state, the admission gate, the projector, and the five restricted information sets |
+| `spec/architecture/state-and-views.yaml` | Authoritative state, the admission gate, the projector, and the restricted information sets |
 | `spec/architecture/clash-protocol.yaml` | The clash state machine and the Lead the Charge ratchet decision |
 | `spec/design/turn-one-slice.yaml` | Roles, verbs, the phase clock, and the five resources |
 | `spec/scenarios/turn-one.yaml` | The vertical slice walked end to end, including a host loss and its recovery |

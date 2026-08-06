@@ -427,6 +427,24 @@ entities:
       reveal_conditions:
         - both-lead-declarations-submitted
 
+  - information: secret-clash-die
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Secret Clash Die
+      summary: The die a combatant has thrown for a clash, before the reveal that settles it.
+      rationale:
+        - Each combatant throws their own die rather than the facilitator throwing both, so for a moment one die is down and the other is not, and the first would otherwise tell the second fighter exactly what they had to beat.
+    game_design:
+      visibility: role-visible
+      enforcement_links:
+        - view-projector
+      permitted_viewers:
+        - owning-player
+        - facilitator
+      reveal_conditions:
+        - both-rolls-submitted
+
   - information: team-phase-initiative-target
     core:
       status: proposed

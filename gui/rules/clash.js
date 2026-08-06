@@ -5,11 +5,18 @@
  * secret, reveal both, add what the shire and any reinforcements are worth,
  * decide whether to lead personally, roll, and count the dead.
  *
- * Two of those steps are simultaneous reveals, and they are why the redaction
+ * Three of those steps are simultaneous reveals, and they are why the redaction
  * layer exists. A player must not see their opponent's card before their own
  * is committed — and here that is not a matter of the client behaving, because
- * the host simply never sends it. `views.js` gates both fields on this
+ * the host simply never sends it. `views.js` gates all three fields on this
  * machine's stage.
+ *
+ * The third is the dice. Each fighter rolls their own, which is what the two of
+ * them would do across a table, and neither sees the other's until both are
+ * down. Reading them off one at a time would tell the second roller exactly
+ * what they needed to beat — and there is nothing left to decide by then, but a
+ * player watching their opponent's six land before their own throw is watching
+ * a result, not a contest.
  *
  * The interesting rule is the second reveal. The printed text says that if you
  * chose to fight normally and your opponent leads the charge, you may change
@@ -19,13 +26,24 @@
  * once and only in one direction.
  */
 
-/** Stages, in order. A clash only ever moves forward. */
+/**
+ * Stages, in order. A clash only ever moves forward.
+ *
+ * `rolls_revealed` is the odd one out: the machine passes through it inside a
+ * single reducer step rather than resting there, because the moment both dice
+ * are down there is nothing left for anybody to decide and the settlement
+ * follows immediately. It exists as a stage all the same, so that "both dice
+ * are in" is a fact `advanceClash` establishes once — for the second player's
+ * die and for a facilitator forcing the thing through alike — rather than a
+ * condition two call sites each test for themselves.
+ */
 export const STAGES = [
   'awaiting_tactics',
   'tactics_revealed',
   'awaiting_lead',
   'lead_revealed',
   'rolling',
+  'rolls_revealed',
   'resolved',
 ];
 
@@ -54,7 +72,9 @@ export function createClash({ id, shireId, attacker, defender }) {
     confirmed: defender ? { [attacker]: false, [defender]: false } : {},
     reinforcements: {},
     scouts: [],
-    rolls: {},
+    // Seeded like the other two secrets rather than left empty, so "everyone
+    // has submitted" is the same test for a die as it is for a card.
+    rolls: defender ? { [attacker]: null, [defender]: null } : {},
     amendWindowEndsAt: null,
     result: defender ? null : { winner: attacker, unopposed: true },
   };
@@ -67,8 +87,14 @@ export const sidesOf = (clash) => [clash.attacker, clash.defender].filter(Boolea
 export const opponentOf = (clash, roleId) =>
   (roleId === clash.attacker ? clash.defender : clash.attacker);
 
+// `!= null` rather than `!== null`, so a key that was never seeded counts as
+// missing rather than as submitted. It matters more than it reads: this now
+// gates a transition whose consequence is a settlement, so a side with no
+// entry would otherwise settle the clash on an undefined die — leadership
+// would look its bonus up under "undefined", score NaN, and hand somebody a
+// silently wrong win.
 const allSubmitted = (clash, field) =>
-  sidesOf(clash).every((roleId) => clash[field][roleId] !== null);
+  sidesOf(clash).every((roleId) => clash[field][roleId] != null);
 
 /**
  * Move a clash on if it is ready to move.
@@ -96,6 +122,12 @@ export function advanceClash(clash) {
   if (clash.stage === 'lead_revealed'
       && sidesOf(clash).every((roleId) => clash.confirmed[roleId])) {
     clash.stage = 'rolling';
+  }
+  if (clash.stage === 'rolling' && allSubmitted(clash, 'rolls')) {
+    // Both dice are down. The caller settles from here — see `settleClash` —
+    // so a clash never rests at this stage; it is the seam between the last
+    // thing a player does and the arithmetic that follows from it.
+    clash.stage = 'rolls_revealed';
   }
   return clash.stage;
 }

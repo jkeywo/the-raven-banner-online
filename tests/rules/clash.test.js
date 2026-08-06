@@ -9,6 +9,7 @@ import {
   casualtiesFor, feed, battleScore, leadership,
 } from '../../gui/rules/clash.js';
 import { tally, settleBattle, pairSides } from '../../gui/rules/battle.js';
+import { overrides } from '../../gui/rules/command-log.js';
 
 const data = await loadData();
 
@@ -346,7 +347,8 @@ describe('through the reducer', () => {
   const HALFDAN = { seatId: 's1', kind: 'player', roleId: 'halfdan_ragnarsson' };
   const GAINBEALD = { seatId: 's2', kind: 'player', roleId: 'gainbeald' };
 
-  it('runs a clash from cards to a settled shire', () => {
+  /** Both fighters through cards and declarations, stopped at the dice. */
+  function upToTheDice() {
     const game = battling();
     const clashId = Object.keys(game.state.battle.clashes)[0];
 
@@ -361,13 +363,106 @@ describe('through the reducer', () => {
     game.step('confirm-lead', { clashId }, HALFDAN);
     game.step('confirm-lead', { clashId }, GAINBEALD);
     expect(game.state.battle.clashes[clashId].stage).toBe('rolling');
+    return { game, clashId };
+  }
 
-    game.step('facilitator:resolve-clash', { clashId });
+  it('runs a clash from cards to a settled shire', () => {
+    // Each fighter throws their own die, and the second one down settles it.
+    // Rewritten from a single facilitator roll: that is now the override, and
+    // this is the path the room actually walks.
+    const { game, clashId } = upToTheDice();
+
+    game.step('submit-roll', { clashId }, HALFDAN);
+    expect(game.state.battle.clashes[clashId].stage).toBe('rolling');
+    expect(game.state.battle.clashes[clashId].rolls.gainbeald).toBeNull();
+
+    game.step('submit-roll', { clashId }, GAINBEALD);
     const clash = game.state.battle.clashes[clashId];
     expect(clash.stage).toBe('resolved');
     expect(clash.result.winner).toBeTruthy();
-    expect(clash.rolls.halfdan_ragnarsson).toBeGreaterThanOrEqual(1);
-    expect(clash.rolls.halfdan_ragnarsson).toBeLessThanOrEqual(6);
+    for (const roleId of ['halfdan_ragnarsson', 'gainbeald']) {
+      expect(clash.rolls[roleId]).toBeGreaterThanOrEqual(1);
+      expect(clash.rolls[roleId]).toBeLessThanOrEqual(6);
+    }
+    // Two dice, two turns of the cursor, and nothing else drew from it.
+    expect(game.state.rngCursor).toBe(2);
+    // Neither die was the facilitator's doing.
+    expect(overrides(game.state.log).map((e) => e.verb)).not.toContain('submit-roll');
+  });
+
+  it('spends a reinforcing bystander their soldiers, once, on the players\' own path', () => {
+    // The settlement block moved out of the facilitator's command so both
+    // paths could share it, and a reinforcer's upkeep is the part of it
+    // reached from neither of the two tests above — the soldiers come off
+    // somebody who is not in the clash at all, now via a settlement no
+    // facilitator triggered.
+    const game = battling();
+    // A third defender, left without a clash of their own by the pairing, is
+    // the only kind of role allowed to reinforce one.
+    game.state.seats.s3 = {
+      id: 's3', token: 's3', name: 's3', roleId: 'ubba_ragnarsson',
+      kind: 'player', connected: true, lastSeen: 0,
+    };
+    const UBBA = { seatId: 's3', kind: 'player', roleId: 'ubba_ragnarsson' };
+    const clashId = Object.keys(game.state.battle.clashes)[0];
+    game.state.battle.spare = { lindsey: ['ubba_ragnarsson'] };
+    const before = game.state.roles.ubba_ragnarsson.soldiers;
+
+    game.step('reinforce_clash', { clashId, soldiers: 1 }, UBBA);
+    game.step('submit-tactic', { clashId, card: '5' }, HALFDAN);
+    game.step('submit-tactic', { clashId, card: '2' }, GAINBEALD);
+    game.step('declare-lead', { clashId, lead: false }, HALFDAN);
+    game.step('declare-lead', { clashId, lead: false }, GAINBEALD);
+    game.step('confirm-lead', { clashId }, HALFDAN);
+    game.step('confirm-lead', { clashId }, GAINBEALD);
+    game.step('submit-roll', { clashId }, HALFDAN);
+    game.step('submit-roll', { clashId }, GAINBEALD);
+
+    expect(game.state.battle.clashes[clashId].stage).toBe('resolved');
+    expect(game.state.roles.ubba_ragnarsson.soldiers).toBe(before - 1);
+  });
+
+  it('takes one die per fighter and no more', () => {
+    const { game, clashId } = upToTheDice();
+    game.step('submit-roll', { clashId }, HALFDAN);
+    expect(admit(game.state, data, { verb: 'submit-roll', payload: { clashId } }, HALFDAN).reason)
+      .toContain('already rolled');
+  });
+
+  it('will not take a die before there is anything to throw it at', () => {
+    const game = battling();
+    const clashId = Object.keys(game.state.battle.clashes)[0];
+    expect(admit(game.state, data, { verb: 'submit-roll', payload: { clashId } }, HALFDAN).reason)
+      .toContain('still something to decide');
+  });
+
+  it('refuses a die from someone not in the clash', () => {
+    const { game, clashId } = upToTheDice();
+    expect(admit(game.state, data, { verb: 'submit-roll', payload: { clashId } },
+      { seatId: 's3', kind: 'player', roleId: 'king_alfred' }).reason)
+      .toContain('not fighting in that clash');
+  });
+
+  it('keeps the first die from the other fighter until both are down', () => {
+    const { game, clashId } = upToTheDice();
+    game.step('submit-roll', { clashId }, HALFDAN);
+    const seen = projectView(game.state, data, {
+      kind: 'player', seatId: 's2', roleId: 'gainbeald',
+      teamId: game.state.roles.gainbeald.teamId,
+    });
+    expect(seen.battle.clashes[clashId].rolls.halfdan_ragnarsson).toBeUndefined();
+    // But you can see you are the one being waited on.
+    expect(seen.clashProgress[clashId].rollSubmitted.halfdan_ragnarsson).toBe(true);
+    expect(seen.clashProgress[clashId].rollsRevealed).toBe(false);
+
+    game.step('submit-roll', { clashId }, GAINBEALD);
+    const after = projectView(game.state, data, {
+      kind: 'player', seatId: 's2', roleId: 'gainbeald',
+      teamId: game.state.roles.gainbeald.teamId,
+    });
+    expect(after.battle.clashes[clashId].rolls.halfdan_ragnarsson)
+      .toBe(game.state.battle.clashes[clashId].rolls.halfdan_ragnarsson);
+    expect(after.clashProgress[clashId].rollsRevealed).toBe(true);
   });
 
   it('refuses a card committing more soldiers than you have', () => {
@@ -396,6 +491,40 @@ describe('through the reducer', () => {
     const clash = game.state.battle.clashes[clashId];
     expect(clash.tactic.gainbeald).toBe('A');       // Withdraw
     expect(clash.stage).toBe('resolved');
+    expect(clash.result.winner).toBeTruthy();
+    // Both dice were thrown for them, and the log says who did it.
+    expect(clash.rolls.halfdan_ragnarsson).toBeGreaterThanOrEqual(1);
+    expect(clash.rolls.gainbeald).toBeGreaterThanOrEqual(1);
+    expect(overrides(game.state.log).map((e) => e.verb))
+      .toContain('facilitator:resolve-clash');
+    expect(game.state.log.at(-1)).toMatchObject({
+      verb: 'facilitator:resolve-clash', override: true,
+    });
+  });
+
+  it('keeps a die a fighter has already thrown when it forces the rest', () => {
+    // The override exists to unstick a clash, not to re-throw somebody's five
+    // into a two. Whatever a player committed stands.
+    const { game, clashId } = upToTheDice();
+    game.step('submit-roll', { clashId }, HALFDAN);
+    const thrown = game.state.battle.clashes[clashId].rolls.halfdan_ragnarsson;
+
+    game.step('facilitator:resolve-clash', { clashId });
+    const clash = game.state.battle.clashes[clashId];
+    expect(clash.rolls.halfdan_ragnarsson).toBe(thrown);
+    expect(clash.rolls.gainbeald).toBeGreaterThanOrEqual(1);
+    expect(clash.stage).toBe('resolved');
+    // One player's die and one the umpire drew: two turns of the cursor, not
+    // three, because the first was not thrown twice.
+    expect(game.state.rngCursor).toBe(2);
+  });
+
+  it('refuses to force a clash that is already settled', () => {
+    const { game, clashId } = upToTheDice();
+    game.step('submit-roll', { clashId }, HALFDAN);
+    game.step('submit-roll', { clashId }, GAINBEALD);
+    expect(admit(game.state, data, { verb: 'facilitator:resolve-clash', payload: { clashId } },
+      game.facilitator).reason).toContain('already settled');
   });
 
   it('lets nothing change hands while blades are out', () => {

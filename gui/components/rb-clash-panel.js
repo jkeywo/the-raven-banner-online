@@ -17,7 +17,8 @@ const STAGE_PROMPT = {
   tactics_revealed: 'Cards down.',
   awaiting_lead: 'Will you lead the charge yourself?',
   lead_revealed: 'You may still join the charge — but not leave it.',
-  rolling: 'Rolling.',
+  rolling: 'Throw your die. Neither of you sees the other until both are down.',
+  rolls_revealed: 'Dice down.',
   resolved: '',
 };
 
@@ -108,6 +109,7 @@ export class RbClashPanel extends HTMLElement {
         ${this._hand(clash, me, soldiers)}
         ${this._reveal(clash, me, opponent, progress)}
         ${this._lead(clash, me, opponent)}
+        ${this._roll(clash, me, opponent, progress)}
         ${this._result(clash, me, opponent, opponentName)}
       </section>`;
   }
@@ -183,6 +185,30 @@ export class RbClashPanel extends HTMLElement {
     return '';
   }
 
+  /**
+   * Your own die.
+   *
+   * Yours to throw, and only once. Whether they have thrown comes from
+   * `clashProgress` rather than from the dice themselves, because the die they
+   * threw is not here yet — that is the point of the stage.
+   */
+  _roll(clash, me, opponent, progress) {
+    if (clash.stage !== 'rolling') return '';
+    const mine = clash.rolls?.[me];
+    if (mine === null || mine === undefined) {
+      return `<div class="rb-roll">
+        <button type="button" data-roll class="rb-primary">Throw your die</button>
+        <p class="rb-meta">${progress.rollSubmitted?.[opponent]
+    ? 'They have thrown. Waiting on you.' : 'Neither of you has thrown yet.'}</p>
+      </div>`;
+    }
+    return `<div class="rb-roll">
+      <p class="rb-rolled">You threw a <strong>${mine}</strong>.</p>
+      <p class="rb-meta">${progress.rollSubmitted?.[opponent]
+    ? 'Both dice are down.' : 'Waiting for them to throw.'}</p>
+    </div>`;
+  }
+
   _result(clash, me, opponent, opponentName) {
     if (!clash.result || clash.result.unopposed) return '';
     const r = clash.result;
@@ -235,6 +261,8 @@ export class RbClashPanel extends HTMLElement {
     }
     const stay = this.querySelector('[data-confirm]');
     if (stay) stay.onclick = () => this._emit('confirm-lead', { clashId });
+    const die = this.querySelector('[data-roll]');
+    if (die) die.onclick = () => this._emit('submit-roll', { clashId });
   }
 }
 

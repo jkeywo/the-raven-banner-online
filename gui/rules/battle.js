@@ -13,7 +13,7 @@
  * second tally and nothing else: a way to be useful without being in the line.
  */
 
-import { createClash, sidesOf } from './clash.js';
+import { createClash, sidesOf, resolveClash } from './clash.js';
 import { TOKENS } from './state.js';
 
 /**
@@ -93,6 +93,53 @@ export function pairSides({ attackers, defenders, shireId, pairs = null }) {
   // Defenders with nobody to fight are the ones who may reinforce or scout.
   const spare = defenders.filter((roleId) => !used.has(roleId));
   return { clashes, spareDefenders: spare };
+}
+
+/**
+ * Read a clash whose dice are both down, and charge everyone for it.
+ *
+ * `resolveClash` works out what happened; this is what it cost, applied to the
+ * board. Casualties, then the food the survivors eat and the ones who starve
+ * because there was none, then wounds — and death at the printed threshold,
+ * read out of `data` rather than written here, because how many wounds kill a
+ * man is a number a designer tunes.
+ *
+ * It lives here rather than in `clash.js` because it reaches across the whole
+ * roster: a clash's arithmetic is one duel's business, but spending the food
+ * and soldiers it consumed is the board's. It lives in one place rather than
+ * two because there are two ways in — both fighters rolling, or a facilitator
+ * forcing a stalled clash forward — and they must cost exactly the same.
+ *
+ * Mutates a draft, like everything else in the reducer's reach. Returns the
+ * outcome it applied.
+ */
+export function settleClash(draft, data, clash) {
+  const outcome = resolveClash(clash, data, {
+    defendedSettlements: defendedSettlements(draft, clash.shireId),
+    food: Object.fromEntries(sidesOf(clash).map((id) => [id, draft.roles[id].food])),
+  });
+
+  for (const roleId of sidesOf(clash)) {
+    const role = draft.roles[roleId];
+    role.soldiers = Math.max(0, role.soldiers - outcome.casualties[roleId]);
+    role.food -= outcome.feeding[roleId].foodSpent;
+    role.soldiers = Math.max(0, role.soldiers - outcome.feeding[roleId].starved);
+    role.wounds += outcome.wounds[roleId];
+    if (role.wounds >= Number(data.meta.woundsFatal)) role.dead = true;
+    // Reinforcing soldiers are spent whatever happens.
+    const committed = clash.reinforcements[roleId];
+    if (committed) draft.roles[roleId].soldiers = Math.max(0, role.soldiers - committed);
+  }
+  // A reinforcing player is not in the clash, so their soldiers are taken
+  // here rather than in the loop above.
+  for (const [roleId, soldiers] of Object.entries(clash.reinforcements)) {
+    if (sidesOf(clash).includes(roleId)) continue;
+    draft.roles[roleId].soldiers = Math.max(0, draft.roles[roleId].soldiers - soldiers);
+  }
+
+  clash.result = outcome;
+  clash.stage = 'resolved';
+  return outcome;
 }
 
 /**

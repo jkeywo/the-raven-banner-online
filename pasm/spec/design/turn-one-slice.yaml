@@ -158,6 +158,26 @@ entities:
       enforcement_links:
         - command-admission
 
+  - verb: submit-roll
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Submit Roll
+      summary: A combatant throws their own die for a clash, once, and the second die down settles it.
+      rationale:
+        - The die is drawn through the reducer's injected roll, so it advances the cursor stored in state and the throw survives a replay.
+        - Two combatants racing to throw cannot diverge on replay, because the log records the order the host actually applied them in.
+      assumptions:
+        - A die once thrown is never thrown again, including by a facilitator forcing the clash forward.
+    game_design:
+      owner_role: owning-player
+      produces_facts:
+        - both-rolls-submitted
+      architecture_links:
+        - submit-roll-command
+      enforcement_links:
+        - command-admission
+
   - verb: transfer-stewardship
     core:
       status: proposed
@@ -215,11 +235,13 @@ entities:
       rationale:
         - Travels the same admission-and-reducer pipeline as a player command, so an override is replayable and shows up in the log rather than silently diverging the state from its history.
         - Forcing a clash forward past an absent combatant is the same fact as both sides having submitted, which is why this verb produces it.
+        - It fills in only what is missing. A die a combatant has already thrown is kept, because re-throwing it under the guise of unsticking a clash is the one thing an umpire must not be able to do by accident.
     game_design:
       owner_role: facilitator
       produces_facts:
         - both-tactics-submitted
         - both-lead-declarations-submitted
+        - both-rolls-submitted
       architecture_links:
         - player-command-message
       enforcement_links:

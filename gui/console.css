@@ -859,6 +859,10 @@ rb-clash-panel { display: block; }
 .rb-card-shown b { font-family: var(--rb-serif); font-size: 1.3rem; }
 .rb-card-shown em { display: block; font-size: 0.75rem; color: var(--rb-muted); }
 
+.rb-roll { margin: 0.8rem 0; }
+.rb-rolled { font-family: var(--rb-serif); font-size: 1.15rem; margin: 0 0 0.2rem; }
+.rb-rolled strong { font-size: 1.6rem; }
+
 .rb-clash-result {
   margin-top: 0.9rem;
   padding: 0.8rem;

@@ -20,7 +20,8 @@ const STAGE_LABEL = {
   tactics_revealed: 'cards down',
   awaiting_lead: 'deciding who leads',
   lead_revealed: 'may still join the charge',
-  rolling: 'ready to roll',
+  rolling: 'throwing their own dice',
+  rolls_revealed: 'dice down',
   resolved: 'settled',
 };
 
@@ -209,7 +210,9 @@ export class RbFacilitatorGrid extends HTMLElement {
     : STAGE_LABEL[clash.stage] ?? clash.stage}${
   clash.result && !clash.auto ? ` — ${this._name(clash.result.winner)} won` : ''}</span>
               ${clash.stage === 'resolved' ? '' : `
-                <button type="button" data-resolve="${clash.id}">Roll it</button>`}
+                <button type="button" data-resolve="${clash.id}"
+                        title="Fills in whatever is missing and settles it. A die a
+                               fighter has already thrown is kept.">Force it through</button>`}
             </li>`).join('')}</ul>
         ` : `<button type="button" data-pair="${shireId}" class="rb-primary"
                ${sides.attackers.length ? '' : 'disabled'}>Pair the fighters</button>`}

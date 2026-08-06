@@ -8,7 +8,8 @@
  */
 
 import {
-  ruleFor, PUBLIC, OWNER, TEAM, FACILITATOR, NOBODY, TACTICS_REVEALED, LEAD_REVEALED,
+  ruleFor, PUBLIC, OWNER, TEAM, FACILITATOR, NOBODY,
+  TACTICS_REVEALED, LEAD_REVEALED, ROLLS_REVEALED,
 } from './visibility.js';
 import { deriveAll } from './derive.js';
 
@@ -101,8 +102,13 @@ export function clashProgress(state) {
         Object.entries(clash.tactic ?? {}).map(([role, card]) => [role, card !== null])),
       leadSubmitted: Object.fromEntries(
         Object.entries(clash.lead ?? {}).map(([role, lead]) => [role, lead !== null])),
+      // A die is the same bargain as a card: that you have thrown is everyone's
+      // business, what you threw is not until both are down.
+      rollSubmitted: Object.fromEntries(
+        Object.entries(clash.rolls ?? {}).map(([role, die]) => [role, die != null])),
       tacticsRevealed: TACTICS_REVEALED.includes(clash.stage),
       leadRevealed: LEAD_REVEALED.includes(clash.stage),
+      rollsRevealed: ROLLS_REVEALED.includes(clash.stage),
     };
   }
   return out;

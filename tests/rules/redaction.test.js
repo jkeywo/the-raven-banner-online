@@ -2,7 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { loadData } from '../helpers/load-data.js';
 import { createInitialState } from '../../gui/rules/state.js';
 import { projectView, unclassifiedPaths, auditProjection } from '../../gui/rules/views.js';
-import { ruleFor, NOBODY } from '../../gui/rules/visibility.js';
+import {
+  ruleFor, NOBODY, TACTICS_REVEALED, LEAD_REVEALED, ROLLS_REVEALED,
+} from '../../gui/rules/visibility.js';
+import { STAGES } from '../../gui/rules/clash.js';
 
 const data = await loadData();
 
@@ -44,7 +47,21 @@ function loadedState() {
       attacker: 'guthrum_the_old', defender: 'cenred',
       tactic: { guthrum_the_old: 'SECRET::clash.c1.tactic.guthrum', cenred: '3' },
       lead: { guthrum_the_old: null, cenred: null },
-      reinforcements: {}, rolls: {}, result: null, amendWindowEndsAt: null,
+      reinforcements: {},
+      rolls: { guthrum_the_old: null, cenred: null },
+      result: null, amendWindowEndsAt: null,
+    },
+    // A second clash, further on: the cards and declarations are up and Guthrum
+    // has thrown his die while Cenred has not thrown his. The first die down is
+    // the one that would tell the other fighter what they had to beat.
+    c2: {
+      id: 'c2', shireId: 'essex', stage: 'rolling', auto: false,
+      attacker: 'guthrum_the_old', defender: 'cenred',
+      tactic: { guthrum_the_old: '4', cenred: '3' },
+      lead: { guthrum_the_old: false, cenred: false },
+      reinforcements: {},
+      rolls: { guthrum_the_old: 'SECRET::clash.c2.roll.guthrum', cenred: null },
+      result: null, amendWindowEndsAt: null,
     },
   };
 
@@ -81,6 +98,21 @@ describe('the manifest is complete', () => {
   it('classifies every path in a fresh game too', () => {
     expect(unclassifiedPaths(createInitialState({ joinCode: 'A', seed: 1, data }))).toEqual([]);
   });
+
+  it('never re-hides a clash secret it has already shown', () => {
+    // Each reveal list has to be a suffix of the stage order: once a card is
+    // face up it stays face up. Three hand-written arrays were three chances
+    // to add a stage to two of them and leave a hole in the third — which is
+    // exactly what adding `rolls_revealed` did, briefly re-hiding both tactic
+    // cards at the one stage where the dice were already public.
+    for (const list of [TACTICS_REVEALED, LEAD_REVEALED, ROLLS_REVEALED]) {
+      expect(list.length).toBeGreaterThan(0);
+      expect(list).toEqual(STAGES.slice(STAGES.indexOf(list[0])));
+    }
+    // And they open in the order the clash actually plays.
+    expect(TACTICS_REVEALED.length).toBeGreaterThan(LEAD_REVEALED.length);
+    expect(LEAD_REVEALED.length).toBeGreaterThan(ROLLS_REVEALED.length);
+  });
 });
 
 describe('no sentinel reaches a seat the manifest does not grant it', () => {
@@ -90,8 +122,10 @@ describe('no sentinel reaches a seat the manifest does not grant it', () => {
   const OWN = {
     // His envoy thread with the Franks, and nothing else in the fixture.
     alfred: ['SECRET::envoy.alfred.message'],
-    // His own tactic card, and his own team's target before it is announced.
-    guthrum: ['SECRET::clash.c1.tactic.guthrum', 'SECRET::initiative.white.target'],
+    // His own tactic card, his own die, and his team's target before it is
+    // announced.
+    guthrum: ['SECRET::clash.c1.tactic.guthrum', 'SECRET::clash.c2.roll.guthrum',
+      'SECRET::initiative.white.target'],
     cenred: [],
     spectator: [],
   };
@@ -141,6 +175,28 @@ describe('the specific things the game keeps quiet', () => {
     const seen = projectView(revealed, data, VIEWERS.cenred);
     expect(seen.battle.clashes.c1.tactic.guthrum_the_old).toBe('SECRET::clash.c1.tactic.guthrum');
     expect(seen.clashProgress.c1.tacticsRevealed).toBe(true);
+  });
+
+  it('keeps a die secret until both are down', () => {
+    // The same bargain as a card. Guthrum has thrown and Cenred has not, so
+    // the number Cenred would have to beat is exactly what he may not see.
+    expect(view('guthrum').battle.clashes.c2.rolls.guthrum_the_old)
+      .toBe('SECRET::clash.c2.roll.guthrum');
+    expect(view('cenred').battle.clashes.c2.rolls?.guthrum_the_old).toBeUndefined();
+    // But he can see that he is the one being waited on.
+    expect(view('cenred').clashProgress.c2.rollSubmitted).toEqual({
+      guthrum_the_old: true, cenred: false,
+    });
+    expect(view('cenred').clashProgress.c2.rollsRevealed).toBe(false);
+  });
+
+  it('releases both dice the moment the machine reveals them', () => {
+    const revealed = loadedState();
+    revealed.battle.clashes.c2.rolls.cenred = 4;
+    revealed.battle.clashes.c2.stage = 'resolved';
+    const seen = projectView(revealed, data, VIEWERS.cenred);
+    expect(seen.battle.clashes.c2.rolls.guthrum_the_old).toBe('SECRET::clash.c2.roll.guthrum');
+    expect(seen.clashProgress.c2.rollsRevealed).toBe(true);
   });
 
   it('scopes an initiative target to the declaring team until it is announced', () => {

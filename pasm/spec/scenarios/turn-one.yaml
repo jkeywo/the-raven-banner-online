@@ -33,6 +33,13 @@ scenario:
         - both-tactics-submitted
     - kind: reveal
       value: lead-the-charge-declaration
+    - kind: action
+      actor: owning-player
+      value: submit-roll
+      requires_facts:
+        - both-lead-declarations-submitted
+    - kind: reveal
+      value: secret-clash-die
     - kind: fail
       value: host-tab-lost
     - kind: recover

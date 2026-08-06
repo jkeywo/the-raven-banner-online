@@ -7,11 +7,12 @@ entities:
       summary: >-
         One paired duel inside a battle, run as an explicit state machine —
         awaiting tactics, tactics revealed, awaiting lead declarations, lead
-        revealed with an amendment window, rolling, resolved.
+        revealed with an amendment window, rolling, rolls revealed, resolved.
       rationale:
-        - This is the only part of the game with a genuine simultaneous reveal, and the only place where a client behaving badly could cheat, so the reveal is enforced by the projector rather than by client etiquette.
+        - This is the only part of the game with genuine simultaneous reveals, and the only place where a client behaving badly could cheat, so each reveal is enforced by the projector rather than by client etiquette.
         - The machine advances only inside the reducer. The amendment window's expiry is dispatched as a command rather than handled by a UI timer, so it appears in the log and replays identically.
         - Extra attackers with no opponent are seeded as already-resolved automatic wins at pairing time, so shire capture is one uniform tally rather than a special case.
+        - "Each combatant throws their own die: rolls revealed is the stage the machine reaches the instant the second one lands, and it passes straight through it to resolved, so both the two-player path and a facilitator forcing a stalled clash forward reach the settlement through the same function."
       references:
         - lead-the-charge-ratchet
     game_design:
@@ -31,6 +32,7 @@ entities:
         - advanceClash
         - amendLead
         - resolveClash
+        - settleClash
         - tally
         - settleBattle
         - heldBackToken
@@ -49,9 +51,10 @@ entities:
       status: proposed
       confidence: confirmed
       title: Clash Machine State
-      summary: Which stage a single clash has reached, plus each side's submitted tactic, lead declaration, reinforcements and roll.
+      summary: Which stage a single clash has reached, plus each side's submitted tactic, lead declaration, reinforcements and die.
       rationale:
-        - The visibility manifest gates the tactic and lead fields on this stage, so the machine's position is what makes a secret a secret.
+        - The visibility manifest gates the tactic, lead and roll fields on this stage, so the machine's position is what makes a secret a secret.
+        - All three are seeded per side as null rather than left empty, so "both sides have submitted" is one test the machine applies three times rather than three tests that could drift apart.
     architecture:
       classification: authoritative
       owner: game-host
@@ -109,6 +112,26 @@ entities:
         - command-admission
       trust_boundary: client-to-host
       payload: clash-and-card
+
+  - message: submit-roll-command
+    core:
+      status: proposed
+      confidence: confirmed
+      title: Submit Roll
+      summary: A combatant's own die for a clash, thrown once and never re-thrown.
+      rationale:
+        - Admission rejects a second die from the same combatant, which is what makes the throw a throw rather than a request for a number the player likes.
+        - The die itself is drawn inside the reducer rather than sent in the payload, so a client cannot choose what it rolled.
+    architecture:
+      authority: request
+      producer:
+        - client-command-gateway
+      consumer:
+        - command-admission
+      validator:
+        - command-admission
+      trust_boundary: client-to-host
+      payload: clash-identifier
 
   - message: declare-lead-command
     core:

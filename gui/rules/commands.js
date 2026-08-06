@@ -21,9 +21,9 @@ import {
   reachableFrom, factionReach, churchesHeld, electorate,
 } from './derive.js';
 import {
-  advanceClash, amendLead, confirmLead, sidesOf, resolveClash, MAX_REINFORCEMENT,
+  advanceClash, amendLead, confirmLead, sidesOf, stageAtLeast, MAX_REINFORCEMENT,
 } from './clash.js';
-import { pairSides, defendedSettlements, settleBattle, seizeInitiative } from './battle.js';
+import { pairSides, settleClash, settleBattle, seizeInitiative } from './battle.js';
 
 /**
  * Phases in which resources may change hands between players. Not during a
@@ -1866,6 +1866,48 @@ export const COMMANDS = {
     },
   },
 
+  /**
+   * Throw your own die.
+   *
+   * One die per fighter, thrown by the fighter, because that is what the two of
+   * them would do across a table — and because a facilitator rolling for
+   * sixteen people in turn is the phase's slowest minute.
+   *
+   * The die is drawn through the injected `roll`, so it advances the cursor in
+   * state like every other random number in the game. Two fighters racing to
+   * roll cannot diverge on replay: the log records the order the host actually
+   * applied them in, and a replay re-applies that order.
+   *
+   * Once yours is thrown you cannot throw it again — there is no re-roll in the
+   * printed rules, and a die you could re-throw until you liked it would not be
+   * a die. The second one down settles the clash on the spot.
+   */
+  'submit-roll': {
+    phases: ['battle'],
+    actor: 'player',
+    admit(ctx) {
+      const roleId = subjectOf(ctx);
+      const clash = ctx.state.battle.clashes[ctx.cmd.payload?.clashId];
+      if (!clash) return no('no such clash');
+      if (!sidesOf(clash).includes(roleId)) return no('you are not fighting in that clash');
+      if (clash.stage !== 'rolling') {
+        return no(stageAtLeast(clash.stage, 'rolling')
+          ? 'the dice are already read' : 'there is still something to decide');
+      }
+      if (clash.rolls[roleId] !== null && clash.rolls[roleId] !== undefined) {
+        return no('you have already rolled');
+      }
+      return ok();
+    },
+    effects(draft, ctx, { data, roll }) {
+      const clash = draft.battle.clashes[ctx.cmd.payload.clashId];
+      clash.rolls[subjectOf(ctx)] = roll(6);
+      // The machine decides whether that was the second die; the settlement
+      // follows from it rather than from this command knowing it was last.
+      if (advanceClash(clash) === 'rolls_revealed') settleClash(draft, data, clash);
+    },
+  },
+
   // --- facilitator ---------------------------------------------------------
   'facilitator:advance-phase': {
     phases: '*',
@@ -2060,10 +2102,19 @@ export const COMMANDS = {
   },
 
   /**
-   * Roll a clash and apply what it costs.
+   * Force a stalled clash through to a result.
    *
-   * Facilitator-driven so the dice happen when the room is ready for them, and
-   * so a clash whose fighter has walked away can still be finished.
+   * The fighters roll their own dice now, so this is no longer how a clash
+   * normally ends — it is the override for when one of them has gone to make
+   * tea and the phase cannot wait. It works from wherever the clash has got to:
+   * a card nobody chose, a declaration nobody made, one die down or none.
+   *
+   * Whatever a player did commit stands. A die already thrown is never thrown
+   * again here, because re-rolling somebody's five into a two under the guise
+   * of unsticking a clash is the one thing an umpire must not be able to do by
+   * accident — and it is logged as an override either way, so the room can see
+   * afterwards which clashes were finished for their fighters rather than by
+   * them.
    */
   'facilitator:resolve-clash': {
     phases: ['battle'],
@@ -2084,33 +2135,11 @@ export const COMMANDS = {
         clash.lead[roleId] ??= false;
       }
       clash.stage = 'rolling';
-      for (const roleId of sidesOf(clash)) clash.rolls[roleId] = roll(6);
+      // Only the dice that are actually missing.
+      for (const roleId of sidesOf(clash)) clash.rolls[roleId] ??= roll(6);
 
-      const outcome = resolveClash(clash, data, {
-        defendedSettlements: defendedSettlements(draft, clash.shireId),
-        food: Object.fromEntries(sidesOf(clash).map((id) => [id, draft.roles[id].food])),
-      });
-
-      for (const roleId of sidesOf(clash)) {
-        const role = draft.roles[roleId];
-        role.soldiers = Math.max(0, role.soldiers - outcome.casualties[roleId]);
-        role.food -= outcome.feeding[roleId].foodSpent;
-        role.soldiers = Math.max(0, role.soldiers - outcome.feeding[roleId].starved);
-        role.wounds += outcome.wounds[roleId];
-        if (role.wounds >= Number(data.meta.woundsFatal)) role.dead = true;
-        // Reinforcing soldiers are spent whatever happens.
-        const committed = clash.reinforcements[roleId];
-        if (committed) draft.roles[roleId].soldiers = Math.max(0, role.soldiers - committed);
-      }
-      // A reinforcing player is not in the clash, so their soldiers are taken
-      // here rather than in the loop above.
-      for (const [roleId, soldiers] of Object.entries(clash.reinforcements)) {
-        if (sidesOf(clash).includes(roleId)) continue;
-        draft.roles[roleId].soldiers = Math.max(0, draft.roles[roleId].soldiers - soldiers);
-      }
-
-      clash.result = outcome;
-      clash.stage = 'resolved';
+      advanceClash(clash);
+      settleClash(draft, data, clash);
     },
   },
 
