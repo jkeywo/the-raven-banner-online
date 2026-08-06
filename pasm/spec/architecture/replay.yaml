@@ -58,8 +58,6 @@ entities:
         - "It reuses the save-opening flow from the host rather than a second reader of the same format, so a file that opens in one opens in the other."
         - The history list is built once and thereafter only has attributes flipped on it. Re-rendering a few thousand entries per step would hand back exactly the stutter the checkpointed cursor exists to prevent.
         - "The role rail mounts one sheet at a time and rebuilds it on every move, rather than keeping sixteen and hiding fifteen. Two private sheets on screen at once is the one thing a sheet called private should never be, and building on demand makes that a property of the code rather than something it has to remember."
-      references:
-        - blank-until-it-differs
     architecture:
       kind: client-interface
       authority: non-authoritative

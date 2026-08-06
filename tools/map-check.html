@@ -43,10 +43,12 @@
   <label><input type="checkbox" id="regions" checked> shire outlines</label>
   <label><input type="checkbox" id="pips" checked> settlements</label>
   <p class="note">
-    <code>data/</code> drawn over the printed maps. Every settlement pip should sit on
-    the letter it was read from, and inside the outline of the shire it was assigned to.
-    A pip in the wrong colour region is a misassignment; a pip with no letter under it
-    is an invention. This is the check the checksums cannot do.
+    <code>data/</code> drawn over the map artwork. Every settlement pip should sit inside
+    the outline of the shire it was assigned to, and every outline should follow the
+    border drawn under it — a pip in the wrong colour region is a misassignment, and an
+    outline crossing a border is a mistraced shire. This is the check the checksums
+    cannot do. It used to also catch a pip with no printed letter under it; the artwork
+    carries no letters now, and that check belonged to the transcription, which is done.
   </p>
 </header>
 <main>
@@ -83,7 +85,7 @@ document.getElementById('pips').onchange = draw;
 
 function draw() {
   for (const b of nav.children) b.setAttribute('aria-pressed', String(b.textContent === current));
-  document.getElementById('art').src = `../assets/maps/${current}.png`;
+  document.getElementById('art').src = `../assets/maps/${current}.svg`;
 
   const svg = document.getElementById('overlay');
   svg.setAttribute('viewBox', `0 0 ${geometry.viewBox[0]} ${geometry.viewBox[1]}`);

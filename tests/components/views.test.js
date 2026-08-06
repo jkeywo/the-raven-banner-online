@@ -15,8 +15,9 @@ import '../../gui/components/rb-seat-roster.js';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const core = await loadData();
 const geometry = JSON.parse(await readFile(join(ROOT, 'data', 'geometry.json'), 'utf8'));
-// The map view wants both halves of the printed sheet: where things sit, and
-// where the exporter blanked the state cells out of the art.
+// The map view wants both halves of the sheet: the shire outlines, and where
+// on the artwork each shire's frame, support strip, castles and settlements
+// belong, since the artwork itself draws none of them.
 const cells = JSON.parse(await readFile(join(ROOT, 'assets', 'maps', 'cells.json'), 'utf8'));
 const data = { ...core, geometry, cells };
 
@@ -24,8 +25,7 @@ const data = { ...core, geometry, cells };
  * A game with someone seated, projected as they would see it.
  *
  * `move` runs against the state before it is projected, which is how a test
- * asks for a board the game has actually moved — every map assertion about
- * live cells needs one, since an untouched board deliberately draws nothing.
+ * asks for a board something has happened on.
  */
 function seatedView({ roleId = 'king_alfred', move } = {}) {
   const state = createInitialState({ joinCode: 'RAVEN7Z', seed: 1, data });
@@ -47,6 +47,10 @@ const mount = (tag) => {
   document.body.append(element);
   return element;
 };
+
+/** Whoever holds this shire, however many lines their name took. */
+const steward = (cell) => [...cell.querySelectorAll('.rb-cell-steward')]
+  .map((line) => line.textContent).join(' ');
 
 beforeEach(() => { document.body.innerHTML = ''; });
 
@@ -99,26 +103,44 @@ describe('<rb-map>', () => {
     }
   });
 
-  it('draws nothing over a board still standing where the rules printed it', () => {
-    // The headline behaviour. The artwork's steward frames, support strips,
-    // castle stacks and settlement letters are blank parchment now, and on
-    // turn zero the overlay leaves them that way — the outlines are there to
-    // be clicked and nothing else. Anything the eye lands on has happened.
+  it('draws the whole board on a game nobody has touched yet', () => {
+    // The headline behaviour, and the opposite of what it used to be. The art
+    // says nothing about the game — no names, no frames, no letters — so a
+    // shire the overlay left alone would be a blank patch of countryside
+    // rather than a quiet one. Every shire on the sheet gets its paper form.
     const { view } = seatedView();
     const map = mount('rb-map');
+    map.setAttribute('sheet', 'northern');
     map.data = data;
     map.view = view;
 
-    expect(map.querySelectorAll('.rb-shire-cells')).toHaveLength(0);
-    expect(map.querySelectorAll('.rb-ghost')).toHaveLength(0);
-    expect(map.querySelectorAll('path.rb-shire.is-live')).toHaveLength(0);
+    const cells = [...map.querySelectorAll('.rb-shire-cells')];
+    expect(cells.map((g) => g.dataset.shire).sort()).toEqual(
+      Object.keys(data.shires.shires).filter((id) => data.shires.shires[id].map === 'northern').sort());
+
+    // Bernicia as the printed sheet has it: its name, the Danish steward the
+    // guide seats there, what supports him, and two castles.
+    const bernicia = map.querySelector('.rb-shire-cells[data-shire="bernicia"]');
+    expect(bernicia.querySelector('.rb-cell-shire').textContent).toBe('Bernicia');
+    // A long name is two lines in the frame, so read them together.
+    expect(steward(bernicia)).toContain('King Ecgberht');
+    expect(steward(bernicia)).toContain('D N');   // the factions he speaks for
+    expect(bernicia.querySelector('.rb-cell-support').textContent).toContain('N, Be');
+    expect(bernicia.querySelectorAll('.rb-cell-castle')).toHaveLength(2);
+    expect(bernicia.querySelectorAll('.rb-settlement')).toHaveLength(4);
+    // The frame and the strip ruled under it, so the cell reads as a form.
+    expect(bernicia.querySelector('rect.rb-cell-frame')).toBeTruthy();
+    expect(bernicia.querySelector('rect.rb-cell-strip')).toBeTruthy();
+
+    // And every shire is tinted by whoever holds it, from the first minute.
+    // As a style rather than a `color` attribute, which the stylesheet's own
+    // default for .rb-shire would quietly beat.
     for (const path of map.querySelectorAll('path.rb-shire')) {
-      expect(path.dataset.moved).toBe('false');
-      expect(path.hasAttribute('color')).toBe(false);
+      expect(path.style.color, path.dataset.shire).toBeTruthy();
     }
   });
 
-  it('draws a shire’s live cells the moment the game moves it', () => {
+  it('follows a shire the game moves', () => {
     const { view } = seatedView({
       move: (state) => {
         state.shires.wrekinsets.stewardRoleId = 'halfdan_ragnarsson';
@@ -133,32 +155,33 @@ describe('<rb-map>', () => {
     map.data = data;
     map.view = view;
 
-    const cellGroups = [...map.querySelectorAll('.rb-shire-cells')];
-    expect(cellGroups.map((g) => g.dataset.shire)).toEqual(['wrekinsets']);
-    const cell = cellGroups[0];
-    expect(cell.querySelector('.rb-cell-steward').textContent).toContain('Halfdan');
+    const cell = map.querySelector('.rb-shire-cells[data-shire="wrekinsets"]');
+    expect(steward(cell)).toContain('Halfdan Ragnarsson');
+    // Ceolwulf held it with three; the Dane who took it has thrown two down.
     expect(cell.querySelectorAll('.rb-cell-castle')).toHaveLength(1);
     expect(cell.querySelectorAll('.rb-settlement')).toHaveLength(3);
     expect(cell.querySelectorAll('.rb-settlement.is-destroyed')).toHaveLength(1);
     expect(cell.querySelector('.rb-settlement-strike')).toBeTruthy();
+
+    // The shires beside it are untouched and still fully drawn.
+    const jorvik = map.querySelector('.rb-shire-cells[data-shire="jorvik"]');
+    expect(steward(jorvik)).toContain('Halfdan Ragnarsson');
   });
 
-  it('marks a shire held without support, once losing it was something that happened', () => {
-    // Rewritten from "three of them at turn zero". Halfdan and Guthrum start
-    // unsupported everywhere they stand, so at turn zero that is a printed
-    // fact rather than an event and the map keeps quiet about it. A Dane
-    // taking a Mercian shire off Ceowulf is an event, and hatches.
-    const { view } = seatedView({
-      move: (state) => { state.shires.wrekinsets.stewardRoleId = 'halfdan_ragnarsson'; },
-    });
+  it('hatches a shire held without support, from the first minute', () => {
+    // Halfdan and Guthrum have settled nowhere, so the shires they hold pay
+    // nothing and count toward Disorder before anyone has done anything. The
+    // board says so, because the board is the only thing that can.
+    const { view } = seatedView();
     const map = mount('rb-map');
     map.setAttribute('sheet', 'northern');
     map.data = data;
     map.view = view;
 
-    const unsupported = [...map.querySelectorAll('path.is-unsupported')].map((p) => p.dataset.shire);
-    expect(unsupported).toEqual(['wrekinsets']);
-    expect(map.querySelector('.rb-cell-support.is-lost')).toBeTruthy();
+    const unsupported = [...map.querySelectorAll('path.is-unsupported')]
+      .map((p) => p.dataset.shire).sort();
+    expect(unsupported).toEqual(['jorvik', 'ribble']);   // east_anglia is eastern
+    expect(map.querySelectorAll('.rb-cell-support.is-lost')).toHaveLength(2);
   });
 
   it('raises the shire that was clicked, rather than deciding anything', () => {
@@ -209,13 +232,23 @@ describe('<rb-map>', () => {
     expect(heard).toBe(null);
   });
 
-  it('leaves a ghost blank while its shire is still where it was printed', () => {
+  it('fills every ghost in before anything has happened', () => {
+    // Rewritten from "leaves a ghost blank until its shire moves". A ghost is
+    // a frame the art does not draw either, so an empty one would be a grey
+    // rectangle in the sea rather than a neighbour worth glancing at.
     const { view } = seatedView();
     const map = mount('rb-map');
     map.setAttribute('sheet', 'northern');
     map.data = data;
     map.view = view;
-    expect(map.querySelector('.rb-ghost')).toBe(null);
+
+    const ghosts = [...map.querySelectorAll('.rb-ghost')];
+    expect(ghosts.map((g) => g.dataset.ghostShire).sort())
+      .toEqual(['magonsets', 'middle_anglia', 'south_mercia']);
+    for (const ghost of ghosts) {
+      expect(ghost.querySelector('.rb-ghost-name').textContent).toBeTruthy();
+      expect(ghost.querySelector('.rb-ghost-steward').textContent).toBeTruthy();
+    }
   });
 
   it('opens a card on the shire chosen, and puts it away again', () => {

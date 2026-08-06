@@ -38,12 +38,38 @@ function stubFetch() {
   });
 }
 
+/**
+ * A storage object of this test's own, rather than one shared and wiped.
+ *
+ * Starting a game queues a debounced autosave, and 250ms later it writes — by
+ * which time the test that started it has finished and a later one has put its
+ * own saves in storage and is asserting about them. Clearing a shared
+ * localStorage cannot help, because the stale timer fires after the clear; a
+ * fresh object can, because the write then lands in the storage of the test
+ * that asked for it, where nobody is looking any more. The failure this
+ * prevents is a resume panel that refuses to hide, in one run out of a few,
+ * depending on how long the tests before it happened to take.
+ */
+function ownStorage() {
+  const entries = new Map();
+  return {
+    get length() { return entries.size; },
+    key: (index) => [...entries.keys()][index] ?? null,
+    getItem: (key) => (entries.has(key) ? entries.get(key) : null),
+    setItem: (key, value) => { entries.set(key, String(value)); },
+    removeItem: (key) => { entries.delete(key); },
+    clear: () => entries.clear(),
+  };
+}
+
 beforeEach(() => {
   document.documentElement.innerHTML = '';
   stubFetch();
   // No broker and no WebRTC. Nothing here gets as far as starting a game.
   delete globalThis.Peer;
-  globalThis.localStorage?.clear?.();
+  Object.defineProperty(globalThis, 'localStorage', {
+    value: ownStorage(), configurable: true, writable: true,
+  });
 });
 
 describe('the facilitator console', () => {

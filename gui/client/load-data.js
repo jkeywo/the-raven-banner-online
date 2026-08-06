@@ -16,11 +16,12 @@ const CORE = ['shires', 'adjacency', 'roles', 'briefs', 'archetypes',
 /**
  * The two files only the map view needs.
  *
- * `geometry` is where things sit on the printed sheets — outlines and
- * settlement anchors. `cells` is where the exporter blanked the state-bearing
- * cells out of the artwork, and so where the overlay has to put them back. It
- * lives beside the art it describes rather than under `data/`, because it is a
- * fact about those pictures and is regenerated whenever they are.
+ * `geometry` is where things sit on the sheets — shire outlines and settlement
+ * anchors. `cells` is where each shire's steward frame, support strip, castle
+ * stack and settlement letters belong on the artwork, which draws none of them
+ * itself. It lives beside the art it describes rather than under `data/`,
+ * because it is a fact about those pictures and is regenerated whenever they
+ * are.
  */
 const MAP_EXTRAS = [
   { name: 'geometry', url: 'data/geometry.json' },

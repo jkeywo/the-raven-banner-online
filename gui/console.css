@@ -451,50 +451,44 @@ rb-map { display: block; }
   background: var(--rb-paper);
 }
 
+/* The wash of whoever holds the ground, under everything else.
+   Deliberately weaker than it looks like it should be: Wessex is blue and so
+   is the sea, and at any more than a tenth the Channel and the shires either
+   side of it read as the same thing. The boundary does the work instead —
+   the shires are outlined in the same colour at full weight. */
 .rb-shire {
   fill: currentColor;
-  fill-opacity: 0.14;
+  fill-opacity: 0.1;
   stroke: currentColor;
   stroke-width: 2;
-  stroke-opacity: 0.5;
+  stroke-opacity: 0.65;
   color: var(--rb-muted);
   cursor: pointer;
   transition: fill-opacity 120ms ease;
 }
 
-/* Blank until it differs. A shire the game has not moved is a hit target and
-   nothing else — the printed parchment shows through it untouched. It still
-   answers a hover, because a map you cannot tell is clickable is a map nobody
-   clicks. */
-.rb-shire[data-moved="false"] {
-  fill-opacity: 0;
-  stroke-opacity: 0;
-}
-
 .rb-shire:hover { fill-opacity: 0.3; }
-.rb-shire[data-moved="false"]:hover { fill-opacity: 0.1; stroke-opacity: 0.35; }
 
-.rb-shire.is-selected,
-.rb-shire[data-moved="false"].is-selected {
+.rb-shire.is-selected {
   fill-opacity: 0.34;
   stroke-width: 5;
   stroke-opacity: 1;
 }
 
 /* Held without support: the defended settlements pay nothing and the shire
-   counts toward Disorder, so it is hatched rather than merely tinted. */
+   counts toward Disorder, so it is hatched rather than merely tinted. Three
+   shires open this way, so it is a marker rather than an alarm — dashed enough
+   to find, quiet enough to live with for five turns. */
 .rb-shire.is-unsupported {
-  stroke-dasharray: 14 9;
-  stroke-width: 5;
-  stroke-opacity: 0.95;
+  stroke-dasharray: 12 10;
+  stroke-width: 4;
+  stroke-opacity: 0.8;
 }
 
 /* A valid target of the action just chosen — an amber glow rather than the
    blood-red the game already uses for "yours" and "unsupported", so a
-   highlighted shire cannot be mistaken for either. Louder than the blank rule
-   above, because a chooser has to be able to point at a quiet shire. */
-.rb-shire.is-highlighted,
-.rb-shire[data-moved="false"].is-highlighted {
+   highlighted shire cannot be mistaken for either. */
+.rb-shire.is-highlighted {
   fill: var(--rb-amber);
   fill-opacity: 0.4;
   stroke: var(--rb-amber);
@@ -507,12 +501,48 @@ rb-map { display: block; }
   50% { fill-opacity: 0.18; }
 }
 
-/* --- the cells the printed sheet no longer carries ----------------------- */
+/* --- the cells, which are the whole of what the art no longer says -------- */
 
-/* Drawn over blanked parchment, so they read as ink on the sheet rather than
-   as an interface floating above it. None of them take a click: the outline
-   underneath is the hit target. */
+/* Ink on the sheet rather than an interface floating above it. None of them
+   take a click: the shire outline underneath is the hit target. */
 .rb-shire-cells, .rb-ghost { pointer-events: none; }
+
+/* The Control/Steward box and the support strip ruled off beneath it, drawn as
+   the printed sheet drew them. Filled rather than merely outlined, because
+   they sit on terrain now and a name over a coastline is a name nobody can
+   read. Not quite opaque, so the ground still shows faintly through and the
+   box reads as printed on the map rather than laid on top of it. */
+.rb-cell-frame, .rb-cell-strip {
+  fill: var(--rb-paper);
+  fill-opacity: 0.92;
+  stroke: var(--rb-ink);
+  stroke-opacity: 0.75;
+  stroke-width: 1.5;
+}
+
+.rb-cell-strip { fill-opacity: 0.86; }
+
+/* The shire's own name, over its frame. */
+.rb-cell-shire {
+  font: 600 21px var(--rb-serif);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  fill: var(--rb-ink);
+  text-anchor: middle;
+  paint-order: stroke;
+  stroke: var(--rb-paper);
+  stroke-width: 4;
+  stroke-opacity: 0.85;
+}
+
+/* "CONTROL / STEWARD" in the corner of the box it names, as small and as quiet
+   as it is in print — it is a caption on a form, not information. */
+.rb-cell-label {
+  font: 8px var(--rb-sans);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  fill: var(--rb-muted);
+}
 
 .rb-cell-steward {
   font: 600 19px var(--rb-serif);
@@ -520,24 +550,29 @@ rb-map { display: block; }
   text-anchor: middle;
 }
 
-.rb-cell-factions {
-  font: 12px var(--rb-sans);
-  letter-spacing: 0.12em;
-  fill: var(--rb-muted);
-  text-anchor: middle;
+/* The faction letters leading the steward's name, set larger as the sheet sets
+   them: the letter is the thing another player reads across the table. */
+.rb-cell-faction {
+  font-weight: 700;
+  font-size: 22px;
+  fill: var(--rb-blood);
 }
 
 .rb-cell-sea {
-  font: 11px var(--rb-sans);
+  font: 10px var(--rb-sans);
+  letter-spacing: 0.06em;
   fill: var(--rb-muted);
   text-anchor: end;
 }
 
+/* Moved off the printed number by a contract or a defensive fleet. */
+.rb-cell-sea.is-moved { fill: var(--rb-blood); font-weight: 700; }
+
 .rb-cell-support {
   font: 600 11px var(--rb-sans);
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   fill: var(--rb-ink);
-  text-anchor: middle;
+  text-anchor: start;
 }
 
 .rb-cell-support.is-lost {
@@ -545,7 +580,14 @@ rb-map { display: block; }
   text-decoration: line-through;
 }
 
-.rb-cell-castle { fill: var(--rb-ink); fill-opacity: 0.85; }
+/* Outlined as well as filled: the stack stands off the frame's edge on open
+   ground, where a solid silhouette would read as a blot. */
+.rb-cell-castle {
+  fill: var(--rb-ink);
+  fill-opacity: 0.85;
+  stroke: var(--rb-paper);
+  stroke-width: 1.5;
+}
 
 .rb-cell-nocastle {
   font: 22px var(--rb-serif);
@@ -573,10 +615,11 @@ rb-map { display: block; }
 }
 
 /* Struck rather than removed: the letter is what the sheet said was there,
-   and its absence is the point. */
+   and its absence is the point — so the cross has to be thin enough to still
+   read the letter through. Four points wide obliterated it. */
 .rb-settlement-strike {
   stroke: var(--rb-blood);
-  stroke-width: 4;
+  stroke-width: 2.5;
   stroke-linecap: round;
 }
 
@@ -586,22 +629,28 @@ rb-map { display: block; }
 /* --- ghost shires -------------------------------------------------------- */
 
 /* A read-only copy of a shire played on another sheet. Quieter than the real
-   thing on purpose — there is one place to select a shire, and this is not it. */
+   thing on purpose — there is one place to select a shire, and this is not it.
+   The paper fill is the same as a real frame's, because it has the same job of
+   holding a name up off the terrain; everything drawn in it is greyer. */
 .rb-ghost-box {
-  fill: currentColor;
-  fill-opacity: 0.12;
+  fill: var(--rb-paper);
+  fill-opacity: 0.82;
   stroke: currentColor;
-  stroke-opacity: 0.4;
+  stroke-opacity: 0.5;
   stroke-width: 1.5;
   color: var(--rb-muted);
 }
 
 .rb-ghost-name {
-  font: 600 13px var(--rb-sans);
-  letter-spacing: 0.08em;
+  font: 600 15px var(--rb-serif);
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   fill: var(--rb-muted);
   text-anchor: middle;
+  paint-order: stroke;
+  stroke: var(--rb-paper);
+  stroke-width: 3.5;
+  stroke-opacity: 0.85;
 }
 
 .rb-ghost-steward {

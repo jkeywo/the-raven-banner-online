@@ -148,18 +148,22 @@ describe('the replay screen', () => {
 
   it('keeps the map in lockstep with the state at the cursor', async () => {
     await opened();
-    const wiltshire = () => document.querySelector('#england [data-shire="wiltshire"]');
+    // The steward drawn in Wiltshire's frame, which is the board saying who
+    // holds it — the map draws every shire every turn, so this cell is filled
+    // in at every cursor position and only its contents move.
+    const holder = () => [...document.querySelectorAll(
+      '#england .rb-shire-cells[data-shire="wiltshire"] .rb-cell-steward')]
+      .map((line) => line.textContent).join(' ');
 
-    // Turn zero is a quiet board: nothing has moved off the printed sheet.
-    expect(wiltshire().dataset.moved).toBe('false');
+    expect(holder()).toContain('King Alfred');
 
     document.getElementById('to-end').click();
 
-    // The last action handed Wiltshire to a Dane, so now it has.
-    expect(wiltshire().dataset.moved).toBe('true');
+    // The last action handed Wiltshire to a Dane, so the frame says so.
+    expect(holder()).toContain('Guthrum');
 
     document.getElementById('to-start').click();
-    expect(wiltshire().dataset.moved).toBe('false');
+    expect(holder()).toContain('King Alfred');
   });
 
   it('moves the Aftermath counters as the cursor moves', async () => {

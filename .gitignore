@@ -5,6 +5,6 @@ node_modules/
 .vitest/
 __pycache__/
 
-# The map PDFs are not committed; the SVG art and data are. The SVGs
-# themselves are generated from raw/ by tools/export_maps_svg.py and committed.
+# The artist's source files are not committed; what the game serves is. The
+# sheets in assets/maps/ are installed from raw/ by tools/export_maps_svg.py.
 raw/

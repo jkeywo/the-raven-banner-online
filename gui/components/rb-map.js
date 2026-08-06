@@ -1,35 +1,36 @@
 /**
- * <rb-map> — the three printed sheets as vector art, with the live game in the
- * cells the art no longer carries.
+ * <rb-map> — the artist's three sheets, with the whole game drawn onto them.
  *
- * The sheets are the exported SVGs from `tools/export_maps_svg.py`, which are
- * the printed artwork with the state-bearing cells cut out of it: the steward
- * frame, the support strip, the castle stack and every settlement letter are
- * blank parchment now. `assets/maps/cells.json` says where those cells were.
- * So the art and the overlay are not two pictures of the same fact any more —
- * the art is the geography and the overlay is the game, and neither can
- * contradict the other because neither draws what the other draws.
+ * The art is geography and nothing else: terrain, coastline, borders, sea. It
+ * carries no shire names, no steward frames, no castle glyphs and no
+ * settlement letters, because everything a printed sheet says about the game
+ * is a thing the game can change, and a drawing that states a fact cannot be
+ * corrected when the fact moves. So the drawing states none of them and this
+ * component states all of them, every shire, every turn.
+ *
+ * That is the whole of it: the art can never be wrong, and there is exactly
+ * one place a player can read who holds Jorvik. An earlier version drew a cell
+ * only where the live board had moved off the printed one, which was right
+ * while the art still spoke — a quiet shire was quiet because the paper had
+ * already said what was true of it. On art that says nothing, a quiet shire is
+ * an unlabelled blank.
+ *
+ * What it draws is the paper form, redrawn: the Control/Steward frame, the
+ * support strip ruled off underneath it, the castle stack up the frame's right
+ * edge, the shire's name over it in small caps, and a letter at each
+ * settlement — F, T or C, ringed when it is defended and struck through when
+ * it has been burned. `assets/maps/cells.json` says where all of those belong.
+ * Anyone who has played this on a table should recognise their own sheet.
  *
  * Art and overlay live inside one `<svg>` rather than an image with a second
- * SVG floating over it. They shared a viewBox before and lined up because two
- * elements agreed about `preserveAspectRatio`; now they share a coordinate
- * system and cannot come apart at all.
- *
- * **Blank until it differs.** A shire the game has not moved draws nothing —
- * no tint, no name, no castles, no letters. Turn zero is a quiet board, which
- * is what makes the first burned farm impossible to miss. The predicate is in
- * `gui/rules/map-state.js` and is testable without any of this. The outline is
- * still there under the parchment, because a click needs a target whether or
- * not anything has happened yet, and because the chooser has to be able to
- * point at shires an action could reach.
+ * SVG floating over it, so they share a coordinate system rather than merely
+ * agreeing about `preserveAspectRatio`, and cannot come apart.
  *
  * Read-only in itself. It renders a projection, raises `rb-shire` when a shire
  * is chosen, and shows whatever the page around it parked in `slot="card"` —
  * the player's read-out, or the facilitator's editor. It never decides
  * anything.
  */
-
-import { shireDeviations } from '../rules/map-state.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -65,8 +66,7 @@ export class RbMap extends HTMLElement {
   /**
    * Shires worth pointing a player's eye at right now — the valid targets of
    * an action they have just picked. Presentation only: clicking one of these
-   * still goes through the same `rb-shire` event as clicking any other, and it
-   * works on a blank shire, which is the point of keeping the outlines.
+   * still goes through the same `rb-shire` event as clicking any other.
    */
   set highlighted(ids) {
     this._highlighted = ids ? new Set(ids) : null;
@@ -185,17 +185,19 @@ export class RbMap extends HTMLElement {
     const overlay = this.querySelector('.rb-map-overlay');
     overlay.replaceChildren();
 
-    for (const [id, printed] of Object.entries(this._data.shires.shires)) {
-      if (printed.map !== this.sheet) continue;
-      const outline = geometry.shires[id];
-      const live = this._view.shires?.[id];
-      if (!outline?.polygon || !live) continue;
+    // Every outline first, then every cell, rather than one shire at a time.
+    // The tints are washes and the cells are ink: drawn shire by shire, a
+    // neighbour's wash would land on top of the frame drawn just before it.
+    const here = Object.entries(this._data.shires.shires)
+      .filter(([id, printed]) => printed.map === this.sheet
+        && geometry.shires[id]?.polygon && this._view.shires?.[id]);
 
-      const moved = shireDeviations(this._view, this._data, id);
-      overlay.append(this._shirePath(id, printed, live, outline, moved));
-      if (moved.length) {
-        overlay.append(this._shireCells(id, printed, live, sheetCells[id], outline, moved));
-      }
+    for (const [id, printed] of here) {
+      overlay.append(this._shirePath(id, printed, this._view.shires[id], geometry.shires[id]));
+    }
+    for (const [id, printed] of here) {
+      overlay.append(this._shireCells(
+        id, printed, this._view.shires[id], sheetCells[id], geometry.shires[id]));
     }
 
     for (const ghost of sheetCells.ghosts ?? []) {
@@ -229,50 +231,47 @@ export class RbMap extends HTMLElement {
               aria-selected="${sheet.id === this.sheet}">${sheetLabel(sheet.display_name)}</button>`).join('');
   }
 
-  /**
-   * The hit target, and the tint when there is something to tint.
-   *
-   * Always drawn, whether or not the shire has moved. A blank shire is
-   * transparent rather than absent: the chooser still points at it, a click
-   * still opens it, and the printed parchment shows through.
-   */
-  _shirePath(id, printed, live, outline, moved) {
+  /** The hit target, and the wash of whoever holds the ground. */
+  _shirePath(id, printed, live, outline) {
     const path = document.createElementNS(SVG_NS, 'path');
     path.setAttribute('d', outline.polygon);
     path.setAttribute('class', 'rb-shire');
     path.dataset.shire = id;
-    path.dataset.moved = String(moved.length > 0);
-    if (moved.length) path.classList.add('is-live');
     if (id === this._selected) path.classList.add('is-selected');
     if (this._highlighted?.has(id)) path.classList.add('is-highlighted');
 
-    // Tinted by whoever holds it, and only once the game has moved it. An
-    // unheld shire, or one whose holder has no faction, keeps the parchment.
-    if (moved.length) {
-      const tint = this._tintFor(live.stewardRoleId);
-      if (tint) path.setAttribute('color', tint);
-      // Without support, defended settlements pay nothing and the shire counts
-      // toward Disorder — worth seeing on the board rather than only in a
-      // table. Hatched only where losing it was something that happened.
-      if (moved.includes('support') && this._supported(id) === false) {
-        path.classList.add('is-unsupported');
-      }
-    }
+    // Tinted by whoever holds it. A shire nobody holds, or whose holder speaks
+    // for no faction, keeps the plain wash — there is no colour to give it.
+    //
+    // Set as a style rather than as the `color` presentation attribute: the
+    // stylesheet gives .rb-shire a default colour, and any rule with a
+    // selector beats a presentation attribute, so an attribute here would be
+    // silently ignored and every shire would come out the same grey.
+    const tint = this._tintFor(live.stewardRoleId);
+    if (tint) path.style.color = tint;
+
+    // Without support, defended settlements pay nothing and the shire counts
+    // toward Disorder. That is worth seeing on the board rather than only in a
+    // table, so it is hatched rather than merely tinted.
+    if (this._supported(id) === false) path.classList.add('is-unsupported');
 
     path.append(titleFor(`${printed.name} — ${this._describe(id, printed, live)}`));
     return path;
   }
 
-  /** The cells the printed sheet used to fill in, filled in from state. */
-  _shireCells(id, printed, live, cell, outline, moved) {
+  /** The sheet the shire had on paper, drawn from what is true now. */
+  _shireCells(id, printed, live, cell, outline) {
     const group = document.createElementNS(SVG_NS, 'g');
     group.setAttribute('class', 'rb-shire-cells');
     group.dataset.shire = id;
 
     const frame = cell?.frame ?? frameOf(outline);
+    const support = cell?.support ?? stripUnder(frame);
     if (frame) {
-      group.append(...this._frameCell(id, printed, live, frame, moved));
-      if (cell?.support) group.append(this._supportCell(id, printed, cell.support));
+      group.append(box(frame, 'rb-cell-frame'), box(support, 'rb-cell-strip'));
+      group.append(this._shireName(printed, frame));
+      group.append(...this._frameCell(id, printed, live, frame));
+      group.append(...this._supportCell(id, printed, support));
       if (cell?.castles) group.append(...castleStack(cell.castles, live.castles));
     }
 
@@ -286,74 +285,106 @@ export class RbMap extends HTMLElement {
     return group;
   }
 
-  /** Who holds it, what they speak for, and anything printed that is now wrong. */
-  _frameCell(id, printed, live, frame, moved) {
-    const nodes = [];
+  /**
+   * The shire's name, above its frame in letterspaced small caps.
+   *
+   * The printed sheets set it wherever the coastline left room — under
+   * Bernicia's frame, over North Mercia's. There is no transcription of where
+   * each one sat, and inventing one per shire would be eighteen numbers nobody
+   * could check, so they all go above: the strip below the frame is spoken
+   * for, and above it is the one side that is free on every sheet.
+   */
+  _shireName(printed, frame) {
+    const text = document.createElementNS(SVG_NS, 'text');
+    text.setAttribute('class', 'rb-cell-shire');
+    text.setAttribute('x', (frame.x0 + frame.x1) / 2);
+    text.setAttribute('y', frame.y0 - 7);
+    text.textContent = printed.name;
+    return text;
+  }
+
+  /** Who holds it, and what they speak for. */
+  _frameCell(id, printed, live, frame) {
+    const nodes = [label(frame.x0 + 7, frame.y0 + 13, 'Control / Steward')];
     const midX = (frame.x0 + frame.x1) / 2;
     const steward = live.stewardRoleId;
     const name = steward
       ? this._data.roles.roles[steward]?.name ?? steward
       : 'unheld';
 
-    const lines = wrapWords(name, NAME_WRAP);
+    // The faction letters lead the name on one line, as they do in print,
+    // because the letters in the support strip below only mean anything read
+    // against them: "support M" is support from the man's own side or from a
+    // rival depending entirely on this. They eat into the width the name has,
+    // so they come out of its wrapping budget — otherwise the two shires whose
+    // steward speaks for two factions push their names into the castles.
+    const factions = this._factionsOf(steward);
+    const lines = wrapWords(name, NAME_WRAP - factions.join(' ').length);
     lines.forEach((line, index) => {
       const text = document.createElementNS(SVG_NS, 'text');
       text.setAttribute('class', 'rb-cell-steward');
       text.setAttribute('x', midX);
-      text.setAttribute('y', frame.y0 + 30 + index * 22 - (lines.length - 1) * 8);
-      text.textContent = line;
+      text.setAttribute('y', frame.y0 + 45 + index * 23 - (lines.length - 1) * 11);
+      if (index === 0 && factions.length) {
+        const mark = document.createElementNS(SVG_NS, 'tspan');
+        mark.setAttribute('class', 'rb-cell-faction');
+        mark.textContent = `${factions.join(' ')} `;
+        text.append(mark);
+      }
+      text.append(document.createTextNode(line));
       nodes.push(text);
     });
 
-    // What they speak for, which is the other half of reading the support
-    // strip below: the letters in the box only mean anything against these.
-    const factions = this._factionsOf(steward);
-    if (factions.length) {
-      const text = document.createElementNS(SVG_NS, 'text');
-      text.setAttribute('class', 'rb-cell-factions');
-      text.setAttribute('x', midX);
-      text.setAttribute('y', frame.y1 - 9);
-      text.textContent = factions.join(' ');
-      nodes.push(text);
-    }
-
     if (live.missionaryCross) {
-      const cross = missionaryCross(frame.x1 - 15, frame.y0 + 16);
+      const cross = missionaryCross(frame.x1 - 15, frame.y0 + 15);
       cross.append(titleFor('Christian missionaries have planted a cross here'));
       nodes.push(cross);
-    }
-
-    // The printed ship number is still on the artwork — it was never a cell —
-    // so when a contract or a defensive fleet moves it, the sheet is quietly
-    // lying. Say the real one where the frame has room.
-    if (moved.includes('shipCost')) {
-      const cost = this._view.derived?.shires?.[id]?.shipCost;
-      if (cost !== null && cost !== undefined) {
-        const text = document.createElementNS(SVG_NS, 'text');
-        text.setAttribute('class', 'rb-cell-sea');
-        text.setAttribute('x', frame.x1 - 6);
-        text.setAttribute('y', frame.y1 - 9);
-        text.textContent = `sea ${cost}`;
-        text.append(titleFor(`Reachable by sea for ${cost}, not the ${printed.shipCost} printed`));
-        nodes.push(text);
-      }
     }
 
     return nodes;
   }
 
-  /** The support box, redrawn, and marked when it is doing nothing. */
+  /**
+   * The support strip: who is behind the steward, and what it costs to arrive
+   * by sea.
+   *
+   * The ship number sat on a little boat out in the water on the printed
+   * sheet, and there is no transcription of where those boats were, so it
+   * moves to the free end of this strip. It is drawn from the derived value
+   * rather than the printed one, which is the same number until a contract or
+   * a defensive fleet moves it.
+   */
   _supportCell(id, printed, support) {
+    const nodes = [label(support.x0 + 7, support.y1 - 3, 'Support')];
     const text = document.createElementNS(SVG_NS, 'text');
     text.setAttribute('class', 'rb-cell-support');
-    text.setAttribute('x', (support.x0 + support.x1) / 2);
-    text.setAttribute('y', support.y1 - 2);
-    text.textContent = printed.support.join(' / ');
+    text.setAttribute('x', support.x0 + 56);
+    text.setAttribute('y', support.y1 - 3);
+    // Not upper-cased: the printed legend distinguishes N (Northumbria) from
+    // Be (Bernicia) and Ea (East Anglia) by that second lower-case letter.
+    text.textContent = printed.support.join(', ');
     if (this._supported(id) === false) {
       text.classList.add('is-lost');
       text.append(titleFor('Held without support: defended settlements pay nothing here'));
     }
-    return text;
+    nodes.push(text);
+
+    const derived = this._view.derived?.shires?.[id];
+    const cost = derived && 'shipCost' in derived ? derived.shipCost : printed.shipCost;
+    if (cost !== null && cost !== undefined) {
+      const sea = document.createElementNS(SVG_NS, 'text');
+      sea.setAttribute('class', 'rb-cell-sea');
+      sea.setAttribute('x', support.x1 - 7);
+      sea.setAttribute('y', support.y1 - 3);
+      sea.textContent = `sea ${cost}`;
+      if (cost !== printed.shipCost) {
+        sea.classList.add('is-moved');
+        sea.append(titleFor(
+          `Reachable by sea for ${cost}, not the ${printed.shipCost} the sheet was printed with`));
+      }
+      nodes.push(sea);
+    }
+    return nodes;
   }
 
   /**
@@ -371,35 +402,32 @@ export class RbMap extends HTMLElement {
     const live = id ? this._view.shires?.[id] : null;
     const printed = id ? this._data.shires.shires[id] : null;
     if (!live || !printed) return null;
-    if (!shireDeviations(this._view, this._data, id).length) return null;
 
     const group = document.createElementNS(SVG_NS, 'g');
     group.setAttribute('class', 'rb-ghost');
     group.dataset.ghostShire = id;
 
     const tint = this._tintFor(live.stewardRoleId);
-    const box = document.createElementNS(SVG_NS, 'rect');
-    box.setAttribute('class', 'rb-ghost-box');
-    box.setAttribute('x', ghost.x0);
-    box.setAttribute('y', ghost.y0);
-    box.setAttribute('width', ghost.x1 - ghost.x0);
-    box.setAttribute('height', ghost.y1 - ghost.y0);
-    if (tint) box.setAttribute('color', tint);
-    group.append(box);
+    const frame = { x0: ghost.x0, y0: ghost.y0, x1: ghost.x1, y1: ghost.y1 };
+    const outline = box(frame, 'rb-ghost-box');
+    if (tint) outline.style.color = tint;
+    group.append(outline);
 
     const midX = (ghost.x0 + ghost.x1) / 2;
-    const label = document.createElementNS(SVG_NS, 'text');
-    label.setAttribute('class', 'rb-ghost-name');
-    label.setAttribute('x', midX);
-    label.setAttribute('y', ghost.y0 + 20);
-    label.textContent = printed.name;
-    group.append(label);
+    const name = document.createElementNS(SVG_NS, 'text');
+    name.setAttribute('class', 'rb-ghost-name');
+    name.setAttribute('x', midX);
+    name.setAttribute('y', ghost.y0 - 6);
+    name.textContent = printed.name;
+    group.append(name);
+
+    group.append(label(ghost.x0 + 7, ghost.y0 + 13, 'Control'));
 
     const steward = live.stewardRoleId;
     const who = document.createElementNS(SVG_NS, 'text');
     who.setAttribute('class', 'rb-ghost-steward');
     who.setAttribute('x', midX);
-    who.setAttribute('y', ghost.y1 - 13);
+    who.setAttribute('y', ghost.y1 - 14);
     who.textContent = steward
       ? this._data.roles.roles[steward]?.name ?? steward
       : 'unheld';
@@ -500,37 +528,62 @@ function anchor(at, size, sides) {
   return { side: sides[chosen][0], at: lead + size * sides[chosen][1] };
 }
 
-/** The crenellated stack beside a frame, one tower per castle still standing. */
+/**
+ * The stack up a frame's right edge, one tower per castle still standing.
+ *
+ * A column growing upward off the frame's bottom corner, which is where the
+ * printed sheet put it: a shire that throws a castle down loses the top of its
+ * own stack rather than having the whole thing shuffle.
+ */
 function castleStack(cell, castles) {
   const towers = [];
   const count = Math.max(0, castles);
-  const size = 26;
-  const perRow = 2;
-  const midX = (cell.x0 + cell.x1) / 2;
-  const midY = (cell.y0 + cell.y1) / 2;
-  const rows = Math.ceil(count / perRow) || 1;
+  const size = 22;
+  const gap = 2;
+  const x = cell.x0 + 3;
   for (let i = 0; i < count; i += 1) {
-    const row = Math.floor(i / perRow);
-    const inRow = Math.min(perRow, count - row * perRow);
-    const column = i % perRow;
     const tower = document.createElementNS(SVG_NS, 'path');
     tower.setAttribute('class', 'rb-cell-castle');
-    tower.setAttribute('d', castlePath(
-      midX + (column - (inRow - 1) / 2) * (size + 6),
-      midY + (row - (rows - 1) / 2) * (size + 6),
-      size));
+    tower.setAttribute('d', castlePath(x + size / 2, cell.y1 - 1 - (i + 0.5) * (size + gap), size));
+    tower.append(titleFor(`${count} ${count === 1 ? 'castle' : 'castles'}`));
     towers.push(tower);
   }
   if (count === 0) {
     const none = document.createElementNS(SVG_NS, 'text');
     none.setAttribute('class', 'rb-cell-nocastle');
-    none.setAttribute('x', midX);
-    none.setAttribute('y', midY + 6);
+    none.setAttribute('x', x + size / 2);
+    none.setAttribute('y', cell.y1 - 6);
     none.textContent = '—';
     none.append(titleFor('No castles left standing'));
     towers.push(none);
   }
   return towers;
+}
+
+/** A ruled box, as the printed sheet ruled its frames. */
+function box(rect, className) {
+  const node = document.createElementNS(SVG_NS, 'rect');
+  node.setAttribute('class', className);
+  node.setAttribute('x', rect.x0);
+  node.setAttribute('y', rect.y0);
+  node.setAttribute('width', rect.x1 - rect.x0);
+  node.setAttribute('height', rect.y1 - rect.y0);
+  return node;
+}
+
+/** The tiny small-caps heading a printed cell carries in its top-left corner. */
+function label(x, y, text) {
+  const node = document.createElementNS(SVG_NS, 'text');
+  node.setAttribute('class', 'rb-cell-label');
+  node.setAttribute('x', x);
+  node.setAttribute('y', y);
+  node.textContent = text;
+  return node;
+}
+
+/** The support strip's rectangle, when the manifest has not already said. */
+function stripUnder(frame) {
+  return frame ? { x0: frame.x0, y0: frame.y1, x1: frame.x1, y1: frame.y1 + 14 } : null;
 }
 
 /** A tower with three merlons, drawn rather than typed — no font to trust. */
@@ -620,23 +673,27 @@ function anchorOf(outline, index) {
 }
 
 /**
- * Greedy word wrap by character count.
+ * A name on one line if it fits, and on two balanced ones if it does not.
  *
  * No text metrics: this runs in a test environment with no layout engine, and
- * a name that wraps one word early is a far smaller problem than a renderer
- * that cannot be tested at all. Two lines is the most a frame has room for, so
- * anything longer is simply allowed to be a little wide.
+ * a name that breaks one word early is a far smaller problem than a renderer
+ * that cannot be tested at all. Two lines is all a frame has room for, so the
+ * question is only where to break, and the answer is wherever leaves the two
+ * halves closest in length — greedy filling gave "Guthrum the / Old", which
+ * looks like a mistake even though it fits.
  */
 function wrapWords(text, max) {
   const words = String(text).split(/\s+/).filter(Boolean);
-  const lines = [];
-  for (const word of words) {
-    const last = lines[lines.length - 1];
-    if (last && last.length + 1 + word.length <= max) lines[lines.length - 1] = `${last} ${word}`;
-    else lines.push(word);
+  if (!words.length) return [''];
+  if (words.join(' ').length <= max || words.length === 1) return [words.join(' ')];
+
+  let best = null;
+  for (let i = 1; i < words.length; i += 1) {
+    const lines = [words.slice(0, i).join(' '), words.slice(i).join(' ')];
+    const evenness = Math.abs(lines[0].length - lines[1].length);
+    if (!best || evenness < best.evenness) best = { evenness, lines };
   }
-  if (lines.length <= 2) return lines.length ? lines : [''];
-  return [lines[0], lines.slice(1).join(' ')];
+  return best.lines;
 }
 
 const clamp = (value, low, high) => Math.min(high, Math.max(low, value));

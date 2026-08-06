@@ -1,101 +1,116 @@
 #!/usr/bin/env python3
-"""Emit the three printed map sheets as vector SVGs for the web client.
+"""Install the three map sheets and say where the game's cells sit on them.
 
-The maps are vector artwork in the A2 map PDF, and the geometry layer
-(`data/geometry.json`) was transcribed against that PDF's page at PDF-point
-resolution -- the 1191x1684 viewBox is the A2 page at 72dpi rounded to whole
-pixels. So the vector art is produced in exactly that space: each sheet's SVG
-gets a viewBox of `0 0 1191 1684`, which is what the SVG overlay in rb-map
-preserveAspectRatios against. One coordinate convention drives the art, the
-geometry data and the overlay, so they cannot drift apart.
+The art is authored, not extracted. It used to be pulled out of the printed A2
+PDF and then *redacted*, because the printed sheet bakes in things that are
+really game state -- the steward's name and faction, the support, the castle
+glyphs, the settlement letters -- and an app that draws them a second time as
+an overlay has two copies of the same fact. Redaction was the wrong instrument
+twice over: it painted an opaque rectangle over each cell rather than removing
+anything, so the sheets came back with brown blocks patched over them, and it
+takes out everything a rectangle so much as touches, so it ate the shire names
+around the frames it was aiming at. "North Mercia" came back as "North ".
 
-The printed sheets bake in things that are really game state -- the steward's
-name and faction, the claims, the castle glyphs, the settlement letters -- and
-an app that draws them a second time as an overlay has two copies of the same
-fact. So this exporter also *strips* those cells out of the art, by redacting
-each known cell rectangle on the PDF page before re-rendering: the steward
-frame, the support strip below it, the castle stack beside it, and every
-settlement anchor. What is left is the geography -- coastlines, borders, shire
-names -- and the map becomes a set of blank fields the overlay fills from
-state. The slot coordinates are written to `assets/maps/cells.json`, which is
-the manifest the overlay draws its replacement glyphs from.
+The artist supplied clean sheets instead: terrain, coastline, borders and sea,
+and nothing else. Nothing on them says anything about the game, so nothing on
+them can go stale, and the overlay owns the whole board rather than patching
+holes in a picture. That is why this file installs artwork instead of deriving
+it -- the drawing is a drawing, and the only thing worth generating from it is
+where things sit.
 
-The PDF itself is not committed -- see the `raw/` entry in .gitignore:
+So the job here is small: copy the three sheets into `assets/maps/` with a
+provenance line, and write `assets/maps/cells.json` -- the manifest saying,
+per shire, where its steward frame, support strip, castle stack and settlement
+anchors belong, plus the greyed off-sheet frames a neighbour is repeated in.
+Coordinates come from `data/geometry.json`, which is A2 at 72dpi (the 1191x1684
+viewBox) because that is the space the geometry was transcribed in. The sheets
+keep their own 300dpi viewBox; `rb-map` places one inside the other, so the two
+resolutions never have to be reconciled anywhere but there.
+
+The artwork is not committed -- see the `raw/` entry in .gitignore:
 
     py -3 tools/export_maps_svg.py
 
-Writes assets/maps/{northern,western,eastern}.svg, assets/maps/cells.json and,
-with --review, assets/maps/review/{sheet}.html so a mis-strip is visible.
+Writes assets/maps/{northern,western,eastern}.svg and assets/maps/cells.json.
 """
 
-import argparse
 import json
-import math
 import re
 from datetime import datetime, timezone
 from pathlib import Path
 
-import fitz
-
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
-PDF = ROOT / "raw" / "Raven Banner Maps A2 v1.1.pdf"
+RAW = ROOT / "raw"
 GEOMETRY = ROOT / "data" / "geometry.json"
 OUT = ROOT / "assets" / "maps"
 
-# Page order in the A2 PDF, matching SHEETS in the gamespec render_overlay.
-SHEETS = {"northern": 0, "western": 1, "eastern": 2}
+# The sheet the game calls it, and the file the artist named it.
+SHEETS = {
+    "northern": "Raven Banner Maps north.svg",
+    "western": "Raven Banner Maps west.svg",
+    "eastern": "Raven Banner Maps east.svg",
+}
 
 # The geometry layer's viewBox, rounded up from the A2 page at 72dpi.
 VIEW_BOX = (1191, 1684)
 
-# Warm parchment, close to the printed sheet, so a stripped cell reads as an
-# empty field rather than a hole.
-PARCHMENT = (0.949, 0.941, 0.898)
-
-# How far a castle stack may sit beside a frame, in points. Glyphs are ~20 wide.
+# How far a castle stack may sit beside a frame, in points. The printed sheet
+# stacks them in a single column just off the frame's right edge; the cell is
+# wider than that so a shire that gains castles has somewhere to put them.
 CASTLE_STRIP = 90
 
-# The Control/Steward frame and the shorter off-sheet frame, from the printed
-# sheet and mirrored in the gamespec extract_maps.py. The 57-tall box is a
-# greyed ghost for a shire that lives on another sheet (or Scotland/Wales).
-BOX_W, BOX_H, GHOST_H = 172, 86, 57
-GHOST_REACH = 30
+# The greyed off-sheet frames, transcribed from the printed sheets.
+#
+# A shire on the edge of one sheet is repeated on its neighbour, greyed and
+# short, so a player looking at one corner of England can see who holds the
+# ground across the border without turning to another sheet. These used to be
+# found by hunting the PDF for 172x57 rectangles and reading the name nearest
+# each one; nothing reads the PDF any more, and twelve rectangles are not worth
+# a detector. They are in the same points as the frames in geometry.json, and
+# were read off the same sheets, so a retrace moves both together.
+GHOSTS = {
+    "northern": {
+        "magonsets": (150, 1562, 321, 1619),
+        "south_mercia": (516, 1615, 688, 1672),
+        "middle_anglia": (764, 1614, 935, 1671),
+    },
+    "western": {
+        "wrekinsets": (291, 123, 463, 180),
+        "north_mercia": (713, 225, 885, 282),
+        "middle_anglia": (982, 683, 1154, 740),
+        "sussex": (999, 1260, 1171, 1317),
+    },
+    "eastern": {
+        "lindsey": (285, 246, 457, 303),
+        "north_mercia": (20, 297, 192, 354),
+        "south_mercia": (11, 700, 184, 758),
+        "redding": (56, 1054, 228, 1112),
+        "wiltshire": (21, 1265, 193, 1322),
+    },
+}
 
-# The printed sheet's small-caps labels come out a little mangled; same fixes
-# as the gamespec extractor so ghost names resolve to shires.
-NAME_FIXES = {"Essexe": "Essex", "Sussexe": "Sussex",
-              "South MErcia": "South Mercia", "North MErcia": "North Mercia"}
 
-
-def provenance(sheet: str) -> str:
+def provenance(source: str) -> str:
     return (
-        "Generated by tools/export_maps_svg.py from raw/Raven Banner Maps A2 "
-        f"v1.1.pdf ({sheet} sheet) at {datetime.now(timezone.utc):%Y-%m-%dT%H:%M:%SZ}. "
-        "Do not hand-edit."
+        f"Generated by tools/export_maps_svg.py from {source} at "
+        f"{datetime.now(timezone.utc):%Y-%m-%dT%H:%M:%SZ}. Do not hand-edit."
     )
 
 
-def cell_rects(geo: dict, sheet: str) -> dict:
-    """The rectangles to blank on this sheet, keyed by shire id.
+def cells_for(geo: dict, sheet: str) -> dict:
+    """Where each shire's cells belong on this sheet, keyed by shire id.
 
-    Returns both the rectangles (for redaction) and a shire-shaped manifest of
-    slots (for the overlay), because they are the same data twice.
+    The frame is transcribed; everything else hangs off it in the same
+    arrangement the printed sheet used, so a player who has played on paper
+    finds the support under the name and the castles beside it.
     """
-    rects = []
-    manifest = {}
+    cells = {}
     for sid, shire in geo["shires"].items():
         if shire["sheet"] != sheet:
             continue
         fx0, fy0, fx1, fy1 = shire["frame"]
-        frame = (fx0 - 4, fy0 - 4, fx1 + 4, fy1 + 4)
-        support = (fx0 - 4, fy1, fx1 + 4, fy1 + 18)
-        castles = (fx1, fy0 - 4, fx1 + CASTLE_STRIP, fy1 + 4)
-        settlements = [(x - 18, y - 16, x + 18, y + 18)
-                       for (x, y) in shire.get("settlements", [])]
-        rects += [frame, support, castles] + settlements
-
-        manifest[sid] = {
+        cells[sid] = {
             "frame": {"x0": fx0, "y0": fy0, "x1": fx1, "y1": fy1},
             "support": {"x0": fx0, "y0": fy1, "x1": fx1, "y1": fy1 + 14},
             "castles": {"x0": fx1, "y0": fy0, "x1": fx1 + CASTLE_STRIP, "y1": fy1},
@@ -104,149 +119,61 @@ def cell_rects(geo: dict, sheet: str) -> dict:
                  "x0": x - 18, "y0": y - 16, "x1": x + 18, "y1": y + 18}
                 for (x, y) in shire.get("settlements", [])],
         }
-    return rects, manifest
+    cells["ghosts"] = [
+        {"shireId": sid, "x0": x0, "y0": y0, "x1": x1, "y1": y1}
+        for sid, (x0, y0, x1, y1) in GHOSTS[sheet].items()]
+    return cells
 
 
-def page_to_svg(page) -> str:
-    """Render a PDF page as SVG whose viewBox is the geometry viewBox."""
-    sx = VIEW_BOX[0] / page.rect.width
-    sy = VIEW_BOX[1] / page.rect.height
-    svg = page.get_svg_image(fitz.Matrix(sx, sy))
-    if not re.search(rf'viewBox="0 0 {VIEW_BOX[0]}(\.\d+)? {VIEW_BOX[1]}(\.\d+)?"', svg):
-        raise RuntimeError(f"viewBox did not land on {VIEW_BOX[0]}x{VIEW_BOX[1]}")
-    return svg
+def install(source: Path, sheet: str) -> str:
+    """The artist's sheet, sized, stamped and otherwise untouched.
 
-
-def proof_near(a, b, tol=3):
-    return abs(a - b) <= tol
-
-
-def shire_name_lookup(shires_data: dict) -> dict:
-    """Map a printed shire name (as it appears on the sheet) to its id."""
-    lookup = {}
-    for sid, printed in shires_data["shires"].items():
-        key = str(printed["name"]).replace(" ", "").upper()
-        lookup[key] = sid
-    return lookup
-
-
-def detect_ghosts(page, lookup: dict, sheet: str) -> list:
-    """The short off-sheet frames on this page, named after the shire (or
-    Scotland, Wales) they stand for.
-
-    Mirrors extract_maps.shape_of / the ghost-naming loop: the frames are the
-    drawn 're' rectangles near 172x57, and each one's name is the largest text
-    span just above or below it. A ghost whose name matches a playable shire is
-    that shire's read-only duplicate; anything else is an off-board neighbour.
+    The files are authored at `width="100%" height="100%"`, which is fine for a
+    sheet opened on its own and no use at all to something embedding it: a
+    percentage of nothing leaves the image with no intrinsic size, and every
+    consumer then guesses differently -- MuPDF hands back a US Letter page.
+    Giving it the size its own viewBox already claims makes the guess
+    unnecessary without changing a single coordinate in the drawing.
     """
-    spans = []
-    for block in page.get_text("dict")["blocks"]:
-        if block["type"] != 0:
-            continue
-        for line in block["lines"]:
-            for span in line["spans"]:
-                text = span["text"].strip()
-                if not text:
-                    continue
-                x0, y0, x1, y1 = span["bbox"]
-                spans.append({"t": text, "x": (x0 + x1) / 2, "y": (y0 + y1) / 2,
-                              "x0": x0, "y0": y0, "x1": x1, "y1": y1,
-                              "size": round(span["size"], 1)})
+    svg = source.read_text(encoding="utf-8")
+    open_tag = re.search(r"<svg\b[^>]*>", svg)
+    if not open_tag:
+        raise RuntimeError(f"{source.name}: no <svg> element")
 
-    ghosts = []
-    for dr in page.get_drawings():
-        for item in dr["items"]:
-            if item[0] != "re":
-                continue
-            r = item[1]
-            if not (proof_near(r.width, BOX_W) and proof_near(r.height, GHOST_H)):
-                continue
-            cx = (r.x0 + r.x1) / 2
-            name = None
-            for lo, hi, spread in ((r.y0 - 45, r.y0 - 3, 115),
-                                   (r.y1 + 8, r.y1 + 52, 115)):
-                found = [s for s in spans if lo < s["y"] < hi
-                         and abs(s["x"] - cx) < spread
-                         and s["size"] >= 16
-                         and len(s["t"].replace(" ", "")) > 1
-                         and set(s["t"].replace(" ", "")) - set("FTC")]
-                if found:
-                    name = NAME_FIXES.get(max(found, key=lambda s: s["size"])["t"],
-                                          max(found, key=lambda s: s["size"])["t"])
-                    break
-            rect = {"x0": r.x0, "y0": r.y0, "x1": r.x1, "y1": r.y1}
-            ghosts.append({
-                "sheet": sheet, "rect": fitz.Rect(r.x0, r.y0, r.x1, r.y1),
-                "name": name, "box": rect,
-                "shireId": lookup.get(str(name or "").replace(" ", "").upper())
-                        if name else None,
-            })
-    return ghosts
+    box = re.search(r'viewBox="0 0 ([\d.]+) ([\d.]+)"', open_tag.group(0))
+    if not box:
+        raise RuntimeError(f"{source.name}: no viewBox to take a size from")
+    width, height = box.group(1), box.group(2)
 
+    sized = open_tag.group(0)
+    for name, value in (("width", width), ("height", height)):
+        if re.search(rf'\b{name}="[^"]*"', sized):
+            sized = re.sub(rf'\b{name}="[^"]*"', f'{name}="{value}"', sized, count=1)
+        else:
+            sized = sized.replace("<svg", f'<svg {name}="{value}"', 1)
 
-def stamp(svg: str, sheet: str) -> str:
-    return svg.replace("<svg", f"<!-- {provenance(sheet)} -->\n<svg", 1)
-
-
-def review_page(sheet: str, original_png: str) -> str:
-    """A side-by-side so a mis-strip is seen, not asserted away."""
-    return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
-<title>Strip review — {sheet}</title><style>
-  body {{ font: 14px system-ui; margin: 1rem; color: #2b2118; background: #f6f1e6; }}
-  img {{ max-width: 48vw; border: 1px solid #d8cdb8; }}
-  h1 {{ font-size: 1.1rem; }} .rb-meta {{ color: #6b5c48; }}
-</style></head><body>
-<h1>{sheet} — original vs stripped</h1>
-<p class="rb-meta">Left: printed sheet. Right: baked state cells redacted out. The
-overlay draws those cells from state now; anything that is NOT a frame/support/
-castle/settlement slot should still be there on the right.</p>
-<div style="display:flex;gap:1rem"><figure><img src="../{sheet}.png"><figcaption>original</figcaption></figure>
-<figure><img src="../{sheet}.svg"><figcaption>stripped</figcaption></figure></div>
-</body></html>"""
+    # After the doctype rather than at the top of the file: a comment before
+    # the XML declaration is not well-formed XML, and these are parsed as XML.
+    stamped = f"<!-- {provenance(f'raw/{source.name}')} -->\n{sized}"
+    return svg[:open_tag.start()] + stamped + svg[open_tag.end():]
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--review", action="store_true",
-                        help="write side-by-side review pages to assets/maps/review/")
-    args = parser.parse_args()
-
     geo = json.loads(GEOMETRY.read_text(encoding="utf-8"))
-    shires_data = json.loads(
-        (ROOT / "data" / "shires.json").read_text(encoding="utf-8"))
-    doc = fitz.open(PDF)
-    if doc.page_count < 3:
-        raise RuntimeError(f"expected at least 3 pages, got {doc.page_count}")
     OUT.mkdir(parents=True, exist_ok=True)
 
-    manifest = {"_generated": provenance("all sheets"), "_doNotEdit": True,
-                "viewBox": VIEW_BOX, "sheets": {}}
-    shire_names = shire_name_lookup(shires_data)
-    for sheet, pageno in SHEETS.items():
-        rects, cells = cell_rects(geo, sheet)
-        page = doc[pageno]
-        ghosts = detect_ghosts(page, shire_names, sheet)
-        bump_ghosts = [g["rect"] for g in ghosts]
-        cells["ghosts"] = [{"name": g["name"], "shireId": g["shireId"],
-                            **g["box"]} for g in ghosts]
-        manifest["sheets"][sheet] = cells
-        for rect in rects + bump_ghosts:
-            page.add_redact_annot(rect, fill=PARCHMENT)
-        page.apply_redactions()
-        svg = stamp(page_to_svg(page), sheet)
+    manifest = {"_generated": provenance("data/geometry.json"),
+                "_doNotEdit": True, "viewBox": VIEW_BOX, "sheets": {}}
+    for sheet, filename in SHEETS.items():
+        manifest["sheets"][sheet] = cells_for(geo, sheet)
+        svg = install(RAW / filename, sheet)
         (OUT / f"{sheet}.svg").write_text(svg, encoding="utf-8")
-        print(f"{sheet}.svg: {len(svg):,} bytes, {len(rects)} cells stripped")
+        shires = len(manifest["sheets"][sheet]) - 1
+        print(f"{sheet}.svg: {len(svg):,} bytes from {filename}; "
+              f"{shires} shires, {len(GHOSTS[sheet])} ghosts")
 
     (OUT / "cells.json").write_text(
         json.dumps(manifest, indent=1), encoding="utf-8")
-
-    if args.review:
-        review = ROOT / "tools" / "review"
-        review.mkdir(exist_ok=True)
-        for sheet in SHEETS:
-            (review / f"{sheet}.html").write_text(
-                review_page(sheet, f"{sheet}.png"), encoding="utf-8")
-        print(f"review pages written to tools/review/")
 
 
 if __name__ == "__main__":

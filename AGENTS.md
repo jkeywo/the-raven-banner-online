@@ -74,8 +74,15 @@ at `C:\AnalogueGames\analogue-projects\GameProjects\raven_banner` by
 `tools/export_web_data.py`, `tools/export_map_geometry.py` and (later)
 `tools/export_vectors.py` **in that repo**. Each file carries a `_generated`
 provenance line naming the `analogue-projects` commit it came from, and
-`_doNotEdit: true`. `assets/maps/*.png` are rendered from the map PDFs the same
-way. To change any of them, change the authored gamespec module and re-export.
+`_doNotEdit: true`. To change any of them, change the authored gamespec module
+and re-export.
+
+`assets/maps/*.svg` are the artist's sheets, installed from `raw/` by
+`tools/export_maps_svg.py` along with `assets/maps/cells.json`. The artwork is
+geography and nothing else — terrain, coastline, borders, sea — so everything a
+printed sheet used to say about the game is drawn by `rb-map` instead, every
+shire, every turn. Art that stated a fact about the game could not be corrected
+when the fact moved. To change a sheet, change the drawing and re-run the tool.
 
 `data/geometry.json` is kept apart from the rules data on purpose. It holds
 where things sit on the printed maps — shire outlines and settlement anchors —
@@ -102,9 +109,9 @@ uv run pasm validate pasm/spec  # spec integrity
 uv run pasm scan pasm/spec      # observed-vs-declared dependency edges
 ```
 
-`tools/map-check.html` draws `data/` over the printed maps so a misread shire is
-visible at a glance. It needs the repo served over http rather than opened from
-disk, because it fetches JSON.
+`tools/map-check.html` draws `data/` over the map artwork so a mistraced shire
+is visible at a glance. It needs the repo served over http rather than opened
+from disk, because it fetches JSON.
 
 In the gamespec project (note: `python3` on this box is usually `py -3`):
 
