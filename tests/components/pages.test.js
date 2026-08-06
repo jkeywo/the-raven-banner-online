@@ -164,6 +164,52 @@ describe('the facilitator console', () => {
     expect(document.getElementById('tab-fac-game').dataset.live).toBe('false');
   });
 
+  it('deletes a saved game from the resume list, once asked', async () => {
+    // localStorage is per-origin and the only copy of a game that survives
+    // this machine is a downloaded file, so the list fills up with abandoned
+    // tests and there was no way to be rid of one but wiping storage by hand.
+    const { Persistence } = await import('../../gui/host/persistence.js');
+    const store = new Persistence({});
+    store.write({ joinCode: 'AAAAAAA', seed: 1, log: [], savedAt: 1 });
+    store.write({ joinCode: 'BBBBBBB', seed: 2, log: [], savedAt: 2 });
+
+    await loadPage('host.html');
+    const { startHostApp } = await import('../../gui/host/host-app.js');
+    await startHostApp({ location: { hash: '', href: 'http://x/host.html' } });
+    expect(document.querySelectorAll('#resume-list li').length).toBe(2);
+
+    const original = globalThis.confirm;
+    globalThis.confirm = () => false;
+    document.querySelector('[data-forget="AAAAAAA"]').click();
+    expect(document.querySelectorAll('#resume-list li').length).toBe(2);   // declined
+
+    globalThis.confirm = () => true;
+    document.querySelector('[data-forget="AAAAAAA"]').click();
+    globalThis.confirm = original;
+
+    // Gone from the list and from storage, and the other one is untouched.
+    expect(document.querySelector('[data-forget="AAAAAAA"]')).toBeNull();
+    expect(document.querySelector('[data-forget="BBBBBBB"]')).toBeTruthy();
+    expect(store.list().map((s) => s.joinCode)).toEqual(['BBBBBBB']);
+  });
+
+  it('hides the resume panel once the last saved game is deleted', async () => {
+    const { Persistence } = await import('../../gui/host/persistence.js');
+    new Persistence({}).write({ joinCode: 'ZZZZZZZ', seed: 1, log: [], savedAt: 1 });
+
+    await loadPage('host.html');
+    const { startHostApp } = await import('../../gui/host/host-app.js');
+    await startHostApp({ location: { hash: '', href: 'http://x/host.html' } });
+    expect(document.getElementById('resume').hidden).toBe(false);
+
+    const original = globalThis.confirm;
+    globalThis.confirm = () => true;
+    document.querySelector('[data-forget="ZZZZZZZ"]').click();
+    globalThis.confirm = original;
+
+    expect(document.getElementById('resume').hidden).toBe(true);
+  });
+
   it('does not call the primary host a co-facilitator', async () => {
     // A class on .rb-co-banner set its own `display`, which in CSS beats the
     // `hidden` attribute on specificity alone — so the banner announcing

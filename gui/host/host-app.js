@@ -65,15 +65,29 @@ export async function startHostApp({ location = window.location } = {}) {
   };
 
   // --- resuming -------------------------------------------------------------
-  const saves = persistence.list();
-  if (saves.length) {
+  renderResumes();
+
+  /**
+   * The saved games on this machine, each with a way to be rid of it.
+   *
+   * Re-rendered rather than reloaded when one is deleted, because a
+   * facilitator clearing out three abandoned test games should not have to
+   * refresh between each — and because the whole panel disappears once the
+   * last one is gone, which a stale list would not show.
+   */
+  function renderResumes() {
+    const saves = persistence.list();
+    $('resume').hidden = saves.length === 0;
     $('resume-list').innerHTML = saves.map((save) => `
-      <li><button type="button" class="rb-resume" data-code="${save.joinCode}">
-        <strong>${save.joinCode}</strong>
-        <span>${save.log.length} action${save.log.length === 1 ? '' : 's'}${
-      save.savedAt ? `, saved ${new Date(save.savedAt).toLocaleTimeString()}` : ''}</span>
-      </button></li>`).join('');
-    $('resume').hidden = false;
+      <li>
+        <button type="button" class="rb-resume" data-code="${save.joinCode}">
+          <strong>${save.joinCode}</strong>
+          <span>${save.log.length} action${save.log.length === 1 ? '' : 's'}${
+  save.savedAt ? `, saved ${new Date(save.savedAt).toLocaleTimeString()}` : ''}</span>
+        </button>
+        <button type="button" class="rb-resume-forget" data-forget="${save.joinCode}"
+                aria-label="Delete game ${save.joinCode}">Delete</button>
+      </li>`).join('');
   }
 
   // Prefilled from whoever last typed one on this machine.
@@ -131,6 +145,21 @@ export async function startHostApp({ location = window.location } = {}) {
   });
 
   $('resume-list').addEventListener('click', (event) => {
+    // Deleting first: the delete button sits inside the same <li> as the
+    // resume button, and closest() would otherwise walk past it and open the
+    // game the facilitator was trying to throw away.
+    const forget = event.target.closest('[data-forget]');
+    if (forget) {
+      const code = forget.dataset.forget;
+      // The only copy that survives this machine is a downloaded save, so a
+      // deletion is as final as deletions get. Asked once, out loud.
+      // eslint-disable-next-line no-alert
+      if (globalThis.confirm?.(
+        `Delete the saved game ${code}? This cannot be undone.`) === false) return;
+      persistence.forget(code);
+      renderResumes();
+      return;
+    }
     const button = event.target.closest('[data-code]');
     if (button) resume(persistence.read(button.dataset.code));
   });
