@@ -254,8 +254,11 @@ export class RbFacilitatorGrid extends HTMLElement {
         ${allDone ? `
           <div class="rb-settle">
             ${this._heldBack(state, shireId)}
-            ${this._stewardPick(state, shireId)}
-            <button type="button" data-settle="${shireId}" class="rb-primary">Settle the shire</button>
+            ${state.battle.settled?.[shireId]
+    ? `<p class="rb-meta" data-settled="${shireId}">Settled.</p>`
+    : `${this._stewardPick(state, shireId)}
+            <button type="button" data-settle="${shireId}" class="rb-primary">
+              Settle it anyway</button>`}
           </div>` : ''}
       </section>`;
   }

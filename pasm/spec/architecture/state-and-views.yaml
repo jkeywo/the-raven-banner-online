@@ -468,7 +468,7 @@ entities:
       status: proposed
       confidence: confirmed
       title: Conquered Shire Steward Pick
-      summary: Who the initiative token holder named to take a shire their attack has just brought down, before the facilitator settles it.
+      summary: Who the initiative token holder named to take a shire their attack has just brought down. Naming settles the shire, so this is read once and then the board carries the answer.
       rationale:
         - Scoped exactly like the declaration that won the shire, because it is the same person at the same table deciding about the same ground, and splitting the two halves of one team-table decision across two audiences would be arbitrary.
         - "No reveal condition: settling writes the taker into the shire, which is public to everybody, so the only window this covers is the one that closes on its own. A reveal condition here would be a second statement of a truth the board already publishes."

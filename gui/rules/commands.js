@@ -24,7 +24,7 @@ import {
   advanceClash, amendLead, confirmLead, sidesOf, stageAtLeast, MAX_REINFORCEMENT,
 } from './clash.js';
 import {
-  pairSides, settleClash, settleBattle, seizeInitiative, tally, conqueringDeclaration,
+  pairSides, settleClash, settleIfReady, seizeInitiative, tally, conqueringDeclaration,
 } from './battle.js';
 
 /**
@@ -1940,7 +1940,14 @@ export const COMMANDS = {
       clash.rolls[subjectOf(ctx)] = roll(6);
       // The machine decides whether that was the second die; the settlement
       // follows from it rather than from this command knowing it was last.
-      if (advanceClash(clash) === 'rolls_revealed') settleClash(draft, data, clash);
+      if (advanceClash(clash) === 'rolls_revealed') {
+        settleClash(draft, data, clash);
+        // And that may have been the last clash of the battle. Nobody has to
+        // press anything for a battle that is simply over — unless the shire
+        // falls and its conqueror has not yet said who takes it, which
+        // `settleIfReady` holds for.
+        settleIfReady(draft, data, clash.shireId);
+      }
     },
   },
 
@@ -1988,6 +1995,11 @@ export const COMMANDS = {
       const { shireId, stewardRoleId } = ctx.cmd.payload ?? {};
       if (!ctx.state.battle.targets.includes(shireId)) return no('no battle was fought there');
 
+      // A battle settles itself the moment nothing is owed, and this pick is
+      // usually the last thing owed — so naming a steward is final, and the
+      // console asks before sending it.
+      if (ctx.state.battle.settled?.[shireId]) return no('that battle is already settled');
+
       const declaration = conqueringDeclaration(ctx.state, shireId);
       if (!declaration) return no('nobody declared an attack there');
       if (declaration.roleId !== roleId) {
@@ -2012,6 +2024,10 @@ export const COMMANDS = {
       // about the reducer's own output.
       draft.battle.stewardPicks ??= {};
       draft.battle.stewardPicks[ctx.cmd.payload.shireId] = ctx.cmd.payload.stewardRoleId;
+      // The other order: the fighting finished first and the battle has been
+      // waiting on this. Either arrival can be the last thing owed, so both
+      // ask rather than either assuming.
+      settleIfReady(draft, ctx.data, ctx.cmd.payload.shireId);
     },
   },
 
@@ -2160,6 +2176,9 @@ export const COMMANDS = {
       draft.battle.spare ??= {};
       draft.battle.spare[shireId] = spareDefenders;
       draft.battle.pairingComplete = true;
+      // Attackers who walked in unopposed are seeded already resolved, so a
+      // battle nobody turned up to defend is over the moment it is paired.
+      settleIfReady(draft, ctx.data, shireId);
     },
   },
 
@@ -2261,6 +2280,11 @@ export const COMMANDS = {
 
       advanceClash(clash);
       settleClash(draft, data, clash);
+      // Forcing the last clash through finishes the battle just as a player's
+      // own die would, so it settles the same way. Without this, a shire that
+      // HELD after a forced clash had no player command left to fire and the
+      // token a twice-winning defender is owed would never move.
+      settleIfReady(draft, data, clash.shireId);
     },
   },
 
@@ -2350,11 +2374,20 @@ export const COMMANDS = {
     admit(ctx) {
       const shireId = ctx.cmd.payload?.shireId;
       if (!ctx.state.battle.targets.includes(shireId)) return no('no battle was fought there');
+      // Settling moves a steward and takes a castle down, so twice is not the
+      // same as once. A battle now settles itself the moment nothing is owed,
+      // which makes "already done" the ordinary state of this button rather
+      // than a mistake nobody would make.
+      if (ctx.state.battle.settled?.[shireId]) return no('that battle is already settled');
       return ok();
     },
     effects(draft, ctx) {
-      settleBattle(draft, ctx.data, ctx.cmd.payload.shireId,
-        { newSteward: ctx.cmd.payload.newSteward ?? null });
+      // Forced: this is the override for a table that has stalled — a
+      // conqueror who has walked away without naming anyone, most likely — so
+      // it settles past the hold that stops the automatic path.
+      settleIfReady(draft, ctx.data, ctx.cmd.payload.shireId, {
+        force: true, newSteward: ctx.cmd.payload.newSteward ?? null,
+      });
     },
   },
 
@@ -2366,7 +2399,7 @@ export const COMMANDS = {
     effects(draft) {
       seizeInitiative(draft);
       draft.battle = { targets: [], sides: {}, clashes: {}, spare: {}, scouts: {},
-        mercenaries: {}, stewardPicks: {}, pairingComplete: false };
+        mercenaries: {}, stewardPicks: {}, settled: {}, pairingComplete: false };
     },
   },
 

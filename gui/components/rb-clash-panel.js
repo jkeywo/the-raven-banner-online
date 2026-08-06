@@ -86,8 +86,15 @@ export class RbClashPanel extends HTMLElement {
     // `me` first: a spectator has no role, and a declaration whose holder was
     // removed has no roleId, and null matching null would hand the spoils of
     // somebody else's battle to a screen with nobody behind it.
+    // A settled battle is finished with: `name-new-steward` refuses one, so
+    // drawing the buttons would be drawing guaranteed refusals — and worse,
+    // asking "that settles the battle?" about a battle already settled. A
+    // control drawn from a different reading of the board than the one that
+    // admits the command is a control that lies.
     const taken = !me ? [] : targets.filter((shireId) =>
-      conqueringDeclaration(view, shireId)?.roleId === me && tally(view, shireId).shireFalls);
+      conqueringDeclaration(view, shireId)?.roleId === me
+      && tally(view, shireId).shireFalls
+      && !view.battle.settled?.[shireId]);
 
     return taken.map((shireId) => {
       const shire = this._data.shires.shires[shireId]?.name ?? shireId;
@@ -100,12 +107,14 @@ export class RbClashPanel extends HTMLElement {
             need not be you.</p>
           <div class="rb-steward-buttons">${attackers.map((roleId) => `
             <button type="button" class="${named === roleId ? 'is-chosen' : ''}"
-                    data-name-steward="${roleId}" data-shire="${shireId}">
+                    data-name-steward="${roleId}" data-shire="${shireId}"
+                    data-name="${this._data.roles.roles[roleId]?.name ?? roleId}">
               ${this._data.roles.roles[roleId]?.name ?? roleId}
             </button>`).join('')}</div>
           <p class="rb-meta">${named
-    ? 'Named. You may still change it until the facilitator settles the shire.'
-    : `Until you name somebody, ${shire} goes to whoever was paired first.`}</p>
+    ? 'Named, and the shire has changed hands.'
+    : `The fighting is done and ${shire} is waiting on you. Naming somebody `
+      + 'settles it there and then, so there is no second word.'}</p>
         </section>`;
     }).join('');
   }
@@ -309,9 +318,17 @@ export class RbClashPanel extends HTMLElement {
     const die = this.querySelector('[data-roll]');
     if (die) die.onclick = () => this._emit('submit-roll', { clashId });
     for (const button of this.querySelectorAll('[data-name-steward]')) {
-      button.onclick = () => this._emit('name-new-steward', {
-        shireId: button.dataset.shire, stewardRoleId: button.dataset.nameSteward,
-      });
+      button.onclick = () => {
+        // Naming is the last thing the battle was waiting for, so it settles
+        // the shire on the spot and there is no taking it back. Worth one
+        // question first — this is the decision the fighting was about.
+        // eslint-disable-next-line no-alert
+        if (globalThis.confirm?.(
+          `Hand ${button.dataset.name} the shire? That settles the battle.`) === false) return;
+        this._emit('name-new-steward', {
+          shireId: button.dataset.shire, stewardRoleId: button.dataset.nameSteward,
+        });
+      };
     }
   }
 }

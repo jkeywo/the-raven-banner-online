@@ -160,6 +160,9 @@ export const FIELD_VISIBILITY = [
     audience: TEAM,
     owner: (segments, state) => conqueringDeclaration(state, segments[2])?.roleId ?? null,
   },
+  // Whether a battle has been settled yet is a fact about the board, and the
+  // board is public. Everyone at the table watched the shire change hands.
+  { path: 'battle.settled.**', audience: PUBLIC },
   { path: 'battle.clashes.*.id', audience: PUBLIC },
   { path: 'battle.clashes.*.shireId', audience: PUBLIC },
   { path: 'battle.clashes.*.stage', audience: PUBLIC },

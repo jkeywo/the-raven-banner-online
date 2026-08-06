@@ -37,6 +37,8 @@ entities:
         - settleClash
         - tally
         - settleBattle
+        - settlementHold
+        - settleIfReady
         - heldBackToken
         - conqueringDeclaration
       tests:
@@ -136,7 +138,7 @@ entities:
       status: proposed
       confidence: confirmed
       title: Name New Steward
-      summary: The initiative token holder's choice of who takes a shire their attack has brought down, changeable until the facilitator settles it.
+      summary: The initiative token holder's choice of who takes a shire their attack has brought down. It is the last thing the battle was waiting for, so it settles the shire on arrival and there is no second word.
       rationale:
         - The spoils belong to whoever spent the token. The facilitator used to pick from a dropdown of attackers, which quietly moved the most political decision of the battle phase off the table it belongs on.
         - Admitted only after the shire has actually fallen, because until the last clash is read there is nothing to give away, and only for somebody who attacked it, because a shire goes to somebody who was there for it.

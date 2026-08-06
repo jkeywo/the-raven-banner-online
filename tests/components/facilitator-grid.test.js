@@ -390,22 +390,28 @@ describe('<rb-facilitator-grid> facilitates the steward rather than choosing one
     expect(grid.querySelector('[data-steward-pick="lindsey"]')).toBeNull();
   });
 
-  it('reads back the holder\'s pick once it lands', () => {
-    const grid = mount();
-    grid.data = data;
-    grid.state = run(takenAtLindsey(), 'name-new-steward',
-      { shireId: 'lindsey', stewardRoleId: 'halfdan_ragnarsson' }, as('halfdan_ragnarsson'));
-
-    expect(grid.querySelector('[data-steward-pick="lindsey"]')?.textContent)
-      .toBe('Halfdan Ragnarsson named Halfdan Ragnarsson to take it.');
-    expect(grid.querySelector('[data-steward-waiting="lindsey"]')).toBeNull();
-  });
-
-  it('settles without naming anybody, because it is not the umpire\'s to name', () => {
+  it('says only that it is settled once the pick has landed', () => {
+    // The pick was the last thing owed, so it settled the battle on arrival —
+    // nothing is left for the umpire to press, and offering the button anyway
+    // would be offering a refusal.
     const grid = mount();
     grid.data = data;
     const state = run(takenAtLindsey(), 'name-new-steward',
       { shireId: 'lindsey', stewardRoleId: 'halfdan_ragnarsson' }, as('halfdan_ragnarsson'));
+    grid.state = state;
+
+    expect(state.shires.lindsey.stewardRoleId).toBe('halfdan_ragnarsson');
+    expect(grid.querySelector('[data-settled="lindsey"]')).toBeTruthy();
+    expect(grid.querySelector('[data-settle="lindsey"]')).toBeNull();
+    expect(grid.querySelector('[data-steward-waiting="lindsey"]')).toBeNull();
+  });
+
+  it('keeps the override for a conqueror who has walked away', () => {
+    // Nobody has named anyone, so nothing settled itself. The button is the
+    // way past a table that has stalled.
+    const grid = mount();
+    grid.data = data;
+    const state = takenAtLindsey();
     grid.state = state;
 
     let raised = null;
@@ -417,6 +423,6 @@ describe('<rb-facilitator-grid> facilitates the steward rather than choosing one
     });
     // And pressing it does what the line above it said it would.
     expect(run(state, raised.verb, raised.payload).shires.lindsey.stewardRoleId)
-      .toBe('halfdan_ragnarsson');
+      .toBe('ubba_ragnarsson');
   });
 });

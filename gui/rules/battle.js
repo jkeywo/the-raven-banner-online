@@ -329,6 +329,55 @@ export function settleBattle(draft, data, shireId, { newSteward = null } = {}) {
 }
 
 /**
+ * Why a finished battle has not settled itself yet, or null if it has or can.
+ *
+ * Derived rather than stored, for the reason the rest of this file is: it is a
+ * question about the board, and the answer changes the moment the board does.
+ * The grid asks it to say what a battle is waiting for; the reducer asks it to
+ * decide whether the last die may go straight through to a settlement.
+ *
+ * @returns {'unfought'|'awaiting-steward-pick'|null}
+ */
+export function settlementHold(state, shireId) {
+  if (state.battle.settled?.[shireId]) return null;
+  const result = tally(state, shireId);
+  if (!result.resolved) return 'unfought';
+  // A shire that falls changes hands, and who takes it is the conqueror's to
+  // say. Settling before they have said would hand it to whichever attacker
+  // happened to be paired first — a default nobody chose, applied to the one
+  // decision the whole battle was fought over.
+  if (result.shireFalls && !state.battle.stewardPicks?.[shireId]) {
+    return 'awaiting-steward-pick';
+  }
+  return null;
+}
+
+/**
+ * Settle a battle if it is finished and nothing is still owed, and say so.
+ *
+ * The last die and the conqueror's pick can arrive in either order, and either
+ * can be the thing that completes a battle — so both call this rather than
+ * either trying to know it was last. The facilitator's own button bypasses the
+ * hold for a table that has stalled.
+ *
+ * @returns {boolean} whether it settled
+ */
+export function settleIfReady(draft, data, shireId, { force = false, newSteward = null } = {}) {
+  if (draft.battle.settled?.[shireId]) return false;
+  if (!force && settlementHold(draft, shireId)) return false;
+  const outcome = settleBattle(draft, data, shireId, {
+    // The conqueror's own word first. `newSteward` is the facilitator's last
+    // resort for a conqueror who has walked out without saying anything, and
+    // it must never talk over one who did.
+    newSteward: draft.battle.stewardPicks?.[shireId] ?? newSteward ?? null,
+  });
+  if (!outcome.applied) return false;
+  draft.battle.settled ??= {};
+  draft.battle.settled[shireId] = true;
+  return true;
+}
+
+/**
  * Hand out the temporary token at the end of a battle phase.
  *
  * A faction that neither attacked anyone nor was attacked gets one for the

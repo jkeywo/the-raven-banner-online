@@ -9,7 +9,7 @@ import {
   casualtiesFor, feed, battleScore, leadership,
 } from '../../gui/rules/clash.js';
 import {
-  tally, settleBattle, pairSides, clashesIn, conqueringDeclaration,
+  tally, settleBattle, pairSides, clashesIn, conqueringDeclaration, settlementHold,
 } from '../../gui/rules/battle.js';
 import { overrides } from '../../gui/rules/command-log.js';
 
@@ -383,15 +383,19 @@ describe('who takes a shire that falls', () => {
       { shireId: 'lindsey', stewardRoleId: 'nobody_at_all' })).toBe('no such role in this game');
   });
 
-  it('is changeable right up until the facilitator settles', () => {
-    // The same bargain a tactic card gets: the commitment is the settling.
+  it('settles the battle the moment it lands, and there is no second word', () => {
+    // The fighting was already over, so the pick was the last thing owed —
+    // and a battle that owes nothing settles itself. That makes naming a
+    // steward final, which is why the console asks before sending it.
     let state = taken();
     state = run(state, HALFDAN, 'name-new-steward',
       { shireId: 'lindsey', stewardRoleId: 'ubba_ragnarsson' });
-    state = run(state, HALFDAN, 'name-new-steward',
-      { shireId: 'lindsey', stewardRoleId: 'halfdan_ragnarsson' });
-    state = run(state, FACILITATOR, 'facilitator:settle-battle', { shireId: 'lindsey' });
-    expect(state.shires.lindsey.stewardRoleId).toBe('halfdan_ragnarsson');
+    expect(state.shires.lindsey.stewardRoleId).toBe('ubba_ragnarsson');
+    expect(state.battle.settled.lindsey).toBe(true);
+
+    expect(refusal(state, HALFDAN, 'name-new-steward',
+      { shireId: 'lindsey', stewardRoleId: 'halfdan_ragnarsson' }))
+      .toBe('that battle is already settled');
   });
 
   it('goes with the battle when the phase ends', () => {
@@ -407,9 +411,8 @@ describe('who takes a shire that falls', () => {
     let state = taken();
     state = run(state, HALFDAN, 'name-new-steward',
       { shireId: 'lindsey', stewardRoleId: 'ubba_ragnarsson' });
-    state = run(state, FACILITATOR, 'facilitator:settle-battle', { shireId: 'lindsey' });
     expect(overrides(state.log).map((e) => e.verb)).not.toContain('name-new-steward');
-    expect(state.log.at(-2)).toMatchObject({
+    expect(state.log.at(-1)).toMatchObject({
       verb: 'name-new-steward', roleId: 'halfdan_ragnarsson',
     });
   });
@@ -720,5 +723,185 @@ describe('through the reducer', () => {
     expect(admit(game.state, data,
       { verb: 'give', payload: { toRoleId: 'gainbeald', what: 'silver', amount: 1 } }, HALFDAN)
       .reason).toContain('phase');
+  });
+});
+
+describe('a battle nobody has to settle by hand', () => {
+  const HALFDAN = { seatId: 's1', kind: 'player', roleId: 'halfdan_ragnarsson' };
+  const GAINBEALD = { seatId: 's2', kind: 'player', roleId: 'gainbeald' };
+  const FACILITATOR = { seatId: 's9', kind: 'facilitator', roleId: null };
+
+  function run(state, actor, verb, payload = {}) {
+    const result = apply(state, data, { verb, payload }, actor, { ts: 0 });
+    if (!result.ok) throw new Error(`${verb} refused: ${result.reason}`);
+    return result.state;
+  }
+
+  const refusal = (state, actor, verb, payload = {}) =>
+    admit(state, data, { verb, payload }, actor).reason;
+
+  /** A one-clash battle over Lindsey, both sides paired and ready to throw. */
+  function readyToRoll({ castles = 1 } = {}) {
+    const state = createInitialState({ joinCode: 'RAVEN7Z', seed: 1, data });
+    state.phase.name = 'battle';
+    state.shires.lindsey.castles = castles;
+    state.battle.targets = ['lindsey'];
+    state.battle.sides = {
+      lindsey: { attackers: ['halfdan_ragnarsson'], defenders: ['gainbeald'] },
+    };
+    state.battle.pairingComplete = true;
+    state.initiative.declared = {
+      white: { roleId: 'halfdan_ragnarsson', shireId: 'lindsey', revealed: true },
+    };
+    const clash = createClash({
+      id: 'lindsey:1', shireId: 'lindsey', attacker: 'halfdan_ragnarsson', defender: 'gainbeald',
+    });
+    clash.stage = 'rolling';
+    state.battle.clashes[clash.id] = clash;
+    return state;
+  }
+
+  it('holds at the last die while the conqueror has not named anyone', () => {
+    // Both dice in, the shire falls, and nothing settles — because handing it
+    // to whichever attacker was paired first is a default nobody chose, on the
+    // one decision the whole battle was fought over.
+    let state = readyToRoll();
+    state = run(state, HALFDAN, 'submit-roll', { clashId: 'lindsey:1' });
+    state = run(state, GAINBEALD, 'submit-roll', { clashId: 'lindsey:1' });
+
+    expect(state.battle.clashes['lindsey:1'].stage).toBe('resolved');
+    expect(tally(state, 'lindsey').shireFalls).toBe(true);
+    expect(settlementHold(state, 'lindsey')).toBe('awaiting-steward-pick');
+    expect(state.battle.settled.lindsey).toBeUndefined();
+    expect(state.shires.lindsey.stewardRoleId).not.toBe('halfdan_ragnarsson');
+  });
+
+  it('settles itself the moment the pick arrives, with nobody pressing anything', () => {
+    let state = readyToRoll();
+    state = run(state, HALFDAN, 'submit-roll', { clashId: 'lindsey:1' });
+    state = run(state, GAINBEALD, 'submit-roll', { clashId: 'lindsey:1' });
+    state = run(state, HALFDAN, 'name-new-steward',
+      { shireId: 'lindsey', stewardRoleId: 'halfdan_ragnarsson' });
+
+    expect(state.battle.settled.lindsey).toBe(true);
+    expect(state.shires.lindsey.stewardRoleId).toBe('halfdan_ragnarsson');
+  });
+
+  it('settles on the last die when the shire holds, because nothing is owed', () => {
+    // No pick is possible for a shire that did not fall, so there is nothing
+    // to wait for and the battle finishes on its own.
+    let state = readyToRoll({ castles: 9 });
+    state = run(state, HALFDAN, 'submit-roll', { clashId: 'lindsey:1' });
+    state = run(state, GAINBEALD, 'submit-roll', { clashId: 'lindsey:1' });
+
+    expect(tally(state, 'lindsey').shireFalls).toBe(false);
+    expect(settlementHold(state, 'lindsey')).toBeNull();
+    expect(state.battle.settled.lindsey).toBe(true);
+  });
+
+  it('settles on the last die when the pick was made first', () => {
+    // The other order. Either arrival can be the last thing owed, so neither
+    // assumes it was.
+    let state = readyToRoll();
+    state = run(state, HALFDAN, 'submit-roll', { clashId: 'lindsey:1' });
+    state.battle.stewardPicks = { lindsey: 'halfdan_ragnarsson' };
+    state = run(state, GAINBEALD, 'submit-roll', { clashId: 'lindsey:1' });
+
+    expect(state.battle.settled.lindsey).toBe(true);
+    expect(state.shires.lindsey.stewardRoleId).toBe('halfdan_ragnarsson');
+  });
+
+  it('says it is still unfought before the dice are in', () => {
+    expect(settlementHold(readyToRoll(), 'lindsey')).toBe('unfought');
+  });
+
+  it('lets the facilitator force a stalled table past the hold', () => {
+    let state = readyToRoll();
+    state = run(state, HALFDAN, 'submit-roll', { clashId: 'lindsey:1' });
+    state = run(state, GAINBEALD, 'submit-roll', { clashId: 'lindsey:1' });
+    expect(settlementHold(state, 'lindsey')).toBe('awaiting-steward-pick');
+
+    state = run(state, FACILITATOR, 'facilitator:settle-battle', { shireId: 'lindsey' });
+    expect(state.battle.settled.lindsey).toBe(true);
+    // Fell back to the only attacker, which is what a default is for.
+    expect(state.shires.lindsey.stewardRoleId).toBe('halfdan_ragnarsson');
+  });
+
+  it('settles a two-clash battle exactly once, on the very last die', () => {
+    // The guard's real job. `submit-roll` asks `settleIfReady` after EVERY
+    // clash it resolves, so a battle of two clashes asks twice — and a castle
+    // coming down twice for one battle would be a silent, permanent error on
+    // the board.
+    const state = createInitialState({ joinCode: 'RAVEN7Z', seed: 1, data });
+    state.phase.name = 'battle';
+    state.shires.lindsey.castles = 2;
+    state.battle.targets = ['lindsey'];
+    state.battle.pairingComplete = true;
+    state.battle.sides = {
+      lindsey: {
+        attackers: ['halfdan_ragnarsson', 'ubba_ragnarsson'],
+        defenders: ['gainbeald', 'ceowulf'],
+      },
+    };
+    state.initiative.declared = {
+      white: { roleId: 'halfdan_ragnarsson', shireId: 'lindsey', revealed: true },
+    };
+    for (const [i, [attacker, defender]] of [
+      ['halfdan_ragnarsson', 'gainbeald'], ['ubba_ragnarsson', 'ceowulf'],
+    ].entries()) {
+      const clash = createClash({
+        id: `lindsey:${i + 1}`, shireId: 'lindsey', attacker, defender,
+      });
+      clash.stage = 'rolling';
+      state.battle.clashes[clash.id] = clash;
+    }
+    state.battle.stewardPicks = { lindsey: 'ubba_ragnarsson' };
+    const castlesBefore = state.shires.lindsey.castles;
+
+    let at = state;
+    const throwFor = (roleId, clashId) =>
+      apply(at, data, { verb: 'submit-roll', payload: { clashId } },
+        { seatId: `s-${roleId}`, kind: 'player', roleId }, { ts: 0 });
+
+    at = throwFor('halfdan_ragnarsson', 'lindsey:1').state;
+    at = throwFor('gainbeald', 'lindsey:1').state;
+    // One clash down, one still rolling: nothing may have settled yet.
+    expect(at.battle.settled.lindsey).toBeUndefined();
+    expect(at.shires.lindsey.castles).toBe(castlesBefore);
+
+    at = throwFor('ubba_ragnarsson', 'lindsey:2').state;
+    at = throwFor('ceowulf', 'lindsey:2').state;
+
+    expect(at.battle.settled.lindsey).toBe(true);
+    if (tally(at, 'lindsey').shireFalls) {
+      expect(at.shires.lindsey.castles).toBe(castlesBefore - 1);
+      expect(at.shires.lindsey.stewardRoleId).toBe('ubba_ragnarsson');
+    } else {
+      expect(at.shires.lindsey.castles).toBe(castlesBefore);
+    }
+  });
+
+  it('never settles the same battle twice, however it got there', () => {
+    // Settling moves a steward and takes a castle down, so twice is not the
+    // same as once.
+    let state = readyToRoll({ castles: 3 });
+    state = run(state, HALFDAN, 'submit-roll', { clashId: 'lindsey:1' });
+    state = run(state, GAINBEALD, 'submit-roll', { clashId: 'lindsey:1' });
+    const castlesAfter = state.shires.lindsey.castles;
+    expect(state.battle.settled.lindsey).toBe(true);
+
+    expect(refusal(state, FACILITATOR, 'facilitator:settle-battle', { shireId: 'lindsey' }))
+      .toBe('that battle is already settled');
+    expect(state.shires.lindsey.castles).toBe(castlesAfter);
+  });
+
+  it('clears the settled marks with the rest of the board', () => {
+    let state = readyToRoll({ castles: 9 });
+    state = run(state, HALFDAN, 'submit-roll', { clashId: 'lindsey:1' });
+    state = run(state, GAINBEALD, 'submit-roll', { clashId: 'lindsey:1' });
+    expect(state.battle.settled.lindsey).toBe(true);
+
+    state = run(state, FACILITATOR, 'facilitator:end-battles', {});
+    expect(state.battle.settled).toEqual({});
   });
 });

@@ -74,6 +74,11 @@ function loadedState() {
   // Alfred's black token declared Lindsey, so the pick about Lindsey is his,
   // and Wessex's — the same scope the declaration that won it has.
   state.battle.stewardPicks = { lindsey: 'SECRET::battle.stewardPick.lindsey' };
+  // Populated for the same reason `mercenaries` is: the completeness walk only
+  // sees a path once something is stored at it, so an empty object would leave
+  // the manifest entry unverified and a forgotten one indistinguishable from a
+  // correct one.
+  state.battle.settled = { lindsey: true };
 
   state.envoys = {
     e1: { roleId: 'king_alfred', npcFaction: 'franks', open: true,

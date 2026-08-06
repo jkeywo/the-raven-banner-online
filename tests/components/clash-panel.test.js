@@ -174,17 +174,20 @@ describe('<rb-clash-panel> when the shire has fallen', () => {
     expect(game.state.battle.stewardPicks.lindsey).toBe('ubba_ragnarsson');
   });
 
-  it('marks the man already named, and says it can still change', () => {
+  it('takes the whole section away once the naming has settled the battle', () => {
+    // Naming was the last thing owed, so the shire changed hands there and
+    // then. `name-new-steward` refuses a second one, so leaving the buttons up
+    // would leave a row of guaranteed refusals — each of which would first ask
+    // "that settles the battle?" about a battle already settled.
     const game = takenLindsey();
     game.step('name-new-steward',
       { shireId: 'lindsey', stewardRoleId: 'ubba_ragnarsson' }, HALFDAN);
-    const panel = mount(seenBy(game.state, 'halfdan_ragnarsson'));
+    expect(game.state.battle.settled.lindsey).toBe(true);
+    expect(game.state.shires.lindsey.stewardRoleId).toBe('ubba_ragnarsson');
 
-    expect(panel.querySelector('[data-name-steward="ubba_ragnarsson"]').className)
-      .toContain('is-chosen');
-    expect(panel.querySelector('[data-name-steward="halfdan_ragnarsson"]').className)
-      .not.toContain('is-chosen');
-    expect(panel.textContent).toContain('You may still change it');
+    const panel = mount(seenBy(game.state, 'halfdan_ragnarsson'));
+    expect(panel.querySelector('[data-spoils="lindsey"]')).toBeNull();
+    expect(panel.querySelector('[data-name-steward]')).toBeNull();
   });
 
   it('offers nothing to a player whose token took nothing', () => {

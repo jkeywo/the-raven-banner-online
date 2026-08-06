@@ -241,6 +241,12 @@ export function createInitialState({ joinCode, seed, data, roleIds }) {
       // Turn-scoped for free: `facilitator:end-battles` clears this whole
       // object, and a pick is only ever about a battle currently on the board.
       stewardPicks: {},
+      // Which shires have already been settled, by shire. Settling moves a
+      // steward and takes a castle down, so doing it twice is not a no-op —
+      // and it can now be reached from three places (the last die, the
+      // conqueror's pick, and the facilitator's own button), any of which
+      // might arrive after another has already finished the job.
+      settled: {},
       pairingComplete: false,
     },
     // Requests waiting on other people's agreement — settling a shire, and
