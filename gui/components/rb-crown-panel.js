@@ -95,6 +95,52 @@ export class RbCrownPanel extends HTMLElement {
       </li>`).join('')}</ul>`;
   }
 
+  /**
+   * The feudal web, read off the board.
+   *
+   * Homage is the thing on this panel with no control attached — it is sworn
+   * and renounced by the players themselves — but it is what makes support,
+   * elections and rebellion mean anything, and it was the one part of the
+   * arrangement a facilitator could not see anywhere. Derived from liegeId
+   * every render rather than kept, so it cannot fall out of step with the
+   * rebellion two headings down that is about to change it.
+   */
+  _homage(nameOf) {
+    const roles = Object.values(this._state.roles ?? {});
+    const vassalsOf = new Map();
+    for (const role of roles) {
+      if (!role.liegeId) continue;
+      if (!vassalsOf.has(role.liegeId)) vassalsOf.set(role.liegeId, []);
+      vassalsOf.get(role.liegeId).push(role.id);
+    }
+
+    if (!vassalsOf.size) {
+      return '<p class="rb-empty">Nobody has sworn to anybody. Every role stands alone.</p>';
+    }
+
+    // A liege who is himself sworn to somebody is shown under his own lord as
+    // well as over his men, which is the shape of the thing: the chain is the
+    // point, not the pairs.
+    const lieges = [...vassalsOf.keys()]
+      .sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
+    const alone = roles
+      .filter((role) => !role.liegeId && !vassalsOf.has(role.id))
+      .map((role) => role.id)
+      .sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
+
+    return `
+      <ul class="rb-homage">${lieges.map((liege) => `
+        <li data-liege="${liege}">
+          <strong>${escape(nameOf(liege))}</strong>${this._state.roles[liege]?.liegeId
+    ? ` <span class="rb-meta">(sworn to ${escape(nameOf(this._state.roles[liege].liegeId))})</span>`
+    : ''}
+          <span class="rb-meta">answered by ${
+  vassalsOf.get(liege).map((id) => escape(nameOf(id))).join(', ')}</span>
+        </li>`).join('')}</ul>
+      ${alone.length ? `<p class="rb-meta" data-unsworn>Answering to nobody: ${
+  alone.map((id) => escape(nameOf(id))).join(', ')}.</p>` : ''}`;
+  }
+
   _render() {
     if (!this.isConnected || !this._state || !this._data) return;
     const nameOf = (id) => this._data.roles.roles[id]?.name ?? id;
@@ -128,6 +174,9 @@ export class RbCrownPanel extends HTMLElement {
             </li>`;
   }).join('')}</ul>` : '<p class="rb-empty">Nobody is standing for anything.</p>'}
 
+        <h3>Who answers to whom</h3>
+        ${this._homage(nameOf)}
+
         ${this._dead(nameOf, crownName)}
 
         <h3>Rebellions waiting on you</h3>
@@ -157,6 +206,11 @@ export class RbCrownPanel extends HTMLElement {
       };
     }
   }
+}
+
+function escape(text) {
+  return String(text ?? '').replace(/[&<>"']/g, (c) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
 customElements.define('rb-crown-panel', RbCrownPanel);

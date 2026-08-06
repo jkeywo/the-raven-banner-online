@@ -316,14 +316,24 @@ export async function startHostApp({ location = window.location } = {}) {
     // reason to have the panel open before a battle exists.
     $('tab-fac-battle').dataset.live = String(phase.name === 'battle' || phase.name === 'team');
 
-    // The debrief appears when the game ends and not before: a half-played
-    // epilogue is a thing to be misread out loud.
+    // The debrief fills in as the game goes, rather than appearing whole at
+    // the end. It is derived from the board every time it renders, so mid-game
+    // it is simply the truth so far — and a facilitator who can watch the four
+    // counters move has something to steer by, instead of meeting them for the
+    // first time with sixteen people waiting.
+    //
+    // It is labelled while the game is still on, because the one danger here is
+    // reading a half-played epilogue out as though it were the ending.
     const ended = phase.name === 'epilogue';
-    $('epilogue-panel').hidden = !ended;
-    $('debrief-waiting').hidden = ended;
+    const started = phase.name !== 'lobby';
+    $('epilogue-panel').hidden = !started;
+    $('debrief-waiting').hidden = started;
+    $('epilogue-provisional').hidden = ended;
     $('tab-fac-debrief').dataset.live = String(ended);
     $('end-game').disabled = ended || phase.name === 'lobby';
-    if (ended) {
+    // Print and save produce the real thing, so they wait for the real thing.
+    for (const id of ['print-epilogue', 'save-epilogue']) $(id).disabled = !ended;
+    if (started) {
       $('epilogue').data = data;
       $('epilogue').state = session.state;
     }

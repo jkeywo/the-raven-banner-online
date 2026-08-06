@@ -210,6 +210,56 @@ describe('the facilitator console', () => {
     expect(document.getElementById('resume').hidden).toBe(true);
   });
 
+  it('fills the debrief in as the game goes, marked as provisional', async () => {
+    // It is derived from the board every render, so mid-game it is simply the
+    // truth so far — and a facilitator who can watch the counters move has
+    // something to steer by rather than meeting them for the first time with
+    // sixteen people waiting.
+    const { Peer, createBroker } = await import('../fakes/peerjs-shim.js');
+    createBroker();
+    globalThis.Peer = Peer;
+
+    await loadPage('host.html');
+    const { startHostApp } = await import('../../gui/host/host-app.js');
+    await startHostApp({ location: { hash: '', href: 'http://x/host.html' } });
+    document.getElementById('new-game').click();
+
+    // The lobby has no board to report on yet.
+    expect(document.getElementById('epilogue-panel').hidden).toBe(true);
+    expect(document.getElementById('debrief-waiting').hidden).toBe(false);
+
+    document.getElementById('advance-phase').click();   // lobby -> team
+
+    expect(document.getElementById('epilogue-panel').hidden).toBe(false);
+    expect(document.getElementById('debrief-waiting').hidden).toBe(true);
+    expect(document.getElementById('epilogue-provisional').hidden).toBe(false);
+    expect(document.getElementById('epilogue').textContent.length).toBeGreaterThan(0);
+    // The real thing is what gets printed, so those wait for the real thing.
+    expect(document.getElementById('print-epilogue').disabled).toBe(true);
+    expect(document.getElementById('save-epilogue').disabled).toBe(true);
+  });
+
+  it('drops the provisional warning and opens print once time is called', async () => {
+    const { Peer, createBroker } = await import('../fakes/peerjs-shim.js');
+    createBroker();
+    globalThis.Peer = Peer;
+
+    await loadPage('host.html');
+    const { startHostApp } = await import('../../gui/host/host-app.js');
+    await startHostApp({ location: { hash: '', href: 'http://x/host.html' } });
+    document.getElementById('new-game').click();
+    document.getElementById('advance-phase').click();   // lobby -> team
+
+    const original = globalThis.confirm;
+    globalThis.confirm = () => true;
+    document.getElementById('end-game').click();
+    globalThis.confirm = original;
+
+    expect(document.getElementById('epilogue-provisional').hidden).toBe(true);
+    expect(document.getElementById('print-epilogue').disabled).toBe(false);
+    expect(document.getElementById('save-epilogue').disabled).toBe(false);
+  });
+
   it('does not call the primary host a co-facilitator', async () => {
     // A class on .rb-co-banner set its own `display`, which in CSS beats the
     // `hidden` attribute on specificity alone — so the banner announcing

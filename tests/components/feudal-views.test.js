@@ -227,3 +227,70 @@ describe('the chooser', () => {
     expect(fieldsFor('request-rebel', viewFor(state, 'cenred'), data)).toEqual([]);
   });
 });
+
+describe('the homage web on the crowns panel', () => {
+  const mountPanel = (state) => {
+    const panel = document.createElement('rb-crown-panel');
+    document.body.append(panel);
+    panel.data = data;
+    panel.state = state;
+    return panel;
+  };
+
+  const fresh = () => createInitialState({ joinCode: 'RAVEN7Z', seed: 1, data });
+
+  it('lists each liege with the men who answer to them', () => {
+    // The printed game opens with a full web already: Alfred holds three
+    // Saxons, and Halfdan holds Ecgberht, Ubba and Frida.
+    const panel = mountPanel(fresh());
+
+    const alfred = panel.querySelector('[data-liege="king_alfred"]').textContent;
+    expect(alfred).toContain('King Alfred');
+    for (const man of ['Cenred', 'Godric', 'Æthelred']) expect(alfred).toContain(man);
+  });
+
+  it('shows a liege who is himself sworn to somebody, because the chain is the point', () => {
+    // Ecgberht answers to Halfdan and is answered to by nobody at the start,
+    // so give him a man and he should appear as both.
+    const state = fresh();
+    expect(state.roles.king_ecgberht.liegeId).toBe('halfdan_ragnarsson');
+    state.roles.uchtred.liegeId = 'king_ecgberht';
+    const panel = mountPanel(state);
+
+    const row = panel.querySelector('[data-liege="king_ecgberht"]');
+    expect(row.textContent).toContain('sworn to Halfdan Ragnarsson');
+    expect(row.textContent).toContain('Uchtred');
+  });
+
+  it('names who is answering to nobody', () => {
+    const panel = mountPanel(fresh());
+
+    const unsworn = panel.querySelector('[data-unsworn]').textContent;
+    expect(unsworn).toContain('Answering to nobody');
+    expect(unsworn).toContain('Ceowulf');          // holds nothing, sworn to nobody
+    expect(unsworn).not.toContain('Cenred');       // he has a lord
+    expect(unsworn).not.toContain('King Alfred');  // he has men
+  });
+
+  it('says plainly when the web is empty', () => {
+    const state = fresh();
+    for (const role of Object.values(state.roles)) role.liegeId = null;
+    const panel = mountPanel(state);
+    expect(panel.textContent).toContain('Nobody has sworn to anybody');
+  });
+
+  it('follows fealty as it is sworn, without being told', () => {
+    // Derived from liegeId every render, so it cannot drift out of step with
+    // the rebellion two headings down that is about to change it.
+    const state = fresh();
+    const panel = mountPanel(state);
+    expect(panel.querySelector('[data-liege="ceowulf"]')).toBeNull();
+
+    const sworn = apply(state, data, {
+      verb: 'facilitator:set', payload: { path: ['roles', 'uchtred', 'liegeId'], value: 'ceowulf' },
+    }, FACILITATOR, { ts: 0 }).state;
+    panel.state = sworn;
+
+    expect(panel.querySelector('[data-liege="ceowulf"]').textContent).toContain('Uchtred');
+  });
+});

@@ -320,6 +320,10 @@ rb-connection-dot[data-tone="connecting"] .rb-dot { animation: rb-pulse 1.4s eas
 .rb-resume span { color: var(--rb-muted); font-size: 0.85rem; }
 .rb-resume-forget { flex: none; color: var(--rb-blood); }
 
+/* The feudal web: one liege per row, their sworn men beside them. */
+.rb-homage { list-style: none; margin: 0.3rem 0 0; padding: 0; display: grid; gap: 0.3rem; }
+.rb-homage li { display: grid; gap: 0.1rem; }
+
 .rb-log {
   font-family: ui-monospace, 'Cascadia Mono', Menlo, monospace;
   font-size: 0.75rem;
