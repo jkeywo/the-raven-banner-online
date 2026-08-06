@@ -13,26 +13,40 @@
 const CORE = ['shires', 'adjacency', 'roles', 'briefs', 'archetypes',
   'tactics', 'factions', 'meta', 'scaling'];
 
-/** Where things sit on the printed maps. Only the map view needs it. */
-const GEOMETRY = 'geometry';
+/**
+ * The two files only the map view needs.
+ *
+ * `geometry` is where things sit on the printed sheets — outlines and
+ * settlement anchors. `cells` is where the exporter blanked the state-bearing
+ * cells out of the artwork, and so where the overlay has to put them back. It
+ * lives beside the art it describes rather than under `data/`, because it is a
+ * fact about those pictures and is regenerated whenever they are.
+ */
+const MAP_EXTRAS = [
+  { name: 'geometry', url: 'data/geometry.json' },
+  { name: 'cells', url: 'assets/maps/cells.json' },
+];
 
 let cached = null;
 
 /**
  * @param {object} [options]
- * @param {boolean} [options.geometry]  also load the map outlines
+ * @param {boolean} [options.geometry]  also load what the map view needs
  * @param {string} [options.base]
  */
 export async function loadData({ geometry = false, base = 'data' } = {}) {
   if (cached && (!geometry || cached.geometry)) return cached;
 
-  const names = geometry ? [...CORE, GEOMETRY] : CORE;
+  const wanted = [
+    ...CORE.map((name) => ({ name, url: `${base}/${name}.json` })),
+    ...(geometry ? MAP_EXTRAS : []),
+  ];
   const loaded = await Promise.all(
-    names.map((name) => fetch(`${base}/${name}.json`).then((response) => {
-      if (!response.ok) throw new Error(`could not load ${name}.json (${response.status})`);
+    wanted.map(({ name, url }) => fetch(url).then((response) => {
+      if (!response.ok) throw new Error(`could not load ${name} (${response.status})`);
       return response.json();
     })));
 
-  cached = { ...cached, ...Object.fromEntries(names.map((name, i) => [name, loaded[i]])) };
+  cached = { ...cached, ...Object.fromEntries(wanted.map(({ name }, i) => [name, loaded[i]])) };
   return cached;
 }

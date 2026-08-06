@@ -466,7 +466,12 @@ async function loadData() {
     'tactics', 'factions', 'meta', 'scaling', 'geometry'];
   const loaded = await Promise.all(
     names.map((name) => fetch(`data/${name}.json`).then((r) => r.json())));
-  return Object.fromEntries(names.map((name, i) => [name, loaded[i]]));
+  const data = Object.fromEntries(names.map((name, i) => [name, loaded[i]]));
+  // Where the exporter blanked the state-bearing cells out of the map art, and
+  // so where <rb-map> has to put them back. Beside the pictures rather than
+  // under data/, because it is regenerated with them.
+  data.cells = await fetch('assets/maps/cells.json').then((r) => r.json());
+  return data;
 }
 
 const title = (text) => String(text ?? '').replace(/_/g, ' ')

@@ -422,36 +422,33 @@ a { color: var(--rb-blood); text-underline-offset: 0.15em; }
   color: var(--rb-paper);
 }
 
-.rb-pane-map {
-  display: grid;
-  grid-template-columns: minmax(0, 3fr) minmax(16rem, 1fr);
-  gap: 1.5rem;
-  align-items: start;
-}
-
-@media (max-width: 60rem) {
-  .rb-pane-map { grid-template-columns: 1fr; }
-}
+/* The map is the pane now. What used to be a second column beside it — the
+   player's shire read-out, the facilitator's editor — is a card on the map,
+   anchored to the shire it is about. */
+.rb-pane-map { display: block; }
 
 /* --- the map ------------------------------------------------------------- */
 
+rb-map { display: block; }
+
 .rb-map-tabs { display: flex; gap: 0.3rem; margin-bottom: -1px; }
 
+/* Not clipped, because the card is positioned against this box and a control
+   the facilitator cannot reach is worse than one that hangs over an edge. */
 .rb-map-stage {
   position: relative;
-  border: 1px solid var(--rb-rule);
-  border-radius: 3px;
-  overflow: hidden;
-  background: var(--rb-paper);
+  overflow: visible;
 }
 
-.rb-map-art { display: block; width: 100%; height: auto; }
-
-.rb-map-overlay {
-  position: absolute;
-  inset: 0;
+/* Art and overlay are one element sharing one coordinate system, so the
+   border belongs to the sheet rather than to a box around it. */
+.rb-map-sheet {
+  display: block;
   width: 100%;
-  height: 100%;
+  height: auto;
+  border: 1px solid var(--rb-rule);
+  border-radius: 3px;
+  background: var(--rb-paper);
 }
 
 .rb-shire {
@@ -465,9 +462,20 @@ a { color: var(--rb-blood); text-underline-offset: 0.15em; }
   transition: fill-opacity 120ms ease;
 }
 
-.rb-shire:hover { fill-opacity: 0.3; }
+/* Blank until it differs. A shire the game has not moved is a hit target and
+   nothing else — the printed parchment shows through it untouched. It still
+   answers a hover, because a map you cannot tell is clickable is a map nobody
+   clicks. */
+.rb-shire[data-moved="false"] {
+  fill-opacity: 0;
+  stroke-opacity: 0;
+}
 
-.rb-shire.is-selected {
+.rb-shire:hover { fill-opacity: 0.3; }
+.rb-shire[data-moved="false"]:hover { fill-opacity: 0.1; stroke-opacity: 0.35; }
+
+.rb-shire.is-selected,
+.rb-shire[data-moved="false"].is-selected {
   fill-opacity: 0.34;
   stroke-width: 5;
   stroke-opacity: 1;
@@ -483,8 +491,10 @@ a { color: var(--rb-blood); text-underline-offset: 0.15em; }
 
 /* A valid target of the action just chosen — an amber glow rather than the
    blood-red the game already uses for "yours" and "unsupported", so a
-   highlighted shire cannot be mistaken for either. */
-.rb-shire.is-highlighted {
+   highlighted shire cannot be mistaken for either. Louder than the blank rule
+   above, because a chooser has to be able to point at a quiet shire. */
+.rb-shire.is-highlighted,
+.rb-shire[data-moved="false"].is-highlighted {
   fill: var(--rb-amber);
   fill-opacity: 0.4;
   stroke: var(--rb-amber);
@@ -497,40 +507,158 @@ a { color: var(--rb-blood); text-underline-offset: 0.15em; }
   50% { fill-opacity: 0.18; }
 }
 
-.rb-shire-tokens { pointer-events: none; }
+/* --- the cells the printed sheet no longer carries ----------------------- */
 
-.rb-shire-label {
-  font: 26px var(--rb-serif);
+/* Drawn over blanked parchment, so they read as ink on the sheet rather than
+   as an interface floating above it. None of them take a click: the outline
+   underneath is the hit target. */
+.rb-shire-cells, .rb-ghost { pointer-events: none; }
+
+.rb-cell-steward {
+  font: 600 19px var(--rb-serif);
   fill: var(--rb-ink);
   text-anchor: middle;
-  paint-order: stroke;
-  stroke: var(--rb-paper);
-  stroke-width: 5;
 }
 
-.rb-settlement-gone {
-  font: bold 30px var(--rb-sans);
+.rb-cell-factions {
+  font: 12px var(--rb-sans);
+  letter-spacing: 0.12em;
+  fill: var(--rb-muted);
+  text-anchor: middle;
+}
+
+.rb-cell-sea {
+  font: 11px var(--rb-sans);
+  fill: var(--rb-muted);
+  text-anchor: end;
+}
+
+.rb-cell-support {
+  font: 600 11px var(--rb-sans);
+  letter-spacing: 0.1em;
+  fill: var(--rb-ink);
+  text-anchor: middle;
+}
+
+.rb-cell-support.is-lost {
   fill: var(--rb-blood);
+  text-decoration: line-through;
+}
+
+.rb-cell-castle { fill: var(--rb-ink); fill-opacity: 0.85; }
+
+.rb-cell-nocastle {
+  font: 22px var(--rb-serif);
+  fill: var(--rb-muted);
+  text-anchor: middle;
+}
+
+.rb-cell-cross { fill: var(--rb-gold); }
+
+.rb-settlement-letter {
+  font: 600 24px var(--rb-serif);
+  fill: var(--rb-ink);
   text-anchor: middle;
   dominant-baseline: central;
   paint-order: stroke;
   stroke: var(--rb-paper);
   stroke-width: 4;
-  pointer-events: all;
 }
+
+/* The ring the printed sheet draws round a settlement somebody has fortified. */
+.rb-settlement-ring {
+  fill: none;
+  stroke: var(--rb-ink);
+  stroke-width: 2.5;
+}
+
+/* Struck rather than removed: the letter is what the sheet said was there,
+   and its absence is the point. */
+.rb-settlement-strike {
+  stroke: var(--rb-blood);
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+.rb-settlement.is-destroyed .rb-settlement-letter { fill: var(--rb-muted); }
+.rb-settlement.is-destroyed .rb-settlement-ring { stroke: var(--rb-muted); }
+
+/* --- ghost shires -------------------------------------------------------- */
+
+/* A read-only copy of a shire played on another sheet. Quieter than the real
+   thing on purpose — there is one place to select a shire, and this is not it. */
+.rb-ghost-box {
+  fill: currentColor;
+  fill-opacity: 0.12;
+  stroke: currentColor;
+  stroke-opacity: 0.4;
+  stroke-width: 1.5;
+  color: var(--rb-muted);
+}
+
+.rb-ghost-name {
+  font: 600 13px var(--rb-sans);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  fill: var(--rb-muted);
+  text-anchor: middle;
+}
+
+.rb-ghost-steward {
+  font: 15px var(--rb-serif);
+  fill: var(--rb-ink);
+  fill-opacity: 0.75;
+  text-anchor: middle;
+}
+
+/* --- the selected shire's card ------------------------------------------- */
+
+/* What used to be a column beside the map. It is anchored to the shire it
+   describes, because "which shire is this about?" was a question the side
+   panel could only answer by repeating the name at the top. */
+.rb-map-card {
+  position: absolute;
+  z-index: 2;
+  width: min(20rem, 78%);
+  max-height: 24rem;
+  overflow: auto;
+  background: var(--rb-parchment);
+  border: 1px solid var(--rb-ink);
+  border-radius: 3px;
+  box-shadow: 0 6px 22px rgb(43 33 24 / 0.28);
+  padding: 0.85rem 1rem;
+  /* These two shifts are the same numbers `anchor()` in rb-map.js reasons
+     about when it works out which side of a shire the card fits on, so they
+     have to stay exactly a whole card and half a card — anything else and the
+     card it thought was on the sheet is not. */
+  --rb-card-dx: -50%;
+  --rb-card-dy: 0%;
+  transform: translate(var(--rb-card-dx), var(--rb-card-dy));
+}
+
+.rb-map-card[data-x="left"] { --rb-card-dx: 0%; }
+.rb-map-card[data-x="right"] { --rb-card-dx: -100%; }
+.rb-map-card[data-y="above"] { --rb-card-dy: -100%; }
+
+.rb-map-card h3, .rb-map-card h4 { font-family: var(--rb-serif); margin: 0; }
+.rb-map-card h3 { font-size: 1.2rem; padding-right: 1.4rem; }
+
+.rb-map-card-close {
+  position: absolute;
+  top: 0.2rem;
+  right: 0.3rem;
+  border: 0;
+  background: none;
+  font-size: 1.2rem;
+  line-height: 1;
+  padding: 0.2rem 0.35rem;
+  cursor: pointer;
+  color: var(--rb-muted);
+}
+
+.rb-map-card-close:hover { color: var(--rb-ink); }
 
 /* --- shire detail -------------------------------------------------------- */
-
-.rb-detail-panel {
-  background: var(--rb-parchment);
-  border: 1px solid var(--rb-rule);
-  border-radius: 3px;
-  padding: 1rem 1.2rem;
-  position: sticky;
-  top: 1rem;
-}
-
-.rb-detail-panel h3 { font-family: var(--rb-serif); font-size: 1.3rem; margin: 0; }
 
 .rb-detail { display: grid; grid-template-columns: auto 1fr; gap: 0.3rem 0.9rem; margin: 1rem 0 0; }
 .rb-detail dt { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--rb-muted); }
@@ -1373,17 +1501,12 @@ rb-envoy-channel h4 { margin: 0 0 0.5rem; }
 
 .rb-inspector-addrole-form label { display: flex; align-items: center; gap: 0.35rem; font-size: 0.85rem; }
 
-/* --- the facilitator's shire editor, beside the map ----------------------- */
+/* --- the facilitator's shire editor, on the map --------------------------- */
 
-rb-shire-editor {
-  display: block;
-  background: var(--rb-parchment);
-  border: 1px solid var(--rb-rule);
-  border-radius: 3px;
-  padding: 0.9rem 1.1rem;
-  position: sticky;
-  top: 1rem;
-}
+/* It sits inside the map's card now rather than in a column beside it, so the
+   parchment, the border and the box shadow are the card's job and this is just
+   its contents. */
+rb-shire-editor { display: block; }
 
 .rb-editor-row { display: grid; gap: 0.2rem; margin-bottom: 0.6rem; font-size: 0.85rem; }
 .rb-editor-row select { padding: 0.3rem; font-size: 0.85rem; }

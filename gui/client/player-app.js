@@ -186,6 +186,13 @@ export async function startPlayerApp({ location = window.location } = {}) {
    * here?" is the first thing the player sees.
    */
   function onShireClicked(shireId) {
+    // The map raises this with a null when the card is dismissed — a click on
+    // the sea, or the card's own close button. Nothing left to fill in, and
+    // nothing left to promote in the action list either.
+    if (!shireId) {
+      $('actions').focusShireId = null;
+      return;
+    }
     showShire(shireId);
 
     const form = $('chooser').hidden ? null : $('chooser').querySelector('form');
@@ -200,6 +207,15 @@ export async function startPlayerApp({ location = window.location } = {}) {
     }
   }
 
+  /**
+   * Everything the printed sheet used to say about a shire, in the card the
+   * map opens on it.
+   *
+   * The map draws a shire's cells only once the game has moved it, so on a
+   * quiet board this is the only place a player can read who holds what — and
+   * on a loud one it is still the only place that says the ship cost, the
+   * trade contract and the settlement tally in words. It has to be complete.
+   */
   function showShire(shireId) {
     const printed = data.shires.shires[shireId];
     const live = client.view?.shires?.[shireId];
@@ -246,7 +262,7 @@ export async function startPlayerApp({ location = window.location } = {}) {
       canTarget = false;
     }
 
-    $('shire-detail').innerHTML = `
+    $('shire-card').innerHTML = `
       <h3>${printed.name}</h3>
       <p class="rb-meta">${printed.map} England</p>
       <dl class="rb-detail">
@@ -349,6 +365,11 @@ export async function startPlayerApp({ location = window.location } = {}) {
     // phase you will miss.
     $('tab-battle').dataset.live = String(view.phase.name === 'battle');
 
+    // The card is on the board rather than off to one side now, so a shire
+    // left open while the turn moves under it would be read as the board —
+    // rewritten from the projection that has just arrived instead. Before the
+    // map is told, because the map places the card by measuring it.
+    if ($('map').selected) showShire($('map').selected);
     $('map').data = data;
     $('map').view = view;
     $('sheet').data = data;

@@ -107,6 +107,20 @@ describe('the facilitator console', () => {
     await startHostApp({ location: { hash: '', href: 'http://x/host.html' } });
     const fetched = globalThis.fetch.mock.calls.map(([url]) => String(url));
     expect(fetched).toContain('data/geometry.json');
+    // And the cell manifest, without which the vector sheets are blank fields
+    // the overlay has nowhere to write into.
+    expect(fetched).toContain('assets/maps/cells.json');
+  });
+
+  it('puts the shire editor inside the map rather than beside it', async () => {
+    // The editor is the map's card now. If it is left outside, clicking a
+    // shire still fills it in and nobody ever sees it.
+    await loadPage('host.html');
+    const { startHostApp } = await import('../../gui/host/host-app.js');
+    await startHostApp({ location: { hash: '', href: 'http://x/host.html' } });
+    expect(document.getElementById('shire-editor').closest('rb-map'))
+      .toBe(document.getElementById('fac-map'));
+    expect(document.getElementById('shire-editor').closest('.rb-map-card-body')).toBeTruthy();
   });
 
   it('switches control panels on the facilitator’s own tabs', async () => {
@@ -289,9 +303,23 @@ describe('the player console', () => {
 
     for (const id of ['code-form', 'join-code', 'name-form', 'player-name', 'role-picker',
       'game-tabs', 'tab-battle', 'action-rail', 'character-rail', 'sheet',
-      'consents', 'ballot', 'chooser', 'actions']) {
+      'consents', 'ballot', 'chooser', 'actions', 'shire-card']) {
       expect(document.getElementById(id), id).toBeTruthy();
     }
+  });
+
+  it('writes the shire read-out into the card on the map', async () => {
+    // The side panel beside the map is gone. Everything it said — steward,
+    // support, castles, ship cost, settlements — is in the card the map opens
+    // on the shire, so this is the one place it can still be read.
+    await loadPage('index.html');
+    const { startPlayerApp } = await import('../../gui/client/player-app.js');
+    await startPlayerApp({ location: { hash: '' } });
+
+    expect(document.getElementById('shire-detail')).toBeNull();
+    expect(document.getElementById('shire-card').closest('rb-map'))
+      .toBe(document.getElementById('map'));
+    expect(document.getElementById('shire-card').closest('.rb-map-card-body')).toBeTruthy();
   });
 
   it('offers the three printed sheets as three buttons, not one board tab', async () => {

@@ -224,6 +224,43 @@ entities:
       tests:
         - npm test
 
+  - decision: blank-until-it-differs
+    core:
+      status: implemented
+      confidence: confirmed
+      title: A Shire Still Where The Rules Put It Draws Nothing
+      summary: >-
+        The exported map art is the printed sheet with the cells that are
+        really game state cut out of it. The overlay fills a cell only where
+        the live board has moved off the printed one, so an untouched game
+        reads as quiet paper and the three shires that have moved are the
+        three things the eye lands on.
+      rationale:
+        - "The alternative is drawing all eighteen shires every frame, which is what the PNG overlay did: every shire tinted, every castle stack redrawn, and the printed artwork obscured by a restatement of itself. A player then has to compare the overlay against a map they cannot see to find what changed."
+        - "The baseline is a whole opening position from createInitialState rather than a hand-listed set of printed values, because \"as printed\" already has a precise meaning in this codebase. That means the map cannot drift from the setup code, and a short-handed table still opens blank — the twelve-player stewardship transfer and castle removal come from a printed table, so they are the printed board."
+        - "Support is compared against the baseline rather than merely reported. Jorvik, Ribble and East Anglia open unsupported, which is printed, so they stay quiet; but the moment Ceowulf is crowned, Gainbeald's Mercian shires light up over a change to nothing about those shires at all."
+        - "adjacencyBought is deliberately excluded: it is a fact about a player, wiped every turn, and a mark that appeared and vanished on its own would teach the table to distrust the overlay."
+      assumptions:
+        - Because a quiet board draws nothing, the shire card is the only place the opening position can be read, so it has to carry everything the old side panel did.
+    implementation:
+      status: declared
+      paths:
+        - gui/rules/map-state.js
+      symbols:
+        - shireDeviations
+        - hasDeviated
+        - deviatedShires
+        - printedBoard
+      tests:
+        - npm test
+    evidence:
+      - kind: test
+        reference: tests/rules/map-state.test.js
+        summary: >-
+          A turn-zero board reports no deviation anywhere; moving one thing
+          reports that shire and only that shire, naming which of the six
+          kinds moved.
+
   - component: player-console
     core:
       status: proposed
@@ -255,6 +292,7 @@ entities:
         - neighbour-consent
         - crown-election
         - command-admission
+        - blank-until-it-differs
     implementation:
       status: declared
       paths:

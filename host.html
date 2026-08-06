@@ -102,8 +102,12 @@
       </nav>
 
       <div data-pane-body="map" class="rb-pane rb-pane-map">
-        <rb-map id="fac-map" sheet="northern"></rb-map>
-        <rb-shire-editor id="shire-editor"></rb-shire-editor>
+        <!-- The umpire's pencil is on the shire being corrected rather than in
+             a second column: the map is the control now, and the editor is
+             what opens when you click one. -->
+        <rb-map id="fac-map" sheet="northern">
+          <rb-shire-editor id="shire-editor" slot="card"></rb-shire-editor>
+        </rb-map>
       </div>
 
       <div data-pane-body="battle" class="rb-pane" hidden>

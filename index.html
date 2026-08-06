@@ -102,10 +102,13 @@
         <!-- the board, or how England is doing, or a battle -->
         <div class="rb-game-main">
           <div data-pane-body="map" class="rb-pane rb-pane-map">
-            <rb-map id="map" sheet="northern" tabs="off"></rb-map>
-            <aside id="shire-detail" class="rb-detail-panel">
-              <p class="rb-empty">Choose a shire on the map.</p>
-            </aside>
+            <!-- What a shire is worth is a card on the shire, not a column
+                 beside the map: the answer to "who holds this?" belongs next
+                 to the thing that was clicked. The map decides when the card
+                 is on screen and where; this is only what goes in it. -->
+            <rb-map id="map" sheet="northern" tabs="off">
+              <div id="shire-card" slot="card"></div>
+            </rb-map>
           </div>
 
           <div data-pane-body="battle" class="rb-pane" hidden>
