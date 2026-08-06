@@ -7,6 +7,12 @@
  * tracker is the drift that would matter most.
  *
  * Pure: state and data in, values out. No DOM, no network, no module globals.
+ *
+ * Board truth only. The debrief used to be assembled at the bottom of this
+ * file, which made the module every rule in the game imports also the module
+ * that knew how a report should be ordered for one reader at one moment. It
+ * has moved to `epilogue.js`, which imports from here — the traffic runs that
+ * way and not back.
  */
 
 import { liegeChain } from './state.js';
@@ -345,89 +351,6 @@ export function aftermath(state, data) {
     disorder: { ...band('disorder', disorder.length), shires: disorder },
     prosperity: band('prosperity', prosperity),
     foreignInfluence: state.aftermath.foreignInfluence,
-  };
-}
-
-/**
- * The debrief, assembled from the board.
- *
- * "In the debrief you should give an overview of the state of the island, both
- * the political and military situation at the end of the game as well as
- * summarising the outcomes from England in the Aftermath." That is a lot to
- * hold in your head after five turns of running four foreign courts, so this
- * puts it in order: the four counters with the sentence printed under each
- * band, what every player ended holding, who ended up wearing what, and the
- * whole ledger of what was promised abroad.
- *
- * Derived rather than stored, like everything else here. An epilogue that
- * could disagree with the map it describes would be worse than none.
- */
-export function epilogue(state, data) {
-  const counters = aftermath(state, data);
-  const named = (which) => {
-    const printed = data.meta.aftermath[which];
-    const counter = counters[which];
-    return {
-      ...counter,
-      title: which,
-      sentence: printed.sentences?.[counter.band] ?? '',
-      start: printed.start,
-    };
-  };
-
-  const players = Object.values(state.roles)
-    .map((role) => ({
-      id: role.id,
-      name: data.roles.roles[role.id]?.name ?? role.id,
-      teamId: role.teamId,
-      factionId: role.factionId,
-      liegeId: role.liegeId,
-      generation: role.generation ?? 0,
-      baptised: Boolean(role.baptised),
-      crowns: Object.keys(state.crownHolders ?? {})
-        .filter((crown) => state.crownHolders[crown] === role.id).sort(),
-      shires: Object.keys(state.shires)
-        .filter((id) => state.shires[id].stewardRoleId === role.id).sort(),
-      // What is left in front of them, which is the other half of "how did
-      // they do" and is nobody's secret once the game is over.
-      resources: {
-        silver: role.silver, food: role.food, soldiers: role.soldiers, ships: role.ships,
-      },
-    }))
-    .sort((a, b) => b.shires.length - a.shires.length || a.name.localeCompare(b.name));
-
-  // Factions as they ended rather than as they began. Somebody who rebelled in
-  // turn three is their own faction of one, and that is the story.
-  const factions = {};
-  for (const player of players) {
-    const faction = factions[player.factionId] ??= {
-      id: player.factionId, members: [], shires: 0, crowns: [],
-    };
-    faction.members.push(player.id);
-    faction.shires += player.shires.length;
-    faction.crowns.push(...player.crowns);
-  }
-
-  return {
-    turn: state.phase.turn,
-    counters: {
-      paganism: named('paganism'),
-      danelaw: named('danelaw'),
-      disorder: named('disorder'),
-      prosperity: named('prosperity'),
-    },
-    foreignInfluence: {
-      prose: state.aftermath.foreignInfluence,
-      note: data.meta.aftermath.foreignInfluence?.note ?? '',
-      // Kept promises first, then broken ones — the debrief wants the deals
-      // before the betrayals.
-      promises: Object.values(state.concessions ?? {})
-        .sort((a, b) => Number(b.kept) - Number(a.kept) || a.turn - b.turn),
-    },
-    players,
-    factions: Object.values(factions)
-      .sort((a, b) => b.shires - a.shires || String(a.id).localeCompare(String(b.id))),
-    notes: state.facilitatorNotes ?? {},
   };
 }
 

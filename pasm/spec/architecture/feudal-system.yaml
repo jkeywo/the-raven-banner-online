@@ -64,7 +64,7 @@ entities:
     implementation:
       status: declared
       paths:
-        - gui/rules/commands.js
+        - gui/rules/commands/feudal.js
         - gui/components/rb-ballot.js
         - gui/components/rb-crown-panel.js
       symbols:
@@ -105,7 +105,7 @@ entities:
     implementation:
       status: declared
       paths:
-        - gui/rules/commands.js
+        - gui/rules/commands/feudal.js
       symbols:
         - swearTo
         - homageReason
@@ -133,7 +133,7 @@ entities:
     implementation:
       status: declared
       paths:
-        - gui/rules/commands.js
+        - gui/rules/commands/feudal.js
       symbols:
         - openRebellion
         - REBELLION_PRINTED_COST

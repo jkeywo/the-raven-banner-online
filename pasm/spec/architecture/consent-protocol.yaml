@@ -14,6 +14,7 @@ entities:
         - One refusal closes it immediately. The requirement is consent from all of them, so a neighbour who says no does not have to wait for the rest to answer.
         - A shire with no steward is silent rather than obstructive — there is nobody to ask — and a Dane holding both sides of a border does not need his own permission.
         - The whole request is public. A settlement is public business, and knowing that a Dane is trying to put down roots next door is exactly the sort of thing to trade on.
+        - "Whether a round carried and what carrying means are two questions, and only the first is the protocol's. Each kind of agreement declares its own carry; the counting delegates to it. Settle Shire and Saxon homage were branches on the kind inside the counting, which would have made a crown vote — nearly the same shape — a third branch in a function with no business knowing about crowns."
       assumptions:
         - The request outlives the phase it was opened in. A negotiation started in the maintenance phase should not die because the clock ran out mid-conversation.
       references:
@@ -27,12 +28,13 @@ entities:
     implementation:
       status: declared
       paths:
-        - gui/rules/commands.js
+        - gui/rules/commands/consent.js
         - gui/components/rb-consent-panel.js
         - gui/components/rb-consent-queue.js
       symbols:
         - neighbourStewards
         - resolveConsent
+        - CONSENT_KINDS
         - RbConsentPanel
         - RbConsentQueue
       tests:
@@ -120,7 +122,7 @@ entities:
     implementation:
       status: declared
       paths:
-        - gui/rules/commands.js
+        - gui/rules/commands/consent.js
         - gui/components/rb-consent-queue.js
       symbols:
         - resolveConsent

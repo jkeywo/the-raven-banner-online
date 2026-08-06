@@ -15,7 +15,7 @@ entities:
     implementation:
       status: declared
       paths:
-        - gui/rules/commands.js
+        - gui/rules/commands/facilitator.js
       tests:
         - npm test
     evidence:
@@ -39,7 +39,7 @@ entities:
     implementation:
       status: declared
       paths:
-        - gui/rules/commands.js
+        - gui/rules/commands/facilitator.js
       tests:
         - npm test
 
@@ -61,7 +61,7 @@ entities:
     implementation:
       status: declared
       paths:
-        - gui/rules/commands.js
+        - gui/rules/commands/facilitator.js
       tests:
         - npm test
     evidence:

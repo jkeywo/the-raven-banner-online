@@ -15,6 +15,7 @@ entities:
         - The band sentences come off the printed tracker rather than being written fresh. A table of numbers is not an ending, and those are the words the game itself ends on.
         - Saved as a self-contained page with its styles inlined, because it is the only artefact of the evening anybody keeps and it should still render the week after with the app closed.
         - What the umpire changed holds only prose an umpire typed. The battle phase files its own machine-written notes under a separate state key, facilitator-only and never read here, so that heading goes on meaning what it says on a page that gets printed and mailed round after the game.
+        - "The report is assembled in a rules module of its own rather than alongside the board derivations it reads. Board truth is asked for by everything in the game; a report is ordered for one reader at one moment, and it is the half that grows — a narrative per player, a comparison against how the evening started — so it grows somewhere other than in the file every rule depends on."
       references:
         - concessions-ledger
     game_design:
@@ -23,8 +24,10 @@ entities:
     implementation:
       status: declared
       paths:
+        - gui/rules/epilogue.js
         - gui/components/rb-epilogue.js
       symbols:
+        - epilogue
         - RbEpilogue
       tests:
         - npm test

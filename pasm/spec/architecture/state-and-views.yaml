@@ -132,6 +132,7 @@ entities:
         - Clients import the same admission functions to grey out unaffordable controls, but their answer is presentation only — the host's answer is the one that counts.
         - Commands whose legality depends on a secret the client cannot see are marked host-only, so a client renders them as available-but-unverified rather than guessing wrong.
         - Facilitator commands pass through admission too; theirs simply always admit, and their log entries are tagged as overrides.
+        - Legality is asked of the derived board rather than of a stored copy of it — what a shire pays, who has support there, how far an army reaches — so admission depends on the same derivation the projector does. The registry was one file for long enough that the edge was invisible to the scanner; splitting it by domain made it observable, and it is declared rather than hidden.
     architecture:
       kind: rules-gate
       authority: authoritative
@@ -143,6 +144,7 @@ entities:
       depends_on:
         - authoritative-game-state
         - clash-resolution
+        - crown-and-support
       must_not_depend_on:
         - client-connection-manager
         - host-peer-listener
@@ -152,6 +154,17 @@ entities:
       paths:
         - gui/rules/admission.js
         - gui/rules/commands.js
+        - gui/rules/commands/index.js
+        - gui/rules/commands/shared.js
+        - gui/rules/commands/lobby.js
+        - gui/rules/commands/feudal.js
+        - gui/rules/commands/holdings.js
+        - gui/rules/commands/consent.js
+        - gui/rules/commands/contracts.js
+        - gui/rules/commands/church.js
+        - gui/rules/commands/envoy.js
+        - gui/rules/commands/battle.js
+        - gui/rules/commands/facilitator.js
         - gui/rules/reducer.js
         - gui/rules/command-log.js
         - gui/rules/rng.js

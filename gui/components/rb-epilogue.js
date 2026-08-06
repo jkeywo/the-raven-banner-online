@@ -13,7 +13,7 @@
  * map it describes would be worse than no epilogue at all.
  */
 
-import { epilogue } from '../rules/derive.js';
+import { epilogue } from '../rules/epilogue.js';
 
 const title = (text) => String(text ?? '').replace(/_/g, ' ')
   .replace(/\b\w/g, (c) => c.toUpperCase());

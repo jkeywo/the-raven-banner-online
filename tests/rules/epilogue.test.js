@@ -3,7 +3,7 @@ import { loadData } from '../helpers/load-data.js';
 import { createInitialState } from '../../gui/rules/state.js';
 import { apply } from '../../gui/rules/reducer.js';
 import { admit } from '../../gui/rules/admission.js';
-import { epilogue } from '../../gui/rules/derive.js';
+import { epilogue } from '../../gui/rules/epilogue.js';
 
 const data = await loadData();
 const FACILITATOR = { seatId: 's9', kind: 'facilitator', roleId: null };
