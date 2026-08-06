@@ -11,6 +11,12 @@
 <body class="rb-shell rb-shell-player">
   <header class="rb-bar">
     <span class="rb-brand">The Raven Banner</span>
+    <!-- Who you are and where the turn is: the four things a player looks up
+         most, on the one strip that is on screen whichever tab is open. -->
+    <div id="bar-status" class="rb-bar-status" hidden>
+      <span id="bar-role" class="rb-bar-role"></span>
+      <rb-phase-clock id="clock"></rb-phase-clock>
+    </div>
     <rb-connection-dot id="connection" status="connecting"></rb-connection-dot>
   </header>
 
@@ -65,10 +71,6 @@
     <!-- 4. the game ------------------------------------------------------- -->
     <section id="screen-game" class="rb-panel rb-full" hidden>
       <header class="rb-game-head">
-        <div>
-          <h1 id="game-role"></h1>
-          <rb-phase-clock id="clock"></rb-phase-clock>
-        </div>
         <nav id="game-tabs" class="rb-tabs" role="tablist">
           <button type="button" role="tab" data-pane="map" aria-selected="true">The board</button>
           <button type="button" role="tab" data-pane="battle" id="tab-battle" aria-selected="false">Battle</button>

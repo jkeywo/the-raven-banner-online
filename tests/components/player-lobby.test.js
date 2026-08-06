@@ -170,6 +170,8 @@ describe('choosing a character and waiting for the facilitator', () => {
 
     expect(document.getElementById('screen-lobby').hidden).toBe(true);
     expect(document.getElementById('screen-game').hidden).toBe(false);
-    expect(document.getElementById('game-role').textContent).toBe('King Alfred');
+    // Name, turn, phase and timer live on the global bar now.
+    expect(document.getElementById('bar-status').hidden).toBe(false);
+    expect(document.getElementById('bar-role').textContent).toBe('King Alfred');
   });
 });

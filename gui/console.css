@@ -65,7 +65,22 @@ body.rb-shell {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  /* No border, radius or padding of its own. The game screen fills the
+     viewport rather than sitting on it as a card, and every region inside it
+     — both rails, the map stage — draws its own border. The panel's added a
+     second line half a millimetre outside those, which read as a doubled
+     edge in the corners. The simpler screens in front of it keep the card
+     look; only the one that goes full-bleed gives it up. */
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+  max-width: none;
 }
+
+/* Which leaves .rb-main's own padding as the only inset, and it is the thing
+   that should own it now. */
+.rb-shell-player .rb-main { padding: 1rem 1.2rem; }
 
 /* --- chrome ------------------------------------------------------------- */
 
@@ -83,6 +98,28 @@ body.rb-shell {
 }
 
 .rb-brand { font-family: var(--rb-serif); font-size: 1.15rem; letter-spacing: 0.02em; }
+
+/* Name, turn, phase and timer, on the strip that is always in view. It sits
+   between the brand and the connection dot and takes the space left over. */
+.rb-bar-status {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  flex: 1;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.rb-bar-role {
+  font-family: var(--rb-serif);
+  font-size: 1.05rem;
+  color: var(--rb-gold);
+  white-space: nowrap;
+}
+
+/* The clock is dark-on-parchment in a panel and light-on-ink up here. */
+.rb-bar-status rb-phase-clock { color: var(--rb-paper); }
+.rb-bar-status .rb-clock-note { display: none; }
 
 .rb-tag {
   font-family: var(--rb-sans);

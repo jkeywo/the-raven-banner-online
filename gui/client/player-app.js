@@ -287,7 +287,11 @@ export async function startPlayerApp({ location = window.location } = {}) {
       show('game');
       selectPane('map');
     }
-    $('game-role').textContent = data.roles.roles[mine]?.name ?? mine;
+    // Name, turn, phase and timer live on the global bar now — the one strip
+    // that is on screen whichever tab is open, and which no longer competes
+    // with the tabs for the top of the game panel.
+    $('bar-status').hidden = false;
+    $('bar-role').textContent = data.roles.roles[mine]?.name ?? mine;
     $('clock').phase = view.phase;
     $('actions').data = data;
     $('actions').view = view;
