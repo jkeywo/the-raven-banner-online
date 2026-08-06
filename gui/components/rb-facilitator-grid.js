@@ -13,6 +13,7 @@
  */
 
 import { battleNoteKey, heldBackToken } from '../rules/battle.js';
+import { TOKENS } from '../rules/state.js';
 
 const STAGE_LABEL = {
   awaiting_tactics: 'choosing cards',
@@ -78,40 +79,91 @@ export class RbFacilitatorGrid extends HTMLElement {
     return `<p class="rb-meta rb-warn" data-token-held-back="${shireId}">${escape(line)}</p>`;
   }
 
+  /**
+   * Who has declared what, and the pencil to change it.
+   *
+   * Drawn in the Team Phase as well as the Battle Phase, because that is when
+   * the plans are actually being made: a facilitator watching the targets
+   * arrive can see the shape of the coming turn while there is still time to
+   * ask about it. The same list carries over into the battle phase, where it
+   * gains the button that turns plans into battles.
+   *
+   * @param {boolean} announceable whether to offer the Announce button — the
+   *   command is battle-phase only, so offering it in the Team Phase would be
+   *   a control that can only refuse.
+   */
+  _declared(state, announceable) {
+    const plans = state.initiative.declared ?? {};
+    // Held tokens *and* standing declarations, not one or the other. A token
+    // can be taken off its holder — one click on the inspector's checkbox, or
+    // a role removed from the game — and the declaration it made stays
+    // behind. Listing only holders would hide that orphan while
+    // `announce-targets` went on staging a battle from it.
+    const rows = TOKENS.filter((token) => state.initiative[token] || plans[token]);
+    const declaredCount = rows.filter((token) => plans[token]).length;
+    const shireOptions = Object.keys(state.shires)
+      .map((id) => `<option value="${id}">${this._data.shires.shires[id]?.name ?? id}</option>`)
+      .join('');
+
+    // Last turn's battles were never ended, so `battle.targets` is still full
+    // and every retarget would refuse. Say so rather than offer the pencil.
+    const stale = Boolean(state.battle.targets?.length) && !announceable;
+
+    return `
+      ${this._note('spare')}
+      <p class="rb-meta">${declaredCount
+    ? `${declaredCount} of ${rows.length} token${rows.length === 1 ? '' : 's'} declared`
+      + `${announceable ? ', not yet announced' : ''}.`
+    : 'No targets declared yet.'}</p>
+      ${stale ? `<p class="rb-meta rb-warn" data-stale-targets>Last turn's battles were
+        never ended, so these cannot be changed yet — end them on the battle
+        tab first.</p>` : ''}
+      ${rows.length ? `
+        <ul class="rb-declared-targets">${rows.map((token) => {
+    const plan = plans[token];
+    const holder = state.initiative[token];
+    return `
+            <li>
+              <span class="rb-inspector-stat-label">${token} — ${
+  this._name(holder ?? plan?.roleId)}${holder ? '' : ' (token taken away)'}</span>
+              ${plan ? '' : '<span class="rb-meta">none declared</span>'}
+              <select data-retarget="${token}" ${stale ? 'disabled' : ''}>
+                <option value="">nowhere yet</option>${shireOptions}
+              </select>
+              <button type="button" data-commit-retarget="${token}" ${stale ? 'disabled' : ''}>
+                ${plan ? 'Change' : 'Set'}</button>
+            </li>`;
+  }).join('')}</ul>` : '<p class="rb-empty">Nobody holds an initiative token.</p>'}
+      ${announceable ? `
+        <button type="button" data-announce class="rb-primary"
+          ${declaredCount ? '' : 'disabled'}>Announce the targets</button>` : ''}`;
+  }
+
+  /** Point each retarget dropdown at what is actually declared right now. */
+  _syncRetargets(state) {
+    for (const select of this.querySelectorAll('[data-retarget]')) {
+      const token = select.dataset.retarget;
+      select.value = state.initiative.declared?.[token]?.shireId ?? '';
+    }
+  }
+
   _render() {
     if (!this.isConnected || !this._state || !this._data) return;
     const state = this._state;
+    const phase = state.phase.name;
 
-    if (state.phase.name !== 'battle') {
+    // The plans are laid in the Team Phase and fought over in the Battle
+    // Phase, so the grid has something to say in both.
+    if (phase !== 'battle' && phase !== 'team') {
       this.innerHTML = '<p class="rb-empty">Not a battle phase.</p>';
       return;
     }
 
-    const declared = Object.entries(state.initiative.declared ?? {});
     const targets = state.battle.targets ?? [];
 
-    if (!targets.length) {
-      const shireOptions = Object.keys(state.shires)
-        .map((id) => `<option value="${id}">${this._data.shires.shires[id]?.name ?? id}</option>`)
-        .join('');
-      this.innerHTML = `
-        ${this._note('spare')}
-        <p class="rb-meta">${declared.length
-    ? `${declared.length} target${declared.length === 1 ? '' : 's'} declared but not announced.`
-    : 'No targets declared yet.'}</p>
-        ${declared.length ? `
-          <ul class="rb-declared-targets">${declared.map(([token, d]) => `
-            <li>
-              <span class="rb-inspector-stat-label">${token} — ${this._name(d.roleId)}</span>
-              <select data-retarget="${token}">${shireOptions}</select>
-              <button type="button" data-commit-retarget="${token}">Change</button>
-            </li>`).join('')}</ul>` : ''}
-        <button type="button" data-announce class="rb-primary"
-          ${declared.length ? '' : 'disabled'}>Announce the targets</button>`;
-      for (const select of this.querySelectorAll('[data-retarget]')) {
-        const token = select.dataset.retarget;
-        select.value = declared.find(([t]) => t === token)?.[1]?.shireId ?? '';
-      }
+    if (phase === 'team' || !targets.length) {
+      this.innerHTML = this._declared(state, phase === 'battle');
+      this._syncRetargets(state);
       this._wire();
       return;
     }
@@ -180,10 +232,17 @@ export class RbFacilitatorGrid extends HTMLElement {
     if (announce) announce.onclick = () => this._emit('facilitator:announce-targets', {});
 
     for (const button of this.querySelectorAll('[data-commit-retarget]')) {
+      const token = button.dataset.commitRetarget;
+      const select = this.querySelector(`[data-retarget="${token}"]`);
+      // "nowhere yet" is not a shire, so committing it could only earn a
+      // refusal in the log. The button waits until the dropdown says
+      // something the command can actually take.
+      const settle = () => { button.disabled = select.disabled || !select.value; };
+      settle();
+      select.onchange = settle;
       button.onclick = () => {
-        const token = button.dataset.commitRetarget;
-        const shireId = this.querySelector(`[data-retarget="${token}"]`).value;
-        this._emit('facilitator:set-initiative-target', { token, shireId });
+        if (!select.value) return;
+        this._emit('facilitator:set-initiative-target', { token, shireId: select.value });
       };
     }
 

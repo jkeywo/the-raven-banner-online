@@ -282,8 +282,10 @@ export async function startHostApp({ location = window.location } = {}) {
 
     // The tab flags itself live rather than the panel disappearing — a
     // control the facilitator needs stays reachable on every phase, it just
-    // says when it matters most.
-    $('tab-fac-battle').dataset.live = String(phase.name === 'battle');
+    // says when it matters most. The Team Phase counts: that is when the
+    // targets are being declared, and watching them arrive is the whole
+    // reason to have the panel open before a battle exists.
+    $('tab-fac-battle').dataset.live = String(phase.name === 'battle' || phase.name === 'team');
 
     // The debrief appears when the game ends and not before: a half-played
     // epilogue is a thing to be misread out loud.
