@@ -143,6 +143,30 @@ body.rb-shell {
 
 .rb-panel.rb-wide { max-width: 60rem; }
 
+/* The facilitator's running console, given half the side margin every other
+   panel keeps.
+
+   Most of that margin is not padding, it is the gutter `margin: 0 auto` leaves
+   either side once the panel has hit its cap, so it grows with the window —
+   and on the wide screen a facilitator actually runs a game from, the board,
+   the battle grid and the inspector were all being squeezed into the middle
+   third of a monitor with a hand's width of parchment down each side.
+
+   Written as an expression rather than a wider fixed cap so it holds at any
+   width: the panel takes its 60rem plus half of whatever the column it sits in
+   has spare, which is that gutter halved exactly. Below 60rem there is nothing
+   spare, the term goes negative, and the cap lands above the width available —
+   so a narrow window is unaffected and this degrades to full width rather than
+   to a sideways scroll.
+
+   100% rather than 100vw, and the difference is not pedantry: the percentage
+   resolves against .rb-main's content box, which is the box the centring is
+   actually happening in, so half means half. 100vw is a different quantity —
+   it counts .rb-main's own padding and, in several browsers, the scrollbar
+   gutter as well — and left the margins about a tenth narrower than asked for
+   on the window this was measured in. */
+.rb-panel.rb-wide#screen-running { max-width: calc(60rem + (100% - 60rem) / 2); }
+
 .rb-columns {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
@@ -626,6 +650,29 @@ rb-map { display: block; }
 .rb-settlement.is-destroyed .rb-settlement-letter { fill: var(--rb-muted); }
 .rb-settlement.is-destroyed .rb-settlement-ring { stroke: var(--rb-muted); }
 
+/* The one thing on an editable map that takes a click of its own. Its shire's
+   cells are pointer-events: none, so this has to put them back on for itself —
+   and only for itself, or the letters and castle stacks either side of it
+   would start swallowing clicks meant for the ground. Drawn at all only on a
+   facilitator's map; there is nothing here for a player to press. */
+.rb-settlement-hit {
+  fill: var(--rb-ink);
+  fill-opacity: 0;
+  pointer-events: all;
+  cursor: pointer;
+}
+
+.rb-settlement-hit:hover { fill-opacity: 0.08; }
+
+/* Which letter the state panel is about, since the panel opens beside it
+   rather than on it. */
+.rb-settlement.is-selected .rb-settlement-hit {
+  fill: var(--rb-amber);
+  fill-opacity: 0.35;
+  stroke: var(--rb-amber);
+  stroke-width: 2;
+}
+
 /* --- ghost shires -------------------------------------------------------- */
 
 /* A read-only copy of a shire played on another sheet. Quieter than the real
@@ -660,34 +707,74 @@ rb-map { display: block; }
   text-anchor: middle;
 }
 
-/* --- the selected shire's card ------------------------------------------- */
+/* --- what is pinned to the sheet ----------------------------------------- */
 
-/* What used to be a column beside the map. It is anchored to the shire it
-   describes, because "which shire is this about?" was a question the side
-   panel could only answer by repeating the name at the top. */
-.rb-map-card {
+/* Two panels open over the map — the shire's card, and the state of whichever
+   settlement the facilitator clicked — and both are pinned to the thing they
+   are about rather than parked in a column, because "which shire is this?" and
+   "which of these five churches?" are questions a side panel could only answer
+   by repeating a name at the top. They share this because they share
+   `anchor()` in rb-map.js, which is the one piece of code that decides which
+   side of a point either of them opens on. */
+.rb-map-card,
+.rb-map-settlement {
   position: absolute;
   z-index: 2;
-  width: min(20rem, 78%);
-  max-height: 24rem;
-  overflow: auto;
   background: var(--rb-parchment);
   border: 1px solid var(--rb-ink);
   border-radius: 3px;
   box-shadow: 0 6px 22px rgb(43 33 24 / 0.28);
-  padding: 0.85rem 1rem;
-  /* These two shifts are the same numbers `anchor()` in rb-map.js reasons
-     about when it works out which side of a shire the card fits on, so they
-     have to stay exactly a whole card and half a card — anything else and the
-     card it thought was on the sheet is not. */
+  /* These two shifts are the same numbers `anchor()` reasons about when it
+     works out which side of an anchor a panel fits on, so they have to stay
+     exactly a whole panel and half a panel — anything else and the panel it
+     thought was on the sheet is not. */
   --rb-card-dx: -50%;
   --rb-card-dy: 0%;
   transform: translate(var(--rb-card-dx), var(--rb-card-dy));
 }
 
-.rb-map-card[data-x="left"] { --rb-card-dx: 0%; }
-.rb-map-card[data-x="right"] { --rb-card-dx: -100%; }
-.rb-map-card[data-y="above"] { --rb-card-dy: -100%; }
+.rb-map-card {
+  width: min(20rem, 78%);
+  max-height: 24rem;
+  overflow: auto;
+  padding: 0.85rem 1rem;
+}
+
+.rb-map-card[data-x="left"],
+.rb-map-settlement[data-x="left"] { --rb-card-dx: 0%; }
+.rb-map-card[data-x="right"],
+.rb-map-settlement[data-x="right"] { --rb-card-dx: -100%; }
+.rb-map-card[data-y="above"],
+.rb-map-settlement[data-y="above"] { --rb-card-dy: -100%; }
+
+/* Three radios and the word "Church". Deliberately the smallest control on the
+   page: it opens on top of the board the facilitator is reading, so it has to
+   get out of the way as soon as it has been answered. */
+.rb-map-settlement {
+  display: grid;
+  gap: 0.1rem;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.8rem;
+}
+
+.rb-map-settlement-name {
+  margin: 0 0 0.15rem;
+  font-family: var(--rb-serif);
+  font-weight: 600;
+}
+
+.rb-map-settlement label {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--rb-ink);
+  cursor: pointer;
+}
+
+.rb-map-settlement input { accent-color: var(--rb-blood); }
 
 .rb-map-card h3, .rb-map-card h4 { font-family: var(--rb-serif); margin: 0; }
 .rb-map-card h3 { font-size: 1.2rem; padding-right: 1.4rem; }
@@ -1560,19 +1647,8 @@ rb-shire-editor { display: block; }
 .rb-editor-row { display: grid; gap: 0.2rem; margin-bottom: 0.6rem; font-size: 0.85rem; }
 .rb-editor-row select { padding: 0.3rem; font-size: 0.85rem; }
 
-.rb-editor-settlements { list-style: none; margin: 0.3rem 0 0; padding: 0; display: grid; gap: 0.4rem; }
-
-.rb-editor-settlements li {
-  display: flex;
-  align-items: center;
-  gap: 0.7rem;
-  font-size: 0.82rem;
-  padding: 0.3rem 0;
-  border-bottom: 1px solid var(--rb-rule);
-}
-
-.rb-editor-settlements li[data-destroyed="true"] { opacity: 0.6; text-decoration: line-through; }
-.rb-editor-settlements label { display: flex; align-items: center; gap: 0.25rem; }
+/* The settlements this card used to list are edited on the map itself now —
+   see .rb-map-settlement, and rb-map.js for why. */
 
 /* --- the replay: the whole country, and the whole log --------------------- */
 

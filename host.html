@@ -92,7 +92,12 @@
       </section>
 
       <nav id="facilitator-tabs" class="rb-tabs" role="tablist">
-        <button type="button" role="tab" data-pane="map" aria-selected="true">Map</button>
+        <!-- The three printed sheets are three buttons rather than one "Map"
+             tab, the same as the player's console: England is the thing being
+             looked at, and which corner of it you want is the question
+             actually being asked. Filled from shires.json so the row cannot
+             disagree with the maps that exist. -->
+        <span id="fac-map-buttons" class="rb-map-buttons"></span>
         <button type="button" role="tab" data-pane="battle" id="tab-fac-battle" aria-selected="false">Battle</button>
         <button type="button" role="tab" data-pane="crowns" id="tab-fac-crowns" aria-selected="false">Crowns &amp; consents</button>
         <button type="button" role="tab" data-pane="envoys" id="tab-fac-envoys" aria-selected="false">Envoys</button>
@@ -104,8 +109,13 @@
       <div data-pane-body="map" class="rb-pane rb-pane-map">
         <!-- The umpire's pencil is on the shire being corrected rather than in
              a second column: the map is the control now, and the editor is
-             what opens when you click one. -->
-        <rb-map id="fac-map" sheet="northern">
+             what opens when you click one. `editable` is the whole of what
+             separates this map from the identical one a player has open — it
+             is what makes a settlement letter take a click and offer its
+             state, so it is granted here rather than assumed by the
+             component. `tabs="off"` because the three sheets are in the tab
+             row above; without it the map draws its own second row. -->
+        <rb-map id="fac-map" sheet="northern" tabs="off" editable>
           <rb-shire-editor id="shire-editor" slot="card"></rb-shire-editor>
         </rb-map>
       </div>

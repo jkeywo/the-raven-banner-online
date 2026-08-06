@@ -314,6 +314,269 @@ describe('<rb-map>', () => {
     }]);
   });
 
+  it('closes a shire when the same one is clicked again', () => {
+    // The × and the sea both close the card, but the thing people try first is
+    // the county they just tapped, and a map that does nothing when they do
+    // reads as one that has stopped responding.
+    const { view } = seatedView();
+    const map = mount('rb-map');
+    map.setAttribute('sheet', 'northern');
+    map.data = data;
+    map.view = view;
+
+    const heard = [];
+    map.addEventListener('rb-shire', (event) => heard.push(event.detail.shireId));
+    const jorvik = () => map.querySelector('path[data-shire="jorvik"]');
+
+    jorvik().dispatchEvent(new Event('click', { bubbles: true }));
+    expect(map.selected).toBe('jorvik');
+    jorvik().dispatchEvent(new Event('click', { bubbles: true }));
+    expect(map.selected).toBe(null);
+    expect(map.querySelector('.rb-map-card').hidden).toBe(true);
+    // The page hears the close as an ordinary deselection, so whatever it put
+    // in the card is emptied rather than left pointing at a shut card.
+    expect(heard).toEqual(['jorvik', null]);
+
+    // And a different shire still simply moves the card.
+    jorvik().dispatchEvent(new Event('click', { bubbles: true }));
+    map.querySelector('path[data-shire="ribble"]').dispatchEvent(new Event('click', { bubbles: true }));
+    expect(map.selected).toBe('ribble');
+  });
+
+  it('gives a player no way to touch a settlement', () => {
+    // The gate on the whole of the editing below. Both consoles mount this
+    // element; only the facilitator's page says `editable`.
+    const { view } = seatedView();
+    const map = mount('rb-map');
+    map.setAttribute('sheet', 'western');
+    map.data = data;
+    map.view = view;
+
+    expect(map.editable).toBe(false);
+    expect(map.querySelector('.rb-settlement-hit')).toBeNull();
+
+    // Even a click aimed straight at the letter is a click on the shire.
+    const heard = [];
+    map.addEventListener('rb-facilitate', (event) => heard.push(event.detail));
+    map.querySelector('.rb-shire-cells[data-shire="wiltshire"] .rb-settlement')
+      .dispatchEvent(new Event('click', { bubbles: true }));
+    expect(heard).toEqual([]);
+    expect(map.selectedSettlement).toBe(null);
+    expect(map.selected).toBe('wiltshire');
+    expect(map.querySelector('.rb-map-settlement').hidden).toBe(true);
+  });
+
+  it('gives every settlement a hit target once the map is editable', () => {
+    // Moved from shire-editor.test.js, where this was a list of two checkboxes
+    // per settlement. The letter is a single character, so it needs a disc
+    // under it to be clickable at all — and one that never reaches past the
+    // halfway line to the letter beside it, because some shires set theirs
+    // closer together than the letters are wide.
+    const { view } = seatedView();
+    const map = mount('rb-map');
+    map.setAttribute('sheet', 'western');
+    map.setAttribute('editable', '');
+    map.data = data;
+    map.view = view;
+
+    const cell = map.querySelector('.rb-shire-cells[data-shire="wiltshire"]');
+    const printedCount = data.shires.shires.wiltshire.settlements.length;
+    expect(cell.querySelectorAll('.rb-settlement')).toHaveLength(printedCount);
+    expect(cell.querySelectorAll('.rb-settlement-hit')).toHaveLength(printedCount);
+
+    const anchors = cells.sheets.western.wiltshire.settlements;
+    for (const [index, hit] of [...cell.querySelectorAll('.rb-settlement-hit')].entries()) {
+      const radius = Number(hit.getAttribute('r'));
+      expect(radius).toBeGreaterThan(0);
+      for (const [other, at] of anchors.entries()) {
+        if (other === index) continue;
+        const gap = Math.hypot(at.x - anchors[index].x, at.y - anchors[index].y);
+        expect(radius).toBeLessThanOrEqual(gap / 2 + 1e-9);
+      }
+    }
+  });
+
+  it('offers the three states a settlement can be in, on the settlement', () => {
+    const { view } = seatedView();
+    const map = mount('rb-map');
+    map.setAttribute('sheet', 'western');
+    map.setAttribute('editable', '');
+    map.data = data;
+    map.view = view;
+
+    const panel = map.querySelector('.rb-map-settlement');
+    expect(panel.hidden).toBe(true);
+
+    const [settlementId] = data.shires.shires.wiltshire.settlements.map((s) => s.id);
+    map.querySelector(`.rb-settlement[data-settlement="${settlementId}"]`)
+      .dispatchEvent(new Event('click', { bubbles: true }));
+
+    expect(map.selectedSettlement).toEqual({ shireId: 'wiltshire', settlementId });
+    expect(panel.hidden).toBe(false);
+    // Radios, not two checkboxes: the states are exclusive in play, and a pair
+    // of boxes could say a burned settlement was also being held.
+    expect([...panel.querySelectorAll('input')].map((i) => i.value))
+      .toEqual(['standing', 'defended', 'destroyed']);
+    expect([...panel.querySelectorAll('input')].every((i) => i.type === 'radio')).toBe(true);
+    expect(panel.querySelector('input[value="standing"]').checked).toBe(true);
+    // Anchored to the settlement, the same way the card is to its shire.
+    expect(panel.style.left).toMatch(/%$/);
+    expect(panel.style.top).toMatch(/%$/);
+    // And the letter it is about is marked, since the panel opens beside it.
+    expect(map.querySelector(`.rb-settlement[data-settlement="${settlementId}"]`)
+      .classList.contains('is-selected')).toBe(true);
+  });
+
+  it('circles or strikes a settlement directly', () => {
+    // Moved from shire-editor.test.js. Same command, raised from the map.
+    const { view } = seatedView();
+    const map = mount('rb-map');
+    map.setAttribute('sheet', 'western');
+    map.setAttribute('editable', '');
+    map.data = data;
+    map.view = view;
+
+    const [settlementId] = data.shires.shires.wiltshire.settlements.map((s) => s.id);
+    map.querySelector(`.rb-settlement[data-settlement="${settlementId}"]`)
+      .dispatchEvent(new Event('click', { bubbles: true }));
+
+    const sent = [];
+    map.addEventListener('rb-facilitate', (event) => sent.push(event.detail));
+    const panel = map.querySelector('.rb-map-settlement');
+    panel.querySelector('input[value="defended"]').dispatchEvent(new Event('change'));
+
+    expect(sent).toEqual([{
+      verb: 'facilitator:set-settlement',
+      payload: { shireId: 'wiltshire', settlementId, field: 'defended', value: true },
+    }]);
+  });
+
+  it('clears what it is leaving before setting what it is going to', () => {
+    // The command takes one field at a time, so defended -> destroyed is two
+    // of them, and the order is the whole point: set-then-clear would leave
+    // the settlement ringed *and* struck through in between, and leave it
+    // there for good if the second command were refused. Cleared first, a
+    // half-applied change is always one of the three legal states.
+    const { view } = seatedView({
+      move: (state) => {
+        const [first] = Object.keys(state.shires.wiltshire.settlements);
+        state.shires.wiltshire.settlements[first].defended = true;
+      },
+    });
+    const map = mount('rb-map');
+    map.setAttribute('sheet', 'western');
+    map.setAttribute('editable', '');
+    map.data = data;
+    map.view = view;
+
+    const [settlementId] = data.shires.shires.wiltshire.settlements.map((s) => s.id);
+    map.querySelector(`.rb-settlement[data-settlement="${settlementId}"]`)
+      .dispatchEvent(new Event('click', { bubbles: true }));
+    const panel = map.querySelector('.rb-map-settlement');
+    expect(panel.querySelector('input[value="defended"]').checked).toBe(true);
+
+    const sent = [];
+    map.addEventListener('rb-facilitate', (event) => sent.push(event.detail.payload));
+    panel.querySelector('input[value="destroyed"]').dispatchEvent(new Event('change'));
+
+    expect(sent).toEqual([
+      { shireId: 'wiltshire', settlementId, field: 'defended', value: false },
+      { shireId: 'wiltshire', settlementId, field: 'destroyed', value: true },
+    ]);
+  });
+
+  it('asks for nothing it already has', () => {
+    // The state the radios are showing is the state on the board, so choosing
+    // it again is not a change and must not become a log entry.
+    const { view } = seatedView();
+    const map = mount('rb-map');
+    map.setAttribute('sheet', 'western');
+    map.setAttribute('editable', '');
+    map.data = data;
+    map.view = view;
+
+    const [settlementId] = data.shires.shires.wiltshire.settlements.map((s) => s.id);
+    map.querySelector(`.rb-settlement[data-settlement="${settlementId}"]`)
+      .dispatchEvent(new Event('click', { bubbles: true }));
+
+    const sent = [];
+    map.addEventListener('rb-facilitate', (event) => sent.push(event.detail));
+    map.querySelector('.rb-map-settlement input[value="standing"]')
+      .dispatchEvent(new Event('change'));
+    expect(sent).toEqual([]);
+  });
+
+  it('closes a settlement when the same one is clicked again', () => {
+    const { view } = seatedView();
+    const map = mount('rb-map');
+    map.setAttribute('sheet', 'western');
+    map.setAttribute('editable', '');
+    map.data = data;
+    map.view = view;
+
+    const [settlementId] = data.shires.shires.wiltshire.settlements.map((s) => s.id);
+    const glyph = () => map.querySelector(`.rb-settlement[data-settlement="${settlementId}"]`);
+
+    glyph().dispatchEvent(new Event('click', { bubbles: true }));
+    expect(map.selectedSettlement).toBeTruthy();
+    glyph().dispatchEvent(new Event('click', { bubbles: true }));
+    expect(map.selectedSettlement).toBe(null);
+    expect(map.querySelector('.rb-map-settlement').hidden).toBe(true);
+  });
+
+  it('keeps one panel on the sheet at a time', () => {
+    // Both are pinned to points a few millimetres apart — a settlement sits
+    // inside its own shire — so two open at once means one covering the other.
+    const { view } = seatedView();
+    // Built before it is mounted: the card's contents are carried in when the
+    // component builds itself, so setting them afterwards would wipe it.
+    const map = document.createElement('rb-map');
+    map.setAttribute('sheet', 'western');
+    map.setAttribute('editable', '');
+    map.innerHTML = '<div slot="card">the card</div>';
+    document.body.append(map);
+    map.data = data;
+    map.view = view;
+
+    const heard = [];
+    map.addEventListener('rb-shire', (event) => heard.push(event.detail.shireId));
+    const [settlementId] = data.shires.shires.wiltshire.settlements.map((s) => s.id);
+
+    map.querySelector('path[data-shire="wiltshire"]').dispatchEvent(new Event('click', { bubbles: true }));
+    expect(map.querySelector('.rb-map-card').hidden).toBe(false);
+
+    map.querySelector(`.rb-settlement[data-settlement="${settlementId}"]`)
+      .dispatchEvent(new Event('click', { bubbles: true }));
+    expect(map.querySelector('.rb-map-card').hidden).toBe(true);
+    expect(map.querySelector('.rb-map-settlement').hidden).toBe(false);
+    // The page is told the card went away rather than left holding a shire
+    // nothing is pointing at any more.
+    expect(heard).toEqual(['wiltshire', null]);
+
+    map.querySelector('path[data-shire="redding"]').dispatchEvent(new Event('click', { bubbles: true }));
+    expect(map.querySelector('.rb-map-settlement').hidden).toBe(true);
+    expect(map.querySelector('.rb-map-card').hidden).toBe(false);
+  });
+
+  it('puts the settlement panel away when its sheet is not the one shown', () => {
+    const { view } = seatedView();
+    const map = mount('rb-map');
+    map.setAttribute('sheet', 'western');
+    map.setAttribute('editable', '');
+    map.data = data;
+    map.view = view;
+
+    const [settlementId] = data.shires.shires.wiltshire.settlements.map((s) => s.id);
+    map.querySelector(`.rb-settlement[data-settlement="${settlementId}"]`)
+      .dispatchEvent(new Event('click', { bubbles: true }));
+    expect(map.querySelector('.rb-map-settlement').hidden).toBe(false);
+
+    map.setAttribute('sheet', 'eastern');
+    expect(map.querySelector('.rb-map-settlement').hidden).toBe(true);
+    map.setAttribute('sheet', 'western');
+    expect(map.querySelector('.rb-map-settlement').hidden).toBe(false);
+  });
+
   it('trims "England" off its own sheet tabs, being already inside the board', () => {
     // A player who has already opened the board should not read "Northern
     // England" beside a sibling top-level tab that is also just "England"

@@ -3,9 +3,15 @@
  *
  * The map is read-only in a player's hands and has to stop being read-only in
  * a facilitator's. This is the panel that appears beside it once a shire is
- * clicked: who stewards it, how many castles are left, what it costs to reach
- * by sea, and which settlements are circled or struck through — the things a
- * paper umpire would simply write on the map in pencil.
+ * clicked: who stewards it, how many castles are left, and what it costs to
+ * reach by sea — the things a paper umpire would simply write on the map in
+ * pencil.
+ *
+ * The settlements used to be listed here too, as a pair of checkboxes each.
+ * They are edited on the map now, by clicking the letter itself: a settlement
+ * has a place on the sheet, and a list of five identical rows named "Church"
+ * could not say which of the five churches on the ground it meant. See
+ * `rb-map.js`.
  *
  * Reads the whole state directly rather than a projection, because a
  * facilitator's own view already is the whole state. Every change still goes
@@ -75,30 +81,13 @@ export class RbShireEditor extends HTMLElement {
         <p class="rb-meta">Printed at ${printed.shipCost}. A contract or a defensive
           fleet already moves this — this adjusts it further, on top of either.</p>`}
 
-      <h4>Settlements</h4>
-      <ul class="rb-editor-settlements">
-        ${Object.values(shire.settlements).map((settlement) => `
-          <li data-destroyed="${settlement.destroyed}">
-            <span>${title(settlement.type)}</span>
-            <label><input type="checkbox" data-settlement="${shireId}|${settlement.id}|defended"
-              ${settlement.defended ? 'checked' : ''}> defended</label>
-            <label><input type="checkbox" data-settlement="${shireId}|${settlement.id}|destroyed"
-              ${settlement.destroyed ? 'checked' : ''}> destroyed</label>
-          </li>`).join('')}
-      </ul>`;
+      <p class="rb-meta">Click a settlement letter on the map to circle or strike it.</p>`;
 
     this.querySelector('[data-steward]').onchange = (event) => {
       this._emit('facilitator:set-steward', { shireId, roleId: event.target.value || null });
     };
     for (const button of this.querySelectorAll('[data-commit-adjust]')) {
       button.onclick = () => this._commitAdjust(button);
-    }
-    for (const input of this.querySelectorAll('[data-settlement]')) {
-      input.onchange = () => {
-        const [sid, settlementId, field] = input.dataset.settlement.split('|');
-        this._emit('facilitator:set-settlement',
-          { shireId: sid, settlementId, field, value: input.checked });
-      };
     }
   }
 
@@ -116,9 +105,6 @@ export class RbShireEditor extends HTMLElement {
     this._emit('facilitator:adjust', { path: path.split('.'), delta });
   }
 }
-
-const title = (text) => String(text ?? '').replace(/_/g, ' ')
-  .replace(/\b\w/g, (c) => c.toUpperCase());
 
 function escape(text) {
   return String(text ?? '').replace(/[&<>"']/g, (c) => (

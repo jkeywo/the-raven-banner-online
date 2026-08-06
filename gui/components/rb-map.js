@@ -30,6 +30,14 @@
  * is chosen, and shows whatever the page around it parked in `slot="card"` —
  * the player's read-out, or the facilitator's editor. It never decides
  * anything.
+ *
+ * One exception, and it is opt-in: with `editable` set, a settlement letter
+ * becomes clickable and opens a three-way state panel over it. That is a
+ * facilitator's pencil and nobody else's, so it is an attribute the
+ * facilitator's page sets rather than something inferred from what happens to
+ * be parked in the card — a player's console and a facilitator's share this
+ * component, and "whether anything is in the card slot" is not the question
+ * being asked. Even then the map only raises the command; admission decides.
  */
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -51,11 +59,29 @@ const FACTION_TINT = {
 /** The letters the printed sheet's own legend explains. */
 const SETTLEMENT_LETTER = { farm: 'F', town: 'T', church: 'C' };
 
+/**
+ * The three states a settlement is ever in, as the facilitator's panel offers
+ * them.
+ *
+ * Radios rather than the two checkboxes this replaced, because the states are
+ * exclusive in play and the pair of boxes could say otherwise: a settlement
+ * somebody has burned is not also a settlement somebody is holding, and a form
+ * that lets an umpire tick both is a form that will eventually be ticked both.
+ */
+const SETTLEMENT_STATES = [
+  ['standing', 'standing'],
+  ['defended', 'defended'],
+  ['destroyed', 'destroyed'],
+];
+
+/** As far as a hit target grows before it starts reaching over a neighbour. */
+const SETTLEMENT_REACH = 20;
+
 /** Roughly how many characters of a steward's name fit across a frame. */
 const NAME_WRAP = 14;
 
 export class RbMap extends HTMLElement {
-  static observedAttributes = ['sheet'];
+  static observedAttributes = ['sheet', 'editable'];
 
   /** The static dataset: shires, factions, roles, geometry, map cells. */
   set data(value) { this._data = value; this._render(); }
@@ -75,8 +101,19 @@ export class RbMap extends HTMLElement {
 
   get sheet() { return this.getAttribute('sheet') || 'northern'; }
 
+  /**
+   * Whether the settlement letters take a click and offer their state.
+   *
+   * A capability the page grants rather than one the component assumes: the
+   * player's console mounts the same element and must not get it.
+   */
+  get editable() { return this.hasAttribute('editable'); }
+
   /** Which shire the card is open on, if any. */
   get selected() { return this._selected ?? null; }
+
+  /** Which settlement the state panel is open on, if any. */
+  get selectedSettlement() { return this._settlement ?? null; }
 
   /**
    * Where the page puts what it wants said about the selected shire.
@@ -116,6 +153,7 @@ export class RbMap extends HTMLElement {
           <button type="button" class="rb-map-card-close" aria-label="Close">×</button>
           <div class="rb-map-card-body"></div>
         </div>
+        <div class="rb-map-settlement" role="group" hidden></div>
       </div>`;
 
     // Built rather than written into the markup above: `<image>` inside an
@@ -137,7 +175,17 @@ export class RbMap extends HTMLElement {
     // One listener for the whole sheet. A click that lands on nothing is a
     // click that closes the card, which is the gesture people already expect
     // from a map: tap a county, tap the sea to put it away.
+    //
+    // A settlement is tested for first and answered on its own, because its
+    // hit target sits inside its shire's and would otherwise only ever be read
+    // as a click on the ground underneath it.
     this.querySelector('.rb-map-sheet').addEventListener('click', (event) => {
+      const glyph = this.editable ? event.target.closest('[data-settlement]') : null;
+      if (glyph) {
+        this._selectSettlement(glyph.closest('[data-shire]').dataset.shire,
+          glyph.dataset.settlement);
+        return;
+      }
       const hit = event.target.closest('[data-shire]');
       this._select(hit ? hit.dataset.shire : null);
     });
@@ -152,13 +200,68 @@ export class RbMap extends HTMLElement {
    * by measuring it — so a render that ran first would be measuring the
    * previous shire's card and would put a taller one off the bottom of the
    * sheet.
+   *
+   * Clicking the shire that is already open closes it. The card has a × and
+   * the sea closes it too, but the thing people actually try first is the
+   * county they just tapped, and a map that does nothing when they do reads as
+   * a map that has stopped responding.
    */
   _select(shireId) {
-    this._selected = shireId;
+    this._selected = shireId === this._selected ? null : shireId;
+    // Only one thing on the sheet is being looked at at a time. Both panels
+    // are pinned to points a few millimetres apart — a settlement sits inside
+    // its own shire — so leaving both open would mean one covering the other.
+    this._settlement = null;
     this.dispatchEvent(new CustomEvent('rb-shire', {
-      bubbles: true, detail: { shireId },
+      bubbles: true, detail: { shireId: this._selected },
     }));
     this._render();
+  }
+
+  /** The same gesture on a settlement: click it to open, click it to close. */
+  _selectSettlement(shireId, settlementId) {
+    const open = this._settlement;
+    const same = open?.shireId === shireId && open?.settlementId === settlementId;
+    if (same) { this._settlement = null; this._render(); return; }
+    // Through _select so the page hears the card go away and empties it,
+    // rather than being left holding a shire nothing is pointing at.
+    if (this.selected !== null) this._select(null);
+    this._settlement = { shireId, settlementId };
+    this._render();
+  }
+
+  /**
+   * A settlement's state, changed one field at a time because that is what the
+   * command takes.
+   *
+   * Reaching two of the three states means two commands, so the order matters:
+   * whatever is being left is cleared before whatever is being gone to is set.
+   * Done the other way round, a settlement on its way from defended to
+   * destroyed would spend the gap between the two commands ringed *and* struck
+   * through — the one reading the radios exist to rule out — and would stay
+   * that way if the second were refused. Cleared first, the half-applied state
+   * is always one of the three legal ones (standing), which is a state a
+   * facilitator can see is not what they asked for and fix with one more
+   * click.
+   */
+  _setSettlementState({ shireId, settlementId }, want) {
+    const live = this._view?.shires?.[shireId]?.settlements?.[settlementId];
+    if (!live) return;
+    const fields = ['defended', 'destroyed'];
+    const wanted = { defended: want === 'defended', destroyed: want === 'destroyed' };
+    const changes = [
+      ...fields.filter((field) => live[field] && !wanted[field]).map((field) => [field, false]),
+      ...fields.filter((field) => !live[field] && wanted[field]).map((field) => [field, true]),
+    ];
+    for (const [field, value] of changes) {
+      this.dispatchEvent(new CustomEvent('rb-facilitate', {
+        bubbles: true,
+        detail: {
+          verb: 'facilitator:set-settlement',
+          payload: { shireId, settlementId, field, value },
+        },
+      }));
+    }
   }
 
   _render() {
@@ -206,15 +309,18 @@ export class RbMap extends HTMLElement {
     }
 
     this._renderCard(sheetCells, width, height);
+    this._renderSettlementPanel(sheetCells, width, height);
   }
 
   /**
    * The sheet row, unless the page around it provides its own.
    *
-   * The player console promotes these three into its main tab bar, where they
-   * replace what used to be a single "The board" tab — so the map must not
-   * also draw them underneath. The facilitator's map has no such bar and keeps
-   * them. `tabs="off"` is the seam.
+   * Both consoles promote these three into their main tab bar, where they
+   * replace what used to be a single board tab — so the map must not also draw
+   * them underneath. The replay, which shows all three sheets at once and has
+   * nothing to pick between, keeps them off for the opposite reason. What is
+   * left needing them is a map mounted on its own, which is what the default
+   * serves. `tabs="off"` is the seam.
    */
   _renderTabs() {
     const tabs = this.querySelector('.rb-map-tabs');
@@ -275,11 +381,17 @@ export class RbMap extends HTMLElement {
       if (cell?.castles) group.append(...castleStack(cell.castles, live.castles));
     }
 
+    const anchors = printed.settlements.map((was, index) =>
+      cell?.settlements?.[index] ?? anchorOf(outline, index));
     printed.settlements.forEach((was, index) => {
-      const at = cell?.settlements?.[index] ?? anchorOf(outline, index);
+      const at = anchors[index];
       const now = live.settlements?.[was.id];
       if (!at || !now) return;
-      group.append(settlementMark(at, now, was));
+      const open = this._settlement;
+      group.append(settlementMark(at, now, was, {
+        reach: this.editable ? reachOf(anchors, index) : 0,
+        selected: open?.shireId === id && open?.settlementId === was.id,
+      }));
     });
 
     return group;
@@ -479,6 +591,75 @@ export class RbMap extends HTMLElement {
     card.style.top = `${down.at}%`;
   }
 
+  /**
+   * The chosen settlement's state, as three radios over the letter itself.
+   *
+   * Pinned the same way the card is and by the same `anchor()`, so it takes
+   * whichever side of the letter it fits on rather than hanging off the sheet
+   * for the settlements down the bottom edge. The anchor is a point rather
+   * than a box, so the two vertical pins are simply a little above and a
+   * little below it — far enough that the panel never lands on the glyph it is
+   * about.
+   */
+  _renderSettlementPanel(sheetCells, width, height) {
+    const panel = this.querySelector('.rb-map-settlement');
+    const chosen = this.editable ? this._settlement : null;
+    const printed = chosen ? this._data.shires.shires[chosen.shireId] : null;
+    const index = printed?.settlements.findIndex((s) => s.id === chosen.settlementId) ?? -1;
+    const live = chosen
+      ? this._view.shires?.[chosen.shireId]?.settlements?.[chosen.settlementId] : null;
+    const at = printed?.map === this.sheet && index >= 0
+      ? sheetCells?.[chosen.shireId]?.settlements?.[index]
+        ?? anchorOf(this._data.geometry.shires[chosen.shireId], index)
+      : null;
+    if (!live || !at) { panel.hidden = true; panel.dataset.key = ''; return; }
+    panel.hidden = false;
+
+    // Rebuilt only when it is about a different settlement. A render lands on
+    // every change anywhere in the game, and one that replaced these controls
+    // each time would take the keyboard focus out of the group a facilitator
+    // was part way through arrowing along.
+    const key = `${chosen.shireId}|${chosen.settlementId}`;
+    if (panel.dataset.key !== key) {
+      panel.dataset.key = key;
+      panel.innerHTML = `<p class="rb-map-settlement-name"></p>${SETTLEMENT_STATES
+        .map(([value, text]) => `<label><input type="radio" name="rb-state-${key}"
+          value="${value}"> ${text}</label>`).join('')}`;
+      const named = title(printed.settlements[index].type);
+      panel.querySelector('.rb-map-settlement-name').textContent = named;
+      // Three radios reading "standing/defended/destroyed" say nothing on
+      // their own about which of a shire's five churches they are for.
+      panel.setAttribute('aria-label', `${named} in ${printed.name}`);
+      for (const input of panel.querySelectorAll('input')) {
+        input.onchange = () => this._setSettlementState(chosen, input.value);
+      }
+    }
+
+    // Read off the board every time rather than left where the last click put
+    // it: the radio says what is true, not what was asked for, so a refused
+    // command shows as the state snapping back.
+    const state = settlementState(live);
+    for (const input of panel.querySelectorAll('input')) input.checked = input.value === state;
+
+    const stage = this.querySelector('.rb-map-stage').getBoundingClientRect();
+    const box = panel.getBoundingClientRect();
+    const panelWidth = stage.width ? (box.width / stage.width) * 100 : 12;
+    const panelHeight = stage.height ? (box.height / stage.height) * 100 : 10;
+    const clear = SETTLEMENT_REACH;
+
+    const across = anchor(
+      (at.x / width) * 100, panelWidth,
+      [['centre', 0.5], ['left', 0], ['right', 1]]);
+    const down = anchor(
+      [((at.y + clear) / height) * 100, ((at.y - clear) / height) * 100], panelHeight,
+      [['below', 0], ['above', 1]]);
+
+    panel.dataset.x = across.side;
+    panel.dataset.y = down.side;
+    panel.style.left = `${across.at}%`;
+    panel.style.top = `${down.at}%`;
+  }
+
   _supported(shireId) {
     return this._view.derived?.shires?.[shireId]?.supported;
   }
@@ -599,6 +780,26 @@ function castlePath(cx, cy, size) {
 }
 
 /**
+ * How far a settlement's hit target may spread before it starts taking clicks
+ * meant for the letter next to it.
+ *
+ * A single comfortable disc will not do. Some shires set their letters
+ * seventeen units apart — closer together than the letters themselves are wide
+ * — and a fixed disc big enough to click on an empty coastline would cover its
+ * neighbour's centre there, so aiming straight at one letter would select the
+ * other. Half the distance to the nearest neighbour is the line the two of them
+ * would agree on, which is the most either can have.
+ */
+function reachOf(anchors, index) {
+  const here = anchors[index];
+  if (!here) return 0;
+  const nearest = anchors.reduce((closest, other, at) => (
+    !other || at === index ? closest
+      : Math.min(closest, Math.hypot(other.x - here.x, other.y - here.y))), Infinity);
+  return Math.min(SETTLEMENT_REACH, nearest / 2);
+}
+
+/**
  * A settlement, as the printed legend draws one: a letter for what it is, a
  * ring when it is defended, and a cross through it when it has been burned.
  *
@@ -606,12 +807,26 @@ function castlePath(cx, cy, size) {
  * its absence is the point — a blank space would read as a farm nobody ever
  * built rather than as one somebody came and burned.
  */
-function settlementMark(at, live, printed) {
+function settlementMark(at, live, printed, { reach = 0, selected = false } = {}) {
   const group = document.createElementNS(SVG_NS, 'g');
   group.setAttribute('class', 'rb-settlement');
   group.dataset.settlement = printed.id;
   if (live.defended) group.classList.add('is-defended');
   if (live.destroyed) group.classList.add('is-destroyed');
+  if (selected) group.classList.add('is-selected');
+
+  // An invisible disc under the glyph, because the glyph is a single letter
+  // and a letter is not something anyone can reliably hit. Drawn only where
+  // there is something to hit it for: on a player's map nothing here takes a
+  // click at all.
+  if (reach > 0) {
+    const hit = document.createElementNS(SVG_NS, 'circle');
+    hit.setAttribute('class', 'rb-settlement-hit');
+    hit.setAttribute('cx', at.x);
+    hit.setAttribute('cy', at.y);
+    hit.setAttribute('r', reach);
+    group.append(hit);
+  }
 
   if (live.defended) {
     const ring = document.createElementNS(SVG_NS, 'circle');
@@ -637,9 +852,19 @@ function settlementMark(at, live, printed) {
     group.append(strike);
   }
 
-  const state = live.destroyed ? 'destroyed' : live.defended ? 'defended' : 'standing';
-  group.append(titleFor(`${title(printed.type)} — ${state}`));
+  group.append(titleFor(`${title(printed.type)} — ${settlementState(live)}`));
   return group;
+}
+
+/**
+ * Which of the three the two stored flags add up to.
+ *
+ * Destroyed wins over defended, matching the glyph — a struck-through letter
+ * reads as burned whatever ring is drawn round it — so a pair of flags that
+ * has somehow come out of step still lights the radio the map is showing.
+ */
+function settlementState(live) {
+  return live.destroyed ? 'destroyed' : live.defended ? 'defended' : 'standing';
 }
 
 /** Two bars rather than a glyph, for the same reason the castles are drawn. */

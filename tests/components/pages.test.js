@@ -149,6 +149,63 @@ describe('the facilitator console', () => {
     expect(document.getElementById('shire-editor').closest('.rb-map-card-body')).toBeTruthy();
   });
 
+  it('offers the three printed sheets as three buttons, not one map tab', async () => {
+    // The same row the player's console already carries. A single "Map" tab
+    // meant picking the board and then picking a sheet inside it, twice, for
+    // the one thing a facilitator looks at most.
+    await loadPage('host.html');
+    const { startHostApp } = await import('../../gui/host/host-app.js');
+    await startHostApp({ location: { hash: '', href: 'http://x/host.html' } });
+
+    const labels = [...document.querySelectorAll('#fac-map-buttons button')]
+      .map((b) => b.textContent.trim());
+    expect(labels).toEqual(['Northern', 'Western', 'Eastern']);
+    expect(document.querySelector('#facilitator-tabs [data-pane="map"]')).toBeNull();
+    // The map is still the pane the console opens into, so the row starts lit.
+    expect(document.getElementById('fac-map-buttons').dataset.active).toBe('true');
+    // And the map does not draw a second row of its own underneath.
+    expect(document.getElementById('fac-map').getAttribute('tabs')).toBe('off');
+  });
+
+  it('switches the facilitator’s map to the sheet clicked, and shows the board', async () => {
+    await loadPage('host.html');
+    const { startHostApp } = await import('../../gui/host/host-app.js');
+    await startHostApp({ location: { hash: '', href: 'http://x/host.html' } });
+
+    // Away on another pane first, so this proves the button brings the board
+    // back rather than only moving a map already in view.
+    document.getElementById('tab-fac-battle').click();
+    expect(document.getElementById('fac-map').closest('[data-pane-body]').hidden).toBe(true);
+    expect(document.getElementById('fac-map-buttons').dataset.active).toBe('false');
+
+    document.querySelector('#fac-map-buttons [data-sheet="eastern"]').click();
+
+    expect(document.getElementById('fac-map').getAttribute('sheet')).toBe('eastern');
+    expect(document.getElementById('fac-map').closest('[data-pane-body]').hidden).toBe(false);
+    expect(document.getElementById('fac-map-buttons').dataset.active).toBe('true');
+    expect(document.querySelector('#fac-map-buttons [data-sheet="eastern"]')
+      .getAttribute('aria-selected')).toBe('true');
+    expect(document.querySelector('#fac-map-buttons [data-sheet="northern"]')
+      .getAttribute('aria-selected')).toBe('false');
+    // The panes' own tabs are untouched by a sheet click — they answer a
+    // different question and keep their own selected state.
+    expect(document.getElementById('tab-fac-battle').getAttribute('aria-selected')).toBe('false');
+  });
+
+  it('lets the facilitator edit settlements on the map, and nobody else', async () => {
+    // `editable` is the whole gate. It is granted by the facilitator's page,
+    // not inferred by the component from what is parked in its card slot.
+    await loadPage('host.html');
+    const { startHostApp } = await import('../../gui/host/host-app.js');
+    await startHostApp({ location: { hash: '', href: 'http://x/host.html' } });
+    expect(document.getElementById('fac-map').editable).toBe(true);
+
+    await loadPage('index.html');
+    const { startPlayerApp } = await import('../../gui/client/player-app.js');
+    await startPlayerApp({ location: { hash: '' } });
+    expect(document.getElementById('map').editable).toBe(false);
+  });
+
   it('switches control panels on the facilitator’s own tabs', async () => {
     await loadPage('host.html');
     const { startHostApp } = await import('../../gui/host/host-app.js');
@@ -386,8 +443,9 @@ describe('the player console', () => {
   });
 
   it('does not draw the sheet row twice', async () => {
-    // The map renders its own row for the facilitator, who has no tab bar to
-    // put it in. The player's console provides one, so the map's is off.
+    // The map renders its own row for whoever has no tab bar to put it in —
+    // the replay's three sheets, side by side. Both consoles provide one now,
+    // so on both of them the map's own row is off.
     await loadPage('index.html');
     const { startPlayerApp } = await import('../../gui/client/player-app.js');
     await startPlayerApp({ location: { hash: '' } });

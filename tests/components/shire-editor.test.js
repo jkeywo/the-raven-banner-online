@@ -130,37 +130,19 @@ describe('<rb-shire-editor>', () => {
       .toContain('nonzero');
   });
 
-  it('lists every settlement with defended and destroyed checkboxes', () => {
+  it('leaves the settlements to the map, and says so', () => {
+    // They were a list of checkboxes here, two per settlement. A shire with
+    // five churches gave five identical rows reading "Church", none of which
+    // said which church on the ground it meant — so the control moved onto the
+    // letter itself. The tests for it went with it, to views.test.js.
     const editor = mount();
     editor.data = data;
-    const state = fresh();
-    editor.state = state;
+    editor.state = fresh();
     editor.shireId = 'wiltshire';
 
-    const printedCount = Object.keys(data.shires.shires.wiltshire.settlements
-      ?? state.shires.wiltshire.settlements).length;
-    expect(editor.querySelectorAll('.rb-editor-settlements li').length).toBe(printedCount);
-    expect(editor.querySelectorAll('[data-settlement$="|defended"]').length).toBe(printedCount);
-    expect(editor.querySelectorAll('[data-settlement$="|destroyed"]').length).toBe(printedCount);
-  });
-
-  it('circles or strikes a settlement directly', () => {
-    const editor = mount();
-    editor.data = data;
-    const state = fresh();
-    editor.state = state;
-    editor.shireId = 'wiltshire';
-    const [settlementId] = Object.keys(state.shires.wiltshire.settlements);
-
-    const sent = [];
-    document.addEventListener('rb-facilitate', (event) => sent.push(event.detail));
-    const defended = editor.querySelector(`[data-settlement="wiltshire|${settlementId}|defended"]`);
-    defended.checked = true;
-    defended.dispatchEvent(new Event('change'));
-    expect(sent).toEqual([{
-      verb: 'facilitator:set-settlement',
-      payload: { shireId: 'wiltshire', settlementId, field: 'defended', value: true },
-    }]);
+    expect(editor.querySelector('.rb-editor-settlements')).toBeNull();
+    expect(editor.querySelector('[data-settlement]')).toBeNull();
+    expect(editor.textContent).toContain('Click a settlement letter on the map');
   });
 
   it('switches cleanly between shires', () => {

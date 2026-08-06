@@ -79,15 +79,22 @@ entities:
       confidence: confirmed
       title: The Facilitator's Pencil Over The Map
       summary: >-
-        The facilitator's own tab shows the same map the players see, and a
-        shire clicked there opens an editor for everything about it: steward,
-        castles, ship value, and each settlement's defended and destroyed
-        state.
+        The facilitator's own tab shows the same map the players see, and
+        every part of it is editable in place: a shire clicked there opens a
+        card for steward, castles and ship value, and a settlement letter
+        clicked opens a three-way state panel over the letter itself.
       rationale:
         - "The facilitator does not need a bespoke map component: a facilitator's projection is already defined as the full unredacted state plus derived, which is exactly what rb-map already renders for a player's redacted one. Feeding it projectView(state, data, { kind: 'facilitator' }) instead of a player's view is the entire integration."
-        - "Claims are edited on the role's own card in the inspector, not here — a claim belongs to a role, not a shire, and duplicating that control on the map would just be a second place for the two to disagree. The shire editor owns only what is actually a shire's own field: steward, castles, ship value and its settlements."
+        - "Claims are edited on the role's own card in the inspector, not here — a claim belongs to a role, not a shire, and duplicating that control on the map would just be a second place for the two to disagree. The shire editor owns only what is actually a shire's own field: steward, castles and ship value."
         - Castles and ship value are adjusted the same delta-and-commit way as every other facilitator number, for the same race-safety reason as numeric-adjustment — a steward's own spend and a facilitator's correction cannot silently overwrite one another.
         - Ship value is a delta on top of shipCostDelta rather than a replacement of the printed cost, so it stacks correctly with whatever a trade contract or a defensive fleet already did to the same field instead of clobbering it.
+        - "A settlement is edited on the settlement rather than in a list on the shire's card. The card could only name them by type, so a shire with five churches offered five identical rows reading \"Church\" and no way to tell which church on the ground any of them meant. The letter is already drawn in the right place; clicking it is the only control that cannot be about the wrong one."
+        - "Three radios — standing, defended, destroyed — rather than the two checkboxes this replaced. The states are exclusive in play and a pair of boxes could say otherwise: a settlement somebody has burned is not also one somebody is holding, and a form that lets an umpire tick both will eventually be ticked both."
+        - "set-settlement still takes one field at a time, so the two transitions that cross the middle state are two commands, and clearing comes before setting. The other order would leave a settlement ringed and struck through in the gap between them, and leave it there if the second were refused; clearing first means a half-applied change is always one of the three legal states, one click from the one that was asked for."
+        - "Editable is an attribute the facilitator's page grants rather than a capability the component infers. rb-map is mounted by both consoles and by the replay, and \"is there something in the card slot?\" is not the same question as \"may this person edit the board\" — a player's settlements have to stay ink on a map."
+        - "The settlement half of this pencil is drawn by rb-map itself, which is declared under player-console because it is the one renderer both consoles share. It stays declared there rather than being claimed twice: the file has one owner, and what this entity adds to it is an attribute the owner honours, not a second copy of the component."
+      references:
+        - player-console
     game_design:
       participating_roles:
         - facilitator
@@ -105,9 +112,17 @@ entities:
         summary: >-
           Reassigning a steward keeps the shire's faction in step, a castle
           or ship-value commit round-trips as a delta and is refused when
-          empty or zero, ship value stacks on an existing shipCostDelta
-          rather than replacing it, and toggling a settlement's defended or
-          destroyed state fires the matching command.
+          empty or zero, and ship value stacks on an existing shipCostDelta
+          rather than replacing it.
+      - kind: test
+        reference: tests/components/views.test.js
+        summary: >-
+          A settlement letter on an editable map takes a click and offers its
+          three states as radios; choosing one that needs two commands sends
+          the clearing one first; choosing the state it is already in sends
+          nothing; and without the editable attribute there is no hit target,
+          no panel and no command — a click on a letter is a click on the
+          shire under it.
 
   - message: adjust-command
     core:

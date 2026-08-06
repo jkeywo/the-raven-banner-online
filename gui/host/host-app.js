@@ -389,18 +389,55 @@ export async function startHostApp({ location = window.location } = {}) {
   // rest — battle, crowns, envoys, the debrief, the inspector — are each a
   // control panel in its own right, and only one needs to be in front at a
   // time.
+  buildMapButtons();
   $('facilitator-tabs').addEventListener('click', (event) => {
+    const sheet = event.target.closest('[data-sheet]');
+    if (sheet) { selectSheet(sheet.dataset.sheet); return; }
     const button = event.target.closest('[data-pane]');
     if (button) selectFacilitatorPane(button.dataset.pane);
   });
 
   function selectFacilitatorPane(pane) {
-    for (const button of $('facilitator-tabs').children) {
+    // The sheet buttons share this bar and answer a different question —
+    // "which corner of England?" rather than "which of these panels?" — so
+    // they are skipped here and carry their own selected state, set in
+    // selectSheet. Asking for [data-pane] rather than every child is what
+    // keeps them out of it.
+    for (const button of $('facilitator-tabs').querySelectorAll('[data-pane]')) {
       button.setAttribute('aria-selected', String(button.dataset.pane === pane));
     }
     for (const section of document.querySelectorAll('[data-pane-body]')) {
       section.hidden = section.dataset.paneBody !== pane;
     }
+    // Only one of the panes is the board, so the sheet row is lit only there.
+    $('fac-map-buttons').dataset.active = String(pane === 'map');
+  }
+
+  /**
+   * The three printed sheets, as three buttons rather than one "Map" tab.
+   *
+   * The same row the player's console carries, for the same reason: England is
+   * what is being looked at, and which corner of it is the question actually
+   * being asked. Built from `shires.json` so the row cannot name a sheet that
+   * does not exist, and clicking one both opens the board and moves the map to
+   * it — a facilitator choosing "Eastern" from the battle tab means "show me
+   * the east", not "show me the east once I have found my way back".
+   */
+  function buildMapButtons() {
+    $('fac-map-buttons').innerHTML = (data.shires.sheets ?? []).map((sheet) => `
+      <button type="button" role="tab" data-sheet="${sheet.id}"
+              aria-selected="${sheet.id === $('fac-map').getAttribute('sheet')}">${
+  sheet.display_name.replace(/\s+England$/, '')}</button>`).join('');
+    // The board is the pane the console opens into, so the row starts lit.
+    $('fac-map-buttons').dataset.active = 'true';
+  }
+
+  function selectSheet(sheetId) {
+    $('fac-map').setAttribute('sheet', sheetId);
+    for (const button of $('fac-map-buttons').children) {
+      button.setAttribute('aria-selected', String(button.dataset.sheet === sheetId));
+    }
+    selectFacilitatorPane('map');
   }
 
   $('advance-phase').addEventListener('click', () => asFacilitator('facilitator:advance-phase'));
