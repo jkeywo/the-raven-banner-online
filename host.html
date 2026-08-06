@@ -216,6 +216,20 @@
               <button id="copy-link" type="button">Copy</button>
             </div>
 
+            <details class="rb-testing">
+              <summary>Testing on one machine</summary>
+              <p class="rb-meta">
+                Opens tabs that each take a seat of their own rather than
+                sharing this machine's. For trying the game out alone — not
+                something to reach for at a real table.
+              </p>
+              <div class="rb-row">
+                <label for="test-seats">How many</label>
+                <input id="test-seats" type="number" min="1" max="8" value="2">
+                <button id="open-test-seats" type="button">Open test players</button>
+              </div>
+            </details>
+
             <p class="rb-pin">
               Facilitator PIN <strong id="facilitator-pin"></strong>
               <span class="rb-meta">

@@ -91,6 +91,35 @@ describe('coming back to a seat you already had', () => {
   });
 });
 
+describe('several seats on one machine, for testing', () => {
+  it('names itself and joins straight away, without touching the saved name', () => {
+    // Tabs of one origin share storage, so four ordinary tabs are one seat
+    // opened four times. `?seat=N` gives each its own token.
+    window.localStorage.setItem('rbo:name', 'Alice');
+    return (async () => {
+      await loadPage();
+      const { startPlayerApp } = await import('../../gui/client/player-app.js');
+      await startPlayerApp({ location: { hash: '#RAVEN7Z', search: '?seat=3' } });
+
+      expect(document.getElementById('screen-lobby').hidden).toBe(false);
+      expect(document.getElementById('lobby-message').textContent).toContain('Seat 3');
+      // The real player's name on this machine is left exactly as it was.
+      expect(window.localStorage.getItem('rbo:name')).toBe('Alice');
+    })();
+  });
+
+  it('gives each seat a token of its own, kept apart from the real ones', async () => {
+    const { installSessionToken } = await import('../../gui/net/session-token.js');
+    const one = installSessionToken('RAVEN7Z', window, { seat: 1 });
+    const two = installSessionToken('RAVEN7Z', window, { seat: 2 });
+    expect(one).not.toBe(two);
+    // And each is stable, so a test tab reloading keeps its seat.
+    expect(installSessionToken('RAVEN7Z', window, { seat: 1 })).toBe(one);
+    // Namespaced away, so a test tab can never be mistaken for a real seat.
+    expect(window.localStorage.getItem('rbo:tok:shared:RAVEN7Z')).toBeNull();
+  });
+});
+
 describe('choosing a character and waiting for the facilitator', () => {
   it('offers the character grid before anybody has picked', async () => {
     await loadPage();

@@ -17,7 +17,9 @@
  */
 
 import { ConnectionManager } from '../net/connection-manager.js';
-import { peerIdForCode, codeFromLocation, normaliseJoinCode, isValidJoinCode } from '../net/join-code.js';
+import {
+  peerIdForCode, codeFromLocation, seatFromLocation, normaliseJoinCode, isValidJoinCode,
+} from '../net/join-code.js';
 import { installSessionToken } from '../net/session-token.js';
 import { loadSavedName, saveName, forgetName } from '../net/name-storage.js';
 import { identify } from '../net/wire.js';
@@ -50,6 +52,10 @@ export async function startPlayerApp({ location = window.location } = {}) {
   let name = '';
   /** Whether this tab let itself in rather than being walked in. */
   let remembering = false;
+  // `?seat=N`: a testing affordance, so one person can drive several seats
+  // from one machine. It forces a token of its own rather than adopting the
+  // shared one, which is what stops four tabs becoming one seat four times.
+  const seat = seatFromLocation(location);
 
   const screens = {
     code: $('screen-code'),
@@ -91,7 +97,7 @@ export async function startPlayerApp({ location = window.location } = {}) {
   });
 
   function connect() {
-    const token = installSessionToken(joinCode);
+    const token = installSessionToken(joinCode, window, { seat });
     $('lobby-code').textContent = joinCode;
     manager.connect(peerIdForCode(joinCode), {
       onData: (message) => client.receive(message),
@@ -403,7 +409,9 @@ export async function startPlayerApp({ location = window.location } = {}) {
   // `remembered` is what tells the lobby to offer a way out: a player who was
   // put here rather than choosing it needs one, and a player who typed their
   // way in does not.
-  const remembered = loadSavedName();
+  // A test seat names itself, so it never waits on the name screen and never
+  // takes the name a real player left on this machine.
+  const remembered = seat !== null ? `Seat ${seat}` : loadSavedName();
   if (joinCode && remembered) {
     remembering = true;
     name = remembered;

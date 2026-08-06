@@ -86,6 +86,20 @@ export function codeFromLocation(location) {
   return isValidJoinCode(code) ? code : null;
 }
 
+/**
+ * The `?seat=N` a test tab was opened with, or null.
+ *
+ * A dev affordance and nothing more: it lets one person drive several seats
+ * from one machine, which is otherwise awkward because tabs of one origin
+ * share storage. Bounded to a small non-negative integer so a stray query
+ * string cannot mint unbounded keys.
+ */
+export function seatFromLocation(location) {
+  const search = String(location?.search ?? '');
+  const found = /[?&]seat=(\d{1,2})(?:&|$)/.exec(search);
+  return found ? Number(found[1]) : null;
+}
+
 /** The link to hand to players — pasteable into a voice chat. */
 export function playerLink(location, code) {
   const base = `${location.origin}${location.pathname}`.replace(/host\.html$/, 'index.html');

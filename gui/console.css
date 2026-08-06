@@ -321,6 +321,12 @@ rb-connection-dot[data-tone="connecting"] .rb-dot { animation: rb-pulse 1.4s eas
 .rb-resume-forget { flex: none; color: var(--rb-blood); }
 .rb-start-over { margin-top: 1.5rem; }
 
+/* Folded away, because it is for one person testing alone and never for a
+   real table. */
+.rb-testing { margin-top: 1rem; }
+.rb-testing summary { cursor: pointer; font-size: 0.85rem; color: var(--rb-muted); }
+.rb-testing input[type="number"] { width: 5rem; }
+
 /* The feudal web: one liege per row, their sworn men beside them. */
 .rb-homage { list-style: none; margin: 0.3rem 0 0; padding: 0; display: grid; gap: 0.3rem; }
 .rb-homage li { display: grid; gap: 0.1rem; }

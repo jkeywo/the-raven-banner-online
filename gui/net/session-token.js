@@ -83,9 +83,25 @@ export function decideToken({
  * @param {string} code  the join code, so seats are scoped to one game
  * @param {Window} [win]
  */
-export function installSessionToken(code, win = globalThis.window) {
+export function installSessionToken(code, win = globalThis.window, { seat = null } = {}) {
   const getRandomValues = (array) => win.crypto.getRandomValues(array);
   const freshToken = mintToken(getRandomValues);
+
+  // `?seat=N` is a testing affordance: one person opening four tabs to play
+  // four seats. Each keeps its own token under its own key, so a tab neither
+  // adopts the shared token nor competes for it — which is the whole reason
+  // two ordinary tabs on one machine are two seats but four are awkward.
+  // Namespaced away from the real keys, so a test tab can never be mistaken
+  // for the seat somebody was actually playing.
+  if (seat !== null) {
+    const key = `rbo:tok:seat:${code}:${seat}`;
+    try {
+      const existing = win.localStorage.getItem(key);
+      if (existing) return existing;
+      win.localStorage.setItem(key, freshToken);
+    } catch { /* private mode; the token still works for this session */ }
+    return freshToken;
+  }
 
   let sessionStore;
   let localStore;

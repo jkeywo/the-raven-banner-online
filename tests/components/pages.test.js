@@ -69,7 +69,8 @@ describe('the facilitator console', () => {
       'tab-fac-debrief', 'battle-panel', 'consent-panel', 'epilogue-panel',
       'debrief-waiting', 'fac-map', 'shire-editor',
       'foreign-influence-note', 'foreign-influence-commit',
-      'tab-fac-game', 'lobby-roles', 'role-grid']) {
+      'tab-fac-game', 'lobby-roles', 'role-grid',
+      'test-seats', 'open-test-seats']) {
       expect(document.getElementById(id), id).toBeTruthy();
     }
   });

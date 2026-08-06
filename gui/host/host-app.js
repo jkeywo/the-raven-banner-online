@@ -426,6 +426,19 @@ export async function startHostApp({ location = window.location } = {}) {
       `raven-banner-${session.state.joinCode}-debrief.html`);
   });
 
+  // A testing affordance, and deliberately behind a fold. Each tab carries a
+  // `?seat=N` that makes it take a token of its own rather than adopting this
+  // machine's shared one — otherwise four tabs are one seat opened four times.
+  $('open-test-seats').addEventListener('click', () => {
+    const wanted = Math.min(8, Math.max(1, Number($('test-seats').value) || 1));
+    const link = $('player-link').value;
+    for (let seat = 1; seat <= wanted; seat += 1) {
+      const [base, hash = ''] = link.split('#');
+      const url = `${base}${base.includes('?') ? '&' : '?'}seat=${seat}${hash ? `#${hash}` : ''}`;
+      globalThis.open?.(url, `rb-seat-${seat}`);
+    }
+  });
+
   $('copy-link').addEventListener('click', async () => {
     await navigator.clipboard?.writeText($('player-link').value);
     $('copy-link').textContent = 'Copied';
