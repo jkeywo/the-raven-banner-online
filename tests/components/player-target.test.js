@@ -8,6 +8,7 @@ import { dirname, join } from 'node:path';
 import { loadData } from '../helpers/load-data.js';
 import { createInitialState } from '../../gui/rules/state.js';
 import { projectView } from '../../gui/rules/views.js';
+import { reachableFrom } from '../../gui/rules/derive.js';
 import { VIEW } from '../../gui/net/wire.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -32,14 +33,20 @@ function stubFetch() {
   });
 }
 
-/** A team-phase view for the given role, with an optional state tweak first. */
-function viewFor(roleId, tweak = () => {}) {
+/** A team-phase game with the given role seated, and an optional tweak. */
+function stateFor(roleId, tweak = () => {}) {
   const state = createInitialState({ joinCode: 'RAVEN7Z', seed: 1, data });
   state.phase.name = 'team';
   state.seats.s1 = {
     id: 's1', token: 't', name: 'A', roleId, kind: 'player', connected: true, lastSeen: 0,
   };
   tweak(state);
+  return state;
+}
+
+/** A team-phase view for the given role, with an optional state tweak first. */
+function viewFor(roleId, tweak = () => {}) {
+  const state = stateFor(roleId, tweak);
   return projectView(state, data, {
     kind: 'player', seatId: 's1', roleId, teamId: state.roles[roleId].teamId,
   });
@@ -71,13 +78,20 @@ describe('targeting a shire straight off the map', () => {
     const { client } = await startPlayerApp({ location: { hash: '' } });
 
     // Halfdan holds white at turn one, but it starts fixed to Lindsey — clear
-    // that so any shire is a legal declaration, same as turn two onward.
+    // that so the declaration is his to make, same as turn two onward.
     client.receive({
       type: VIEW,
       data: viewFor('halfdan_ragnarsson', (state) => { delete state.initiative.declared.white; }),
     });
     const shirePath = document.querySelector('#map path.rb-shire');
     const shireId = shirePath.dataset.shire;
+    // The console opens on the northern sheet, and Halfdan's reach is exactly
+    // its six shires — so whichever one is drawn first, he can attack it. That
+    // is what makes the button appear, and asserting it here means a change to
+    // the default sheet or to his starting holdings fails for a legible reason
+    // rather than as a mysteriously absent button.
+    expect(reachableFrom(stateFor('halfdan_ragnarsson'), data, 'halfdan_ragnarsson'))
+      .toContain(shireId);
     shirePath.dispatchEvent(new Event('click', { bubbles: true }));
 
     const button = document.querySelector('[data-target-shire]');
@@ -112,6 +126,41 @@ describe('targeting a shire straight off the map', () => {
       expect(message.data.verb).toBe('declare-initiative-target');
       expect(message.data.payload).toEqual({ shireId });
     }
+  });
+
+  it('offers no Target button on a shire the token holder cannot reach', async () => {
+    await loadPage();
+    const { startPlayerApp } = await import('../../gui/client/player-app.js');
+    const { client } = await startPlayerApp({ location: { hash: '' } });
+
+    // Guthrum holds black and can reach Essex and Middle Anglia, both on the
+    // eastern sheet. The console opens on the northern one, where every shire
+    // is beyond him — so the button has to stay away rather than be offered
+    // and then refused by the host.
+    client.receive({
+      type: VIEW,
+      data: viewFor('guthrum_the_old', (state) => { delete state.initiative.declared.black; }),
+    });
+    document.querySelector('#map path.rb-shire')
+      .dispatchEvent(new Event('click', { bubbles: true }));
+
+    expect(document.querySelector('[data-target-shire]')).toBeNull();
+  });
+
+  it('offers it again on a shire the same holder can reach', async () => {
+    await loadPage();
+    const { startPlayerApp } = await import('../../gui/client/player-app.js');
+    const { client } = await startPlayerApp({ location: { hash: '' } });
+
+    client.receive({
+      type: VIEW,
+      data: viewFor('guthrum_the_old', (state) => { delete state.initiative.declared.black; }),
+    });
+    document.querySelector('#map').setAttribute('sheet', 'eastern');
+    document.querySelector('#map path[data-shire="essex"]')
+      .dispatchEvent(new Event('click', { bubbles: true }));
+
+    expect(document.querySelector('[data-target-shire]')?.dataset.targetShire).toBe('essex');
   });
 
   it('does not offer declare-initiative-target as a plain action-list item any more', async () => {

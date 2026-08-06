@@ -131,7 +131,7 @@ entities:
       status: proposed
       confidence: confirmed
       title: Roster Edit Commands
-      summary: set-steward, set-settlement, add-claim, remove-claim, assign-initiative, add-role and remove-role — the structured edits a role or shire card can make.
+      summary: set-steward, set-settlement, add-claim, remove-claim, assign-initiative, add-role and remove-role — the structured edits a role or shire card can make. Structured rather than unconditional — assign-initiative refuses to leave a role holding two of the three tokens, which is the one facilitator edit with an invariant of its own.
     architecture:
       authority: request
       producer:

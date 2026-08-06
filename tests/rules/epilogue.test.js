@@ -161,4 +161,34 @@ describe('what the umpire changed', () => {
     expect(Object.values(epilogue(state, data).notes))
       .toContain('His son wants peace with the Danes.');
   });
+
+  it('is only that, after a whole game of battle phases filing their own notes', () => {
+    // This page gets printed and mailed round the week after, so the heading
+    // has to keep meaning what it says. Every battle phase that could not hand
+    // the spare token out writes a line somewhere — with four factions "more
+    // than one stayed out" is the ordinary case, so a five-turn game writes
+    // about five of them. None of them is anything the umpire changed, and
+    // none of them belongs under a heading claiming they were.
+    let state = playing();
+    state.roles.ceowulf.dead = true;
+    state = run(state, 'facilitator:heir-arrives',
+      { roleId: 'ceowulf', note: 'His son wants peace with the Danes.' });
+
+    let guard = 0;
+    while (state.phase.name !== 'epilogue' && (guard += 1) < 100) {
+      // Exactly what the grid's "End the battles and hand out the spare
+      // token" button sends, every turn.
+      if (state.phase.name === 'battle') state = run(state, 'facilitator:end-battles');
+      state = run(state, 'facilitator:advance-phase');
+    }
+
+    expect(state.phase.name).toBe('epilogue');
+    // The notes were genuinely written — this is not passing because nothing
+    // happened.
+    expect(Object.keys(state.battleNotes).length).toBeGreaterThan(1);
+
+    const { notes } = epilogue(state, data);
+    expect(Object.values(notes)).toEqual(['His son wants peace with the Danes.']);
+    expect(Object.keys(notes).filter((key) => key.startsWith('initiative:'))).toEqual([]);
+  });
 });

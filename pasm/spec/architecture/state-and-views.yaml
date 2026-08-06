@@ -354,6 +354,8 @@ entities:
         - projected-facilitator-view
       runs_in:
         - facilitator-browser-runtime
+      depends_on:
+        - authoritative-game-state
     implementation:
       status: declared
       paths:

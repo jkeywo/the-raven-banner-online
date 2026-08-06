@@ -12,6 +12,8 @@
  * travels the same pipeline as everything else, so it is in the log.
  */
 
+import { battleNoteKey, heldBackToken } from '../rules/battle.js';
+
 const STAGE_LABEL = {
   awaiting_tactics: 'choosing cards',
   tactics_revealed: 'cards down',
@@ -38,6 +40,44 @@ export class RbFacilitatorGrid extends HTMLElement {
     return roleId ? (this._data.roles.roles[roleId]?.name ?? roleId) : 'nobody';
   }
 
+  /**
+   * A note the battle phase filed because it had nowhere else to say it.
+   *
+   * `seizeInitiative` runs inside `effects`, and `facilitator:end-battles`
+   * clears the board a line after calling it — so a phase that could not hand
+   * the spare token out has to have written that down at the time. Without
+   * this the button labelled "hand out the spare token" would look identical
+   * whether it had or not.
+   */
+  _note(what) {
+    const note = this._state.battleNotes?.[battleNoteKey(this._state.phase.turn, what)];
+    return note ? `<p class="rb-meta rb-warn" data-initiative-note="${what}">${escape(note)}</p>` : '';
+  }
+
+  /**
+   * A token this battle should move and cannot, said out loud.
+   *
+   * Derived here rather than written down when the settling ran, because it is
+   * a fact about the board and not an event — `heldBackToken` reads the same
+   * tally, declaration and holders that `settleBattle` read. That is what
+   * gives the line a way to go away: clear the other counter or push this one
+   * across, and the warning stops being true and stops being drawn. A stored
+   * one would have sat here going stale until the phase ended, telling the
+   * facilitator to do a thing they had already done.
+   */
+  _heldBack(state, shireId) {
+    const held = heldBackToken(state, shireId);
+    if (!held) return '';
+    const shire = this._data.shires.shires[shireId]?.name ?? shireId;
+    // Every name goes through _name, which answers 'nobody' for an unheld
+    // token — a token can be sitting on the table with nobody behind it, and
+    // a warning that reads "stays with null" is worse than no warning.
+    const line = `${this._name(held.steward)} has won ${shire} twice over but already holds `
+      + `the ${held.alsoHolds} token, so the ${held.token} token stays with `
+      + `${this._name(held.stays)}. Move a counter by hand if it should change hands.`;
+    return `<p class="rb-meta rb-warn" data-token-held-back="${shireId}">${escape(line)}</p>`;
+  }
+
   _render() {
     if (!this.isConnected || !this._state || !this._data) return;
     const state = this._state;
@@ -55,6 +95,7 @@ export class RbFacilitatorGrid extends HTMLElement {
         .map((id) => `<option value="${id}">${this._data.shires.shires[id]?.name ?? id}</option>`)
         .join('');
       this.innerHTML = `
+        ${this._note('spare')}
         <p class="rb-meta">${declared.length
     ? `${declared.length} target${declared.length === 1 ? '' : 's'} declared but not announced.`
     : 'No targets declared yet.'}</p>
@@ -76,6 +117,7 @@ export class RbFacilitatorGrid extends HTMLElement {
     }
 
     this.innerHTML = `${targets.map((shireId) => this._battle(state, shireId)).join('')}
+      ${this._note('spare')}
       <button type="button" data-end>End the battles and hand out the spare token</button>`;
     this._wire();
   }
@@ -122,6 +164,7 @@ export class RbFacilitatorGrid extends HTMLElement {
 
         ${allDone ? `
           <div class="rb-settle">
+            ${this._heldBack(state, shireId)}
             <label>New steward if it falls
               <select data-steward="${shireId}">
                 ${sides.attackers.map((r) => `<option value="${r}">${this._name(r)}</option>`).join('')}
@@ -161,6 +204,11 @@ export class RbFacilitatorGrid extends HTMLElement {
       });
     }
   }
+}
+
+function escape(text) {
+  return String(text ?? '').replace(/[&<>"']/g, (c) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
 customElements.define('rb-facilitator-grid', RbFacilitatorGrid);

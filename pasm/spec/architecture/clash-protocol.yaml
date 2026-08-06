@@ -33,6 +33,7 @@ entities:
         - resolveClash
         - tally
         - settleBattle
+        - heldBackToken
       tests:
         - npm test
     evidence:

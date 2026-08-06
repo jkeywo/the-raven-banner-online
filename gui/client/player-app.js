@@ -25,7 +25,7 @@ import { sendCommand } from '../net/command-gateway.js';
 import { ClientState } from './client-state.js';
 import { loadData } from './load-data.js';
 import { renderChooser, valuesFrom, payloadFrom, shireTargetsFor } from './action-chooser.js';
-import { availableTo } from '../rules/admission.js';
+import { admit } from '../rules/admission.js';
 import '../components/rb-connection-dot.js';
 import '../components/rb-seat-roster.js';
 import '../components/rb-map.js';
@@ -167,12 +167,28 @@ export async function startPlayerApp({ location = window.location } = {}) {
     // Holding an initiative token turns the shire just clicked into
     // something that can be targeted directly, rather than picked a second
     // time from a dropdown listing every shire in England. Asked of the same
-    // admission function the action list uses, so this never offers a Target
-    // button the host would go on to refuse.
+    // admission function the host will use, and asked about this shire rather
+    // than about the verb in general — a token holder can only name somewhere
+    // they can reach, so "can I target?" has no answer that is not about a
+    // particular shire. That is what keeps the button from being offered and
+    // then refused.
+    //
+    // Wrapped because this is a client asking a host's rule about a redacted
+    // projection: a rule that reaches into a hole in it throws rather than
+    // returning a verdict, which is exactly why `availableTo` wraps its own
+    // probes. Nothing the reach gate reads is private today, so this catches
+    // the next rule added to that admit rather than a live fault — and a
+    // missing button is a far better failure than a console that stopped
+    // rendering shires.
     const me = client.view?.viewer;
-    const canTarget = me && availableTo(client.view, data,
-      { seatId: me.seatId, kind: 'player', roleId: me.roleId })
-      .some((a) => a.verb === 'declare-initiative-target' && a.ok);
+    let canTarget = false;
+    try {
+      canTarget = Boolean(me) && admit(client.view, data,
+        { verb: 'declare-initiative-target', payload: { shireId } },
+        { seatId: me.seatId, kind: 'player', roleId: me.roleId }).ok;
+    } catch {
+      canTarget = false;
+    }
 
     $('shire-detail').innerHTML = `
       <h3>${printed.name}</h3>

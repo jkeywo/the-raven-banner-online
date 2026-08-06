@@ -16,7 +16,9 @@
  * to disagree with the first.
  */
 
-import { factionReach, isChristian, isPagan, isDanishHeld } from '../rules/derive.js';
+import {
+  factionReach, reachableFrom, isChristian, isPagan, isDanishHeld,
+} from '../rules/derive.js';
 
 /**
  * @typedef {object} Field
@@ -130,12 +132,18 @@ export function fieldsFor(verb, view, data) {
         options: [{ value: '', label: 'nobody — stand alone' }, ...others()],
       }];
 
+    // The map's Target button is how a token holder declares now, so nothing
+    // renders this — rb-action-list filters the verb out. It stays as the
+    // answer to `shireTargetsFor`, which is what would highlight the legal
+    // shires if the verb ever came back to the list, and it is reach-filtered
+    // for the same reason raid-settlement is: a player should not be invited
+    // to attack the other side of England.
     case 'declare-initiative-target':
       return [{
         name: 'shireId',
         label: 'Attack',
         kind: 'select',
-        options: Object.keys(view.shires ?? {})
+        options: reachableFrom(view, data, me)
           .map((id) => ({ value: id, label: data.shires.shires[id]?.name ?? id })),
       }];
 

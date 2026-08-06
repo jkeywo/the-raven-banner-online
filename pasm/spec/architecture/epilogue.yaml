@@ -14,6 +14,7 @@ entities:
         - Derived from the board rather than accumulated as the game runs, so the epilogue cannot disagree with the maps the players are looking at while it is read out.
         - The band sentences come off the printed tracker rather than being written fresh. A table of numbers is not an ending, and those are the words the game itself ends on.
         - Saved as a self-contained page with its styles inlined, because it is the only artefact of the evening anybody keeps and it should still render the week after with the app closed.
+        - What the umpire changed holds only prose an umpire typed. The battle phase files its own machine-written notes under a separate state key, facilitator-only and never read here, so that heading goes on meaning what it says on a page that gets printed and mailed round after the game.
       references:
         - concessions-ledger
     game_design:

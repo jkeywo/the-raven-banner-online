@@ -53,6 +53,10 @@ function loadedState() {
       messages: ['SECRET::envoy.alfred.message'] },
   };
   state.facilitatorNotes = { plan: 'SECRET::facilitatorNotes.plan' };
+  // The battle phase's own channel, which is a separate key so the epilogue
+  // never prints it — and facilitator-only for the same reason the umpire's
+  // own notes are.
+  state.battleNotes = { 'initiative:t1:spare': 'SECRET::battleNotes.spare' };
   state.log = [{ seq: 1, verb: 'claim-role', payload: 'SECRET::log.entry' }];
   state.seed = 987654;
 
@@ -103,7 +107,7 @@ describe('no sentinel reaches a seat the manifest does not grant it', () => {
     // anything from them would only make adjudication harder.
     const json = JSON.stringify(projectView(state, data, { kind: 'facilitator' }));
     for (const secret of ['SECRET::clash.c1.tactic.guthrum', 'SECRET::facilitatorNotes.plan',
-      'SECRET::initiative.white.target', 'SECRET::log.entry']) {
+      'SECRET::battleNotes.spare', 'SECRET::initiative.white.target', 'SECRET::log.entry']) {
       expect(json).toContain(secret);
     }
   });

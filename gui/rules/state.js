@@ -18,6 +18,26 @@ export const SCHEMA_VERSION = 1;
 export const PHASES = ['team', 'battle', 'maintenance', 'encounter'];
 
 /**
+ * The three initiative tokens, in the order the sheets name them.
+ *
+ * Each is a plain roleId-or-null on `state.initiative`, sitting alongside
+ * `declared`. No role may be the value of more than one at a time — they are
+ * three counters on a table, and nobody is handed two.
+ */
+export const TOKENS = ['white', 'black', 'bonus'];
+
+/**
+ * Which token this role holds, or null. The one place that question is asked.
+ *
+ * Every reader used to spell the lookup out for itself, which is how the bonus
+ * token came to be written in two different shapes without anything noticing.
+ */
+export function tokenHeldBy(initiative, roleId) {
+  if (!roleId) return null;
+  return TOKENS.find((token) => initiative?.[token] === roleId) ?? null;
+}
+
+/**
  * Which roles are in play at a given head count.
  *
  * "You can run the game with up to 4 fewer players than maximum. To do so drop
@@ -241,6 +261,12 @@ export function createInitialState({ joinCode, seed, data, roleIds }) {
     // two stamps are set when the facilitator calls time.
     aftermath: { foreignInfluence: '', endedAt: null, endedOnTurn: null },
     facilitatorNotes: {},
+    // What the battle phase could not do and had no other way to report — see
+    // `battleNoteKey` in battle.js. Kept apart from facilitatorNotes on
+    // purpose: that one is prose an umpire typed, and the epilogue reads it
+    // out under "What the umpire changed", which is not where a
+    // machine-voiced line about a counter belongs.
+    battleNotes: {},
     log: [],
     lastSeq: {},
   };

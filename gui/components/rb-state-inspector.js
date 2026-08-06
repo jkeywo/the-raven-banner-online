@@ -30,7 +30,7 @@ const STATS = [
   ['soldiers', 'Soldiers'], ['ships', 'Ships'], ['wounds', 'Wounds'],
 ];
 
-const TOKENS = ['white', 'black', 'bonus'];
+import { TOKENS } from '../rules/state.js';
 
 export class RbStateInspector extends HTMLElement {
   set state(value) {
@@ -121,6 +121,18 @@ export class RbStateInspector extends HTMLElement {
       .filter(([, s]) => s.stewardRoleId === role.id)
       .map(([id]) => this._data.shires.shires[id]?.name ?? id)
       .sort((a, b) => a.localeCompare(b));
+    // One role, one token, so the other boxes are disabled rather than left
+    // clickable-and-then-refused: the panel says the rule instead of the log
+    // saying it afterwards, the same greying the player's action list does.
+    //
+    // But it reads every token rather than asking which one they hold, because
+    // this panel is the pencil the rest of the design defers to. `settleBattle`
+    // stands aside for "the facilitator moves it by hand", `seizeInitiative`
+    // does the same, and `facilitator:set-initiative-target` refuses a double
+    // hold with "clear one first" — all three are pointing here. A panel that
+    // showed only the first of two counters would be pointing at a stray it
+    // had itself made invisible, and unclearable from any card on the grid.
+    const holds = TOKENS.filter((token) => this._state.initiative?.[token] === role.id);
 
     return `
       <article class="rb-inspector-card">
@@ -169,8 +181,13 @@ export class RbStateInspector extends HTMLElement {
           <legend>Initiative token</legend>
           ${TOKENS.map((token) => `
             <label><input type="checkbox" data-token="${token}|${role.id}"
-              ${this._state.initiative[token] === role.id ? 'checked' : ''}> ${title(token)}</label>`).join('')}
+              ${holds.includes(token) ? 'checked' : ''}
+              ${holds.length && !holds.includes(token) ? 'disabled' : ''}> ${title(token)}</label>`).join('')}
         </fieldset>
+        ${holds.length > 1 ? `<p class="rb-meta rb-warn">Holding the ${holds.join(' and ')}
+          tokens — one of those is a stray. Uncheck it.</p>`
+    : holds.length ? `<p class="rb-meta">Holding the ${holds[0]} token — uncheck it before
+          moving them onto another.</p>` : ''}
 
         <button type="button" class="rb-inspector-remove"
           data-remove-role="${role.id}" data-name="${escape(printed.name ?? role.id)}">

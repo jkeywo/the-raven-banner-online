@@ -199,9 +199,12 @@ describe('turn one is written down for you', () => {
       state = run(state, FACILITATOR, 'facilitator:advance-phase');
     }
     expect(state.phase).toMatchObject({ turn: 2, name: 'team' });
+    // Somewhere he can actually march: a token names an attack, and an attack
+    // has to reach. Wiltshire is the far side of England from the Danish
+    // landing, which is why it was never a legal declaration for him.
     state = run(state, as('halfdan_ragnarsson'), 'declare-initiative-target',
-      { shireId: 'wiltshire' });
-    expect(state.initiative.declared.white.shireId).toBe('wiltshire');
+      { shireId: 'north_mercia' });
+    expect(state.initiative.declared.white.shireId).toBe('north_mercia');
   });
 });
 

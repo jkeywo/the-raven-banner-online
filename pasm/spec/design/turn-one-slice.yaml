@@ -105,7 +105,7 @@ entities:
       status: proposed
       confidence: confirmed
       title: Declare Initiative Target
-      summary: An initiative token holder names the shire they intend to attack, visible to their team until the battle phase announces it.
+      summary: An initiative token holder names a shire they can reach and intend to attack, visible to their team until the battle phase announces it. Reachability is the same gate join-battle puts on an attacker, and a role may be holding only one of the three tokens at a time.
     game_design:
       owner_role: owning-player
       produces_facts:

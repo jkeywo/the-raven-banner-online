@@ -158,6 +158,64 @@ describe('one card per role', () => {
     });
   });
 
+  it('greys out the other two boxes for a role already holding a token', () => {
+    // One role, one token. Halfdan opens the game holding white, so the panel
+    // has to say so rather than let the umpire click black and read the
+    // refusal in the log a moment later.
+    const inspector = mount('rb-state-inspector');
+    inspector.data = data;
+    const state = fresh();
+    expect(state.initiative.white).toBe('halfdan_ragnarsson');
+    inspector.state = state;
+
+    const box = (token) =>
+      inspector.querySelector(`[data-token="${token}|halfdan_ragnarsson"]`);
+    expect(box('white').checked).toBe(true);
+    expect(box('white').disabled).toBe(false);
+    expect(box('black').disabled).toBe(true);
+    expect(box('bonus').disabled).toBe(true);
+
+    // Somebody holding nothing keeps all three.
+    for (const token of ['white', 'black', 'bonus']) {
+      expect(inspector.querySelector(`[data-token="${token}|cenred"]`).disabled).toBe(false);
+    }
+  });
+
+  it('shows both counters when a role has somehow ended up holding two', () => {
+    // The panel is the pencil the rest of the design points at: settleBattle
+    // holds a token back for "the facilitator moves it by hand", seizeInitiative
+    // does the same, and facilitator:set-initiative-target refuses a double
+    // hold with "clear one first". So a stray second token has to be visible
+    // here and clickable off — a card that showed only the first would leave it
+    // on the board, unclearable from anywhere in the game.
+    const inspector = mount('rb-state-inspector');
+    inspector.data = data;
+    const state = fresh();
+    state.initiative.black = 'halfdan_ragnarsson';
+    inspector.state = state;
+
+    const box = (token) =>
+      inspector.querySelector(`[data-token="${token}|halfdan_ragnarsson"]`);
+    expect(box('white').checked).toBe(true);
+    expect(box('black').checked).toBe(true);
+    expect(box('white').disabled).toBe(false);
+    expect(box('black').disabled).toBe(false);
+    // The one they do not hold stays shut, which is the rule as it always was.
+    expect(box('bonus').checked).toBe(false);
+    expect(box('bonus').disabled).toBe(true);
+    expect(inspector.textContent).toContain('one of those is a stray');
+
+    // And unchecking one is a command that clears exactly that counter.
+    let raised = null;
+    inspector.addEventListener('rb-facilitate', (event) => { raised = event.detail; });
+    const black = box('black');
+    black.checked = false;
+    black.dispatchEvent(new Event('change'));
+    expect(raised).toEqual({
+      verb: 'facilitator:assign-initiative', payload: { token: 'black', roleId: null },
+    });
+  });
+
   it('offers to remove a role, with a confirmation', () => {
     const inspector = mount('rb-state-inspector');
     inspector.data = data;

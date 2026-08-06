@@ -14,6 +14,39 @@
  */
 
 import { createClash, sidesOf } from './clash.js';
+import { TOKENS } from './state.js';
+
+/**
+ * Where a note the battle phase has no other way to say is filed, for one turn.
+ *
+ * `seizeInitiative` runs inside `effects`, where there is nothing to refuse
+ * with and no return value anybody reads — and `facilitator:end-battles` wipes
+ * `draft.battle` in the same breath, so a phase that could not hand the spare
+ * token out has nowhere left to say so a moment later. That is the one thing
+ * here that genuinely has to be written down: it is not derivable afterwards,
+ * because the board it was about is gone. Everything else the settling could
+ * not do is read back off the board instead — see `heldBackToken`.
+ *
+ * Its own key rather than `facilitatorNotes`, which is a different channel
+ * wearing the same shape. `facilitatorNotes` is prose an umpire typed, and
+ * `epilogue()` reads it out under "What the umpire changed" on a page that
+ * gets printed and mailed round after the game. Machine-voiced lines about
+ * counters do not belong in it: with four factions "more than one stayed out"
+ * is the ordinary case, so five turns would leave five of them in the debrief,
+ * each under a raw key and none of them anything the umpire changed. Two
+ * audiences, two keys, and the epilogue stays clean by construction rather
+ * than by a filter at the far end that somebody has to remember.
+ *
+ * Keyed by turn, so `<rb-facilitator-grid>` renders only the note about the
+ * turn in front of it, and rewritten rather than appended, so ending the
+ * battles twice leaves one answer rather than two. Older turns are simply left
+ * behind: nothing renders them, they are facilitator-only, and a game is five
+ * turns long.
+ *
+ * @param {number} turn
+ * @param {string} what  what the note is about — `spare` for the end-of-phase token
+ */
+export const battleNoteKey = (turn, what) => `initiative:t${turn}:${what}`;
 
 /** How many defended settlements a shire currently has. */
 export function defendedSettlements(state, shireId) {
@@ -104,10 +137,52 @@ export function tally(state, shireId) {
 }
 
 /**
+ * The token a finished battle should move and cannot, or null.
+ *
+ * A role holds at most one token — three counters on a table, and nobody is
+ * handed two — so a defender who won twice while already holding one leaves
+ * the attacker's token where it is. `settleBattle` runs inside `effects`,
+ * where there is nothing to refuse with, so the answer is to not create the
+ * double-hold and let the facilitator, who is standing over the battle anyway,
+ * push a counter across by hand.
+ *
+ * Read off the board rather than filed away at the moment it happens, because
+ * it is a fact about the board and not an event: the tally, which token
+ * declared against this shire, and who is holding what. `settleBattle` asks
+ * before it moves anything and `<rb-facilitator-grid>` asks again to draw the
+ * warning, so the two cannot come to disagree — and following the instruction
+ * is what makes the warning go away, which is a dismissal a stored note never
+ * had.
+ *
+ * @returns {{token: string, steward: string, alsoHolds: string,
+ *            stays: string|null}|null}
+ */
+export function heldBackToken(state, shireId) {
+  const result = tally(state, shireId);
+  const steward = state.shires[shireId]?.stewardRoleId;
+  if (!result.resolved || !result.tokenChangesHands || !steward) return null;
+
+  // Whichever token was used to declare this attack is the one that would pass.
+  const used = Object.entries(state.initiative.declared ?? {})
+    .find(([, declaration]) => declaration.shireId === shireId);
+  if (!used) return null;
+
+  const [token] = used;
+  const alsoHolds = TOKENS.find((other) => other !== token
+    && state.initiative[other] === steward);
+  if (!alsoHolds) return null;
+  // `stays` is a roleId or null — a token can be sitting on the table with
+  // nobody holding it, which is what removing a role leaves behind.
+  return { token, steward, alsoHolds, stays: state.initiative[token] ?? null };
+}
+
+/**
  * Apply the outcome of a finished battle to the board.
  *
  * Mutates a draft, because it is called from inside the reducer where a draft
- * is what exists. Returns what it did, so the log and the console can say.
+ * is what exists. Returns what it did, so the log and the console can say —
+ * including `tokenHeldBack`, because `tokenChangesHands` is what the tally
+ * says should happen and is not always what did.
  */
 export function settleBattle(draft, data, shireId, { newSteward = null } = {}) {
   const result = tally(draft, shireId);
@@ -115,6 +190,9 @@ export function settleBattle(draft, data, shireId, { newSteward = null } = {}) {
 
   const shire = draft.shires[shireId];
   const defendingSteward = shire.stewardRoleId;
+  // Asked before the shire below can change hands, because it is a question
+  // about whoever was defending it.
+  const heldBack = heldBackToken(draft, shireId);
 
   if (result.shireFalls) {
     // The token holder names who takes it — often not themselves, which is how
@@ -130,17 +208,24 @@ export function settleBattle(draft, data, shireId, { newSteward = null } = {}) {
     if (shire.castles > floor) shire.castles -= 1;
   }
 
-  if (result.tokenChangesHands && defendingSteward) {
+  // Skipping is defensible; skipping silently would not be — `tokenChangesHands`
+  // goes on reading true and nobody reads this return value. But nothing is
+  // written down about it either: the grid asks `heldBackToken` the same
+  // question against the same board and says so itself, so there is no second
+  // copy of the answer to go stale while the facilitator fixes it.
+  if (result.tokenChangesHands && defendingSteward && !heldBack) {
     // Whichever token was used to declare this attack passes to the defender.
     const used = Object.entries(draft.initiative.declared)
       .find(([, declaration]) => declaration.shireId === shireId);
-    if (used) {
-      const [token] = used;
-      draft.initiative[token] = defendingSteward;
-    }
+    if (used) draft.initiative[used[0]] = defendingSteward;
   }
 
-  return { ...result, applied: true, newSteward: shire.stewardRoleId };
+  return {
+    ...result,
+    applied: true,
+    newSteward: shire.stewardRoleId,
+    tokenHeldBack: Boolean(heldBack),
+  };
 }
 
 /**
@@ -150,6 +235,14 @@ export function settleBattle(draft, data, shireId, { newSteward = null } = {}) {
  * following turn only. It is the game's way of noticing that sitting quietly
  * while everyone else fights should not be free of consequence — for them or
  * for you.
+ *
+ * The token is a plain roleId, exactly like white and black. It used to be
+ * written here as `{ roleId, expiresTurn }` and as a bare string everywhere
+ * else, which meant every `initiative[token] === roleId` comparison in the
+ * codebase stopped seeing the bonus holder the moment this function fired —
+ * including the one that clears a removed role's token. `expiresTurn` was
+ * never read by anything, so the "next turn only" it implied was a comment
+ * with a field attached; the facilitator takes the token back by hand.
  */
 export function seizeInitiative(draft) {
   const involved = new Set();
@@ -168,11 +261,36 @@ export function seizeInitiative(draft) {
   const quiet = [...new Set(Object.values(draft.roles).map((r) => r.factionId))]
     .filter((faction) => faction && !involved.has(faction));
 
+  // Every way this ends says so. The button that calls it reads "End the
+  // battles and hand out the spare token", and nobody reads the return value,
+  // so a phase that handed one out and a phase that could not have to look
+  // different to the facilitator standing in front of it. This one is written
+  // down rather than derived because the command wipes `draft.battle` a line
+  // after calling this, taking the evidence with it.
+  const noteKey = battleNoteKey(draft.phase.turn, 'spare');
+  delete draft.battleNotes[noteKey];
+
   // One token, and only if exactly one faction stayed out — otherwise the
   // facilitator decides, which is what the paper game does anyway.
-  if (quiet.length !== 1) return null;
-  const holder = Object.values(draft.roles).find((r) => r.factionId === quiet[0]);
-  if (!holder) return null;
-  draft.initiative.bonus = { roleId: holder.id, expiresTurn: draft.phase.turn + 1 };
-  return draft.initiative.bonus;
+  if (quiet.length !== 1) {
+    draft.battleNotes[noteKey] = quiet.length
+      ? `No spare initiative token was handed out: ${quiet.length} factions stayed out of the `
+        + 'fighting, so which of them takes it is yours to decide.'
+      : 'No spare initiative token was handed out: every faction was in the fighting.';
+    return null;
+  }
+  // Which member of that faction takes it was always an arbitrary pick, so it
+  // picks somebody empty-handed: a role may hold only one token, and handing
+  // a second to whoever happens to be first in the roster would break that
+  // for no reason. If the whole faction is already holding tokens there is
+  // nobody left to give it to, and the facilitator decides — as above.
+  const members = Object.values(draft.roles).filter((r) => r.factionId === quiet[0]);
+  const holder = members.find((r) => !TOKENS.some((t) => draft.initiative[t] === r.id));
+  if (!holder) {
+    draft.battleNotes[noteKey] = 'No spare initiative token was handed out: everyone in '
+      + 'the faction that stayed out of the fighting is already holding one.';
+    return null;
+  }
+  draft.initiative.bonus = holder.id;
+  return holder.id;
 }

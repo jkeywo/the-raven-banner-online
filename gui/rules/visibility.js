@@ -40,6 +40,11 @@ export const FIELD_VISIBILITY = [
   { path: 'log.**', audience: FACILITATOR },
   { path: 'lastSeq.**', audience: NOBODY },
   { path: 'facilitatorNotes.**', audience: FACILITATOR },
+  // The battle phase's own channel, and facilitator-only for the same reason:
+  // it is the umpire being told to move a counter the rules could not move
+  // themselves. Separate from facilitatorNotes so the epilogue's ledger of
+  // what the umpire changed stays a ledger of what the umpire changed.
+  { path: 'battleNotes.**', audience: FACILITATOR },
   { path: 'phase.**', audience: PUBLIC },
 
   // --- seats ---------------------------------------------------------------
@@ -100,9 +105,12 @@ export const FIELD_VISIBILITY = [
   // is protected by the teams sitting apart; here the manifest does it. The
   // declaring role is inside the record, so both the audience and the reveal
   // condition read it out of state rather than off the path.
+  // Who holds each of the three tokens is public — a counter sits in front of
+  // somebody, in full view. All three are the same shape, a plain roleId or
+  // null, so all three are the same kind of path.
   { path: 'initiative.white', audience: PUBLIC },
   { path: 'initiative.black', audience: PUBLIC },
-  { path: 'initiative.bonus.**', audience: PUBLIC },
+  { path: 'initiative.bonus', audience: PUBLIC },
   {
     path: 'initiative.declared.**',
     audience: TEAM,

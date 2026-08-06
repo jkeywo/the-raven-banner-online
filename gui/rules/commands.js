@@ -15,7 +15,7 @@
  * is what makes a crashed host recoverable.
  */
 
-import { PHASES, seatHolding } from './state.js';
+import { PHASES, TOKENS, tokenHeldBy, seatHolding } from './state.js';
 import {
   incomeFor, isDanish, isPagan, isChristian, isDanishHeld, momentumGain,
   reachableFrom, factionReach, churchesHeld, electorate,
@@ -370,13 +370,29 @@ export const COMMANDS = {
   'declare-initiative-target': {
     phases: ['team'],
     actor: 'player',
-    probe: (state) => ({ shireId: Object.keys(state.shires)[0] }),
+    // A shire this holder could actually name, not simply the first one on the
+    // map. The probe answers "is there any declaration available at all?", and
+    // asking after an unreachable shire would answer "you cannot reach that
+    // shire" and grey the Target button out for everybody — the first shire in
+    // the map is almost never one the token holder can attack.
+    probe: (state, data, roleId) => ({
+      shireId: reachableFrom(state, data, roleId)[0] ?? Object.keys(state.shires)[0],
+    }),
     admit(ctx) {
-      const { state, cmd } = ctx;
+      const { state, data, cmd } = ctx;
       const roleId = subjectOf(ctx);
-      const token = Object.keys(state.initiative)
-        .find((k) => ['white', 'black', 'bonus'].includes(k) && state.initiative[k] === roleId);
+      const token = tokenHeldBy(state.initiative, roleId);
       if (!token) return no('you do not hold an initiative token');
+      // And only one of them. `effects` writes the declaration under whichever
+      // token comes first, so a holder of two would name one shire and have
+      // the other token's declaration quietly never made. Nothing a player can
+      // do reaches this state — a raw `facilitator:set` can — but
+      // facilitator:set-initiative-target already refuses it with "clear one
+      // first", and two commands reading the same board have to agree about it.
+      const also = TOKENS.find((other) => other !== token && state.initiative[other] === roleId);
+      if (also) {
+        return no(`you hold the ${token} and ${also} tokens — the facilitator must clear one first`);
+      }
       // Turn one is written down for you. From turn two it is your problem,
       // which is exactly the moment the game hands the plan over.
       // `declared` itself, not just an entry in it, can be missing here: a
@@ -386,11 +402,18 @@ export const COMMANDS = {
         return no('this turn\'s target is fixed by the rules');
       }
       if (!state.shires[cmd.payload?.shireId]) return no('no such shire');
+      // The same gate join-battle puts on an attacker, and for the same
+      // reason: a token names where your army goes, and an army goes where it
+      // can march, sail or be welcomed. Declaring further than that would let
+      // the battle phase stand up a fight nobody could have reached.
+      if (!reachableFrom(state, data, roleId).includes(cmd.payload.shireId)) {
+        return no('you cannot reach that shire');
+      }
       return ok();
     },
     effects(draft, ctx) {
       const roleId = subjectOf(ctx);
-      const token = ['white', 'black', 'bonus'].find((k) => draft.initiative[k] === roleId);
+      const token = tokenHeldBy(draft.initiative, roleId);
       draft.initiative.declared[token] = {
         roleId, shireId: ctx.cmd.payload.shireId, revealed: false,
       };
@@ -2306,21 +2329,31 @@ export const COMMANDS = {
   /**
    * Move an initiative token onto a role, or off it.
    *
-   * White, black and bonus are three independent fields, so assigning one
-   * never has to go looking for who else might be holding it — there is
-   * nowhere else for it to be.
+   * White, black and bonus are three separate fields but not three
+   * independent ones: a role may be the value of at most one of them, because
+   * on the table they are three counters and nobody is handed two. So
+   * assigning one does have to go looking for who else the named role might
+   * already be holding, and refuse rather than quietly leave them with a
+   * second. Taking a token off (`roleId: null`) is always allowed — that is
+   * the way out of a double-hold, not into one.
    */
   'facilitator:assign-initiative': {
     phases: '*',
     actor: 'facilitator',
     admit(ctx) {
       const { token, roleId } = ctx.cmd.payload ?? {};
-      if (!['white', 'black', 'bonus'].includes(token)) return no('no such token');
-      if (roleId !== null && !ctx.state.roles[roleId]) return no('no such character');
+      if (!TOKENS.includes(token)) return no('no such token');
+      if (roleId === null) return ok();
+      if (!ctx.state.roles[roleId]) return no('no such character');
+      const held = tokenHeldBy(ctx.state.initiative, roleId);
+      // Re-affirming the token they already hold is a no-op, not a second one.
+      if (held && held !== token) {
+        return no(`${pretty(roleId)} already holds the ${held} token`);
+      }
       return ok();
     },
     effects(draft, ctx) {
-      draft.initiative[ctx.cmd.payload.token] = ctx.cmd.payload.roleId;
+      draft.initiative[ctx.cmd.payload.token] = ctx.cmd.payload.roleId ?? null;
     },
   },
 
@@ -2333,14 +2366,29 @@ export const COMMANDS = {
    * back to move a target after that would be moving a fight, not fixing a
    * plan. Before that moment, this overrides even a turn-one fixed target,
    * same as any other facilitator edit.
+   *
+   * Deliberately no reachability gate: a facilitator moving a target is
+   * usually recording something that happened in the room, and the room beats
+   * the model. The one-token check below is not that — it is a consistency
+   * guard, because this command writes the token's holder into the
+   * declaration and a holder of two tokens would be written into two.
    */
   'facilitator:set-initiative-target': {
     phases: ['team', 'battle'],
     actor: 'facilitator',
     admit(ctx) {
       const { token, shireId } = ctx.cmd.payload ?? {};
-      if (!['white', 'black', 'bonus'].includes(token)) return no('no such token');
-      if (!ctx.state.initiative[token]) return no('nobody holds that token');
+      if (!TOKENS.includes(token)) return no('no such token');
+      const holder = ctx.state.initiative[token];
+      if (!holder) return no('nobody holds that token');
+      // This command never moves a token onto anybody, so it cannot itself
+      // create a double-hold — it can only inherit one, from a raw
+      // facilitator:set or a save written before one-token-per-role was a
+      // rule. That is exactly when a facilitator wants telling, rather than
+      // being handed two declarations under one name.
+      const also = TOKENS.find((other) => other !== token
+        && ctx.state.initiative[other] === holder);
+      if (also) return no(`${pretty(holder)} also holds the ${also} token — clear one first`);
       if (ctx.state.battle.targets.length) return no('the targets are already announced');
       if (!ctx.state.shires[shireId]) return no('no such shire');
       return ok();
@@ -2429,7 +2477,7 @@ export const COMMANDS = {
       for (const seat of Object.values(draft.seats)) {
         if (seat.roleId === roleId) seat.roleId = null;
       }
-      for (const token of ['white', 'black', 'bonus']) {
+      for (const token of TOKENS) {
         if (draft.initiative[token] === roleId) draft.initiative[token] = null;
       }
       for (const crown of Object.keys(draft.crownHolders)) {
