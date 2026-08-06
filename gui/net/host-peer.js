@@ -81,6 +81,16 @@ export class HostPeer {
 
   _claim() {
     if (this._stopped) return;
+    // PeerJS is a vendored <script>, so it can simply not be there — a 404 on
+    // the vendor file, or a browser extension that ate it. Throwing here
+    // escapes into whatever called start(), which is a click handler, and the
+    // console dies silently with no clue on screen. Saying so and stopping is
+    // the honest failure: there is no retry that can conjure the library.
+    if (typeof this._Peer !== 'function') {
+      this._status('error');
+      this._log('[host] PeerJS did not load — check vendor/peerjs.min.js is being served');
+      return;
+    }
     const peer = new this._Peer(this.peerId, {});
     this.peer = peer;
 

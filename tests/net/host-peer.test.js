@@ -88,6 +88,23 @@ describe('claiming the room code', () => {
     host.stop();
     vi.useRealTimers();
   });
+
+  it('says so rather than throwing when PeerJS never loaded', () => {
+    // The library is a vendored <script>, so it can simply not be there — a
+    // 404 on the vendor file, an extension that ate it. start() is called
+    // from a click handler, so a throw here escapes into the handler and the
+    // console dies with nothing on screen to say why.
+    const statuses = [];
+    const lines = [];
+    const { host } = makeHost({
+      Peer: undefined,
+      onStatus: (s) => statuses.push(s),
+      onLog: (line) => lines.push(line),
+    });
+    expect(() => host.start()).not.toThrow();
+    expect(statuses).toContain('error');
+    expect(lines.join(' ')).toContain('PeerJS did not load');
+  });
 });
 
 describe('seating', () => {
