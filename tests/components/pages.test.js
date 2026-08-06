@@ -68,7 +68,8 @@ describe('the facilitator console', () => {
       'facilitator-tabs', 'tab-fac-battle', 'tab-fac-crowns', 'tab-fac-envoys',
       'tab-fac-debrief', 'battle-panel', 'consent-panel', 'epilogue-panel',
       'debrief-waiting', 'fac-map', 'shire-editor',
-      'foreign-influence-note', 'foreign-influence-commit']) {
+      'foreign-influence-note', 'foreign-influence-commit',
+      'tab-fac-game', 'lobby-roles', 'role-grid']) {
       expect(document.getElementById(id), id).toBeTruthy();
     }
   });
@@ -136,6 +137,31 @@ describe('the facilitator console', () => {
     expect(document.getElementById('join-code').closest('[data-pane-body]').hidden).toBe(true);
     document.querySelector('[data-pane="game"]').click();
     expect(document.getElementById('join-code').closest('[data-pane-body]').hidden).toBe(false);
+  });
+
+  it('shows the same character grid every player sees, until the game begins', async () => {
+    // The one test here that needs render() to actually run past session.start()
+    // rather than stop at the markup — that needs a Peer that does not throw
+    // the moment the host tries to claim an address.
+    const { Peer, createBroker } = await import('../fakes/peerjs-shim.js');
+    createBroker();
+    globalThis.Peer = Peer;
+
+    await loadPage('host.html');
+    const { startHostApp } = await import('../../gui/host/host-app.js');
+    await startHostApp({ location: { hash: '', href: 'http://x/host.html' } });
+    document.getElementById('new-game').click();
+
+    expect(document.getElementById('lobby-roles').hidden).toBe(false);
+    expect(document.getElementById('tab-fac-game').dataset.live).toBe('true');
+    const roles = document.querySelectorAll('#role-grid .rb-role');
+    expect(roles.length).toBe(16);
+    expect([...roles].every((r) => r.textContent.includes('open'))).toBe(true);
+
+    document.getElementById('advance-phase').click();   // lobby -> team
+
+    expect(document.getElementById('lobby-roles').hidden).toBe(true);
+    expect(document.getElementById('tab-fac-game').dataset.live).toBe('false');
   });
 
   it('does not call the primary host a co-facilitator', async () => {

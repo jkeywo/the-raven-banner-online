@@ -283,7 +283,15 @@ rb-connection-dot[data-tone="connecting"] .rb-dot { animation: rb-pulse 1.4s eas
   gap: 0.1rem;
   text-align: left;
   padding: 0.7rem 0.8rem;
+  /* A <button> gets these from the generic button rule already; a plain
+     <div> — the facilitator's read-only mirror of this same grid — needs
+     them stated outright. */
+  border: 1px solid var(--rb-rule);
+  border-radius: 3px;
+  background: var(--rb-paper);
 }
+
+.rb-lobby-roles { margin-bottom: 1.5rem; }
 
 .rb-role-name {
   font-family: var(--rb-serif);

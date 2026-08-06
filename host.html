@@ -98,7 +98,7 @@
         <button type="button" role="tab" data-pane="envoys" id="tab-fac-envoys" aria-selected="false">Envoys</button>
         <button type="button" role="tab" data-pane="debrief" id="tab-fac-debrief" aria-selected="false">Debrief</button>
         <button type="button" role="tab" data-pane="inspector" aria-selected="false">Inspector</button>
-        <button type="button" role="tab" data-pane="game" aria-selected="false">Game &amp; roster</button>
+        <button type="button" role="tab" data-pane="game" id="tab-fac-game" aria-selected="false">Game &amp; roster</button>
       </nav>
 
       <div data-pane-body="map" class="rb-pane rb-pane-map">
@@ -190,6 +190,16 @@
       </div>
 
       <div data-pane-body="game" class="rb-pane" hidden>
+        <section id="lobby-roles" class="rb-lobby-roles" hidden>
+          <h2>Choosing characters</h2>
+          <p class="rb-meta">
+            The same picker every player has open right now. Begin the game
+            above once enough of the table has sat down — a seat can still be
+            claimed or re-claimed after that, same as any late arrival.
+          </p>
+          <div id="role-grid" class="rb-roles"></div>
+        </section>
+
         <div class="rb-columns">
           <div>
             <h1>Game <span id="join-code" class="rb-code"></span></h1>

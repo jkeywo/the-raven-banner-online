@@ -225,6 +225,13 @@ export async function startHostApp({ location = window.location } = {}) {
 
     const phase = session.state.phase;
     $('clock').phase = phase;
+    // The same picker every player has open, mirrored here so the
+    // facilitator can watch the table fill in without needing a second
+    // screen — gone once the game leaves the lobby, since there is no
+    // going back to it.
+    $('tab-fac-game').dataset.live = String(phase.name === 'lobby');
+    $('lobby-roles').hidden = phase.name !== 'lobby';
+    if (phase.name === 'lobby') renderRoleGrid(session.state, session.roster());
     // The map wants a projection rather than raw state, purely for the
     // `.derived` tints and support hatching it already knows how to draw — a
     // facilitator's own projection is the whole board anyway, so nothing is
@@ -296,6 +303,22 @@ export async function startHostApp({ location = window.location } = {}) {
     // Nothing to pause or stretch before the game starts, or after it ends.
     const running = phase.endsAt !== null || phase.paused;
     for (const id of ['pause-clock', 'extend-clock', 'shorten-clock']) $(id).disabled = !running;
+  }
+
+  /** The same grid a player's own lobby screen shows, read rather than clicked. */
+  function renderRoleGrid(state, seats) {
+    const holderOf = new Map(seats.filter((s) => s.roleId).map((s) => [s.roleId, s]));
+    $('role-grid').innerHTML = Object.keys(state.roles).map((roleId) => {
+      const printed = data.roles.roles[roleId] ?? {};
+      const seat = holderOf.get(roleId);
+      return `<div class="rb-role">
+          <span class="rb-role-name">${escape(printed.name ?? roleId)}</span>
+          <span class="rb-role-team">${title(printed.team)} · ${title(printed.archetype)}</span>
+          ${seat
+    ? `<span class="rb-role-taken">${escape(seat.name)}${seat.connected ? '' : ' — away'}</span>`
+    : '<span class="rb-meta">open</span>'}
+        </div>`;
+    }).join('');
   }
 
   /** The facilitator acts as themselves — a seat of their own on this tab. */
@@ -390,4 +413,12 @@ async function loadData() {
   const loaded = await Promise.all(
     names.map((name) => fetch(`data/${name}.json`).then((r) => r.json())));
   return Object.fromEntries(names.map((name, i) => [name, loaded[i]]));
+}
+
+const title = (text) => String(text ?? '').replace(/_/g, ' ')
+  .replace(/\b\w/g, (c) => c.toUpperCase());
+
+function escape(text) {
+  return String(text ?? '').replace(/[&<>"']/g, (c) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }

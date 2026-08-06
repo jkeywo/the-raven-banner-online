@@ -218,12 +218,25 @@ export async function startPlayerApp({ location = window.location } = {}) {
     if (!mine) {
       show('lobby');
       $('lobby-message').textContent = 'Choose a character.';
+      $('role-picker').hidden = false;
       renderRolePicker(view);
       if (client.lastRefusal) $('claim-error').textContent = client.lastRefusal.reason;
       return;
     }
 
-    // Seated: the board, the sheet and the tracker take over.
+    // Seated, but the facilitator has not begun the game — stay on the
+    // lobby screen with a character chosen rather than open the board on a
+    // turn that has not started. There is no going back to lobby once left,
+    // so this can never re-trigger mid-game.
+    if (view.phase.name === 'lobby') {
+      show('lobby');
+      $('lobby-message').textContent =
+        `Playing ${data.roles.roles[mine]?.name ?? mine}. Waiting for the facilitator to start the game.`;
+      $('role-picker').hidden = true;
+      return;
+    }
+
+    // Seated and under way: the board, the sheet and the tracker take over.
     if (screens.game.hidden) {
       show('game');
       selectPane('map');
