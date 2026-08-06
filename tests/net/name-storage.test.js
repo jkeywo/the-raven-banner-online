@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach } from 'vitest';
-import { loadSavedName, saveName } from '../../gui/net/name-storage.js';
+import { loadSavedName, saveName, forgetName } from '../../gui/net/name-storage.js';
 
 beforeEach(() => { window.localStorage.clear(); });
 
@@ -32,5 +32,28 @@ describe('name-storage', () => {
     };
     expect(loadSavedName(brokenWindow)).toBe('');
     expect(() => saveName('Cenred', brokenWindow)).not.toThrow();
+  });
+});
+
+describe('forgetting a name', () => {
+  it('removes it, so the next load asks rather than assuming', () => {
+    saveName('Cenred');
+    forgetName();
+    expect(loadSavedName()).toBe('');
+  });
+
+  it('is the only way to forget — a blank save never clears one', () => {
+    // A blank is what an untouched field gives you, and taking that as
+    // "forget me" would lose the name every time somebody tabbed past it.
+    saveName('Cenred');
+    saveName('');
+    expect(loadSavedName()).toBe('Cenred');
+    forgetName();
+    expect(loadSavedName()).toBe('');
+  });
+
+  it('does not throw when storage is unavailable', () => {
+    const brokenWindow = { get localStorage() { throw new Error('nope'); } };
+    expect(() => forgetName(brokenWindow)).not.toThrow();
   });
 });

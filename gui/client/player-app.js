@@ -19,7 +19,7 @@
 import { ConnectionManager } from '../net/connection-manager.js';
 import { peerIdForCode, codeFromLocation, normaliseJoinCode, isValidJoinCode } from '../net/join-code.js';
 import { installSessionToken } from '../net/session-token.js';
-import { loadSavedName, saveName } from '../net/name-storage.js';
+import { loadSavedName, saveName, forgetName } from '../net/name-storage.js';
 import { identify } from '../net/wire.js';
 import { sendCommand } from '../net/command-gateway.js';
 import { ClientState } from './client-state.js';
@@ -48,6 +48,8 @@ export async function startPlayerApp({ location = window.location } = {}) {
   const data = await loadData({ geometry: true });
   let joinCode = codeFromLocation(location);
   let name = '';
+  /** Whether this tab let itself in rather than being walked in. */
+  let remembering = false;
 
   const screens = {
     code: $('screen-code'),
@@ -99,6 +101,20 @@ export async function startPlayerApp({ location = window.location } = {}) {
   }
 
   document.addEventListener('rb-retry', () => manager.retryNow());
+
+  // The way out of a remembered seat: back to the code screen, with the
+  // remembered name cleared so the next load asks properly rather than
+  // marching the player into the same silent game again.
+  $('start-over').addEventListener('click', () => {
+    remembering = false;
+    manager.disconnect?.();
+    forgetName();
+    location.hash = '';
+    joinCode = '';
+    $('join-code').value = '';
+    show('code');
+    $('join-code').focus();
+  });
 
   // --- the game -------------------------------------------------------------
   $('game-tabs').addEventListener('click', (event) => {
@@ -220,9 +236,17 @@ export async function startPlayerApp({ location = window.location } = {}) {
       return;
     }
 
+    // A seat let itself back in on a remembered name, and the game it
+    // remembered is not answering — a host whose tab died, a code that has
+    // moved on, a token the host no longer knows. Say so and offer the way
+    // back to the front door, rather than sitting on "waiting" forever.
+    $('start-over').hidden = !remembering;
+
     const view = client.view;
     if (!view) {
-      $('lobby-message').textContent = 'Waiting for the facilitator…';
+      $('lobby-message').textContent = remembering
+        ? `Looking for game ${joinCode}, as ${name}…`
+        : 'Waiting for the facilitator…';
       return;
     }
 
@@ -370,8 +394,27 @@ export async function startPlayerApp({ location = window.location } = {}) {
     else $('action-error').textContent = 'Not connected — try again in a moment.';
   }
 
-  // A link with the code already in it skips the first screen.
-  if (joinCode) {
+  // A code in the link and a name already given: the two screens in front of
+  // the game exist to collect exactly those, so there is nothing left to ask.
+  // The session token survives a reload and the host matches it back to the
+  // seat that held it, so this lands the player back in their own chair rather
+  // than making them walk through the door again to reach it.
+  //
+  // `remembered` is what tells the lobby to offer a way out: a player who was
+  // put here rather than choosing it needs one, and a player who typed their
+  // way in does not.
+  const remembered = loadSavedName();
+  if (joinCode && remembered) {
+    remembering = true;
+    name = remembered;
+    connect();
+    show('lobby');
+    // Nothing has arrived to subscribe on yet, so the lobby would sit blank
+    // until the first projection — which for a game that is not answering is
+    // never. One render now says who we are looking for, and offers the way
+    // back out.
+    render();
+  } else if (joinCode) {
     $('lobby-code').textContent = joinCode;
     show('name');
   } else {

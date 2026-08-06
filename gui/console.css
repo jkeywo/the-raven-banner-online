@@ -319,6 +319,7 @@ rb-connection-dot[data-tone="connecting"] .rb-dot { animation: rb-pulse 1.4s eas
 .rb-resume { display: flex; justify-content: space-between; gap: 1rem; flex: 1; }
 .rb-resume span { color: var(--rb-muted); font-size: 0.85rem; }
 .rb-resume-forget { flex: none; color: var(--rb-blood); }
+.rb-start-over { margin-top: 1.5rem; }
 
 /* The feudal web: one liege per row, their sworn men beside them. */
 .rb-homage { list-style: none; margin: 0.3rem 0 0; padding: 0; display: grid; gap: 0.3rem; }

@@ -23,3 +23,16 @@ export function saveName(name, win = globalThis.window) {
     if (name) win.localStorage.setItem(KEY, name);
   } catch { /* private mode; nothing survives, and that is fine */ }
 }
+
+/**
+ * Forget it, so the next load asks rather than assuming.
+ *
+ * `saveName('')` deliberately will not do this: a blank is what an untouched
+ * field gives you, and taking that as "forget me" would lose the name every
+ * time somebody tabbed past it. Forgetting has to be asked for.
+ */
+export function forgetName(win = globalThis.window) {
+  try {
+    win.localStorage.removeItem(KEY);
+  } catch { /* nothing stored, nothing to remove */ }
+}

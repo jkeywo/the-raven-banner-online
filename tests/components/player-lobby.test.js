@@ -47,6 +47,50 @@ beforeEach(() => {
   globalThis.localStorage?.clear?.();
 });
 
+describe('coming back to a seat you already had', () => {
+  it('skips both join screens when the code and the name are already known', async () => {
+    // The session token survives a reload and the host matches it back to the
+    // seat that held it — so the two screens in front of the game exist to
+    // collect exactly what this player has already given.
+    window.localStorage.setItem('rbo:name', 'Alice');
+    await loadPage();
+    const { startPlayerApp } = await import('../../gui/client/player-app.js');
+    await startPlayerApp({ location: { hash: '#RAVEN7Z' } });
+
+    expect(document.getElementById('screen-code').hidden).toBe(true);
+    expect(document.getElementById('screen-name').hidden).toBe(true);
+    expect(document.getElementById('screen-lobby').hidden).toBe(false);
+    expect(document.getElementById('lobby-message').textContent).toContain('as Alice');
+  });
+
+  it('still asks for a name when it has no idea who you are', async () => {
+    await loadPage();
+    const { startPlayerApp } = await import('../../gui/client/player-app.js');
+    await startPlayerApp({ location: { hash: '#RAVEN7Z' } });
+
+    expect(document.getElementById('screen-name').hidden).toBe(false);
+    expect(document.getElementById('screen-lobby').hidden).toBe(true);
+  });
+
+  it('offers a way out of a game that is not answering, and only then', async () => {
+    // A player who was put here rather than choosing it needs one; a player
+    // who typed their way in does not.
+    window.localStorage.setItem('rbo:name', 'Alice');
+    await loadPage();
+    const { startPlayerApp } = await import('../../gui/client/player-app.js');
+    await startPlayerApp({ location: { hash: '#RAVEN7Z' } });
+    expect(document.getElementById('start-over').hidden).toBe(false);
+
+    document.getElementById('start-over').click();
+
+    // Back at the front door, and the name is forgotten so the next load asks
+    // properly rather than marching them into the same silent game again.
+    expect(document.getElementById('screen-code').hidden).toBe(false);
+    expect(document.getElementById('screen-lobby').hidden).toBe(true);
+    expect(window.localStorage.getItem('rbo:name')).toBeNull();
+  });
+});
+
 describe('choosing a character and waiting for the facilitator', () => {
   it('offers the character grid before anybody has picked', async () => {
     await loadPage();
