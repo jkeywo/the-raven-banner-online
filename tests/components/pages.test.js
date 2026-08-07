@@ -256,6 +256,16 @@ describe('the facilitator console', () => {
     expect(roles.length).toBe(16);
     expect([...roles].every((r) => r.textContent.includes('open'))).toBe(true);
 
+    // Dealt a team to a row: four teams, four seats each. Every question a
+    // facilitator asks this grid is about a team — is Wessex all seated, has
+    // anybody from the Summer Army turned up — and one that reflowed to fit
+    // the window answered none of them.
+    const rows = [...document.querySelectorAll('#role-grid .rb-roles-team')];
+    expect(rows).toHaveLength(4);
+    expect(rows.map((row) => row.querySelectorAll('.rb-role').length)).toEqual([4, 4, 4, 4]);
+    expect(rows.map((row) => row.dataset.team).sort()).toEqual(
+      ['great_heathen_army', 'great_summer_army', 'mercia', 'wessex']);
+
     document.getElementById('advance-phase').click();   // lobby -> team
 
     expect(document.getElementById('lobby-roles').hidden).toBe(true);

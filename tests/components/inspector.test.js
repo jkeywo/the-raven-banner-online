@@ -19,6 +19,70 @@ const mount = (tag) => {
 
 beforeEach(() => { document.body.innerHTML = ''; });
 
+describe('cards grouped by whose man each role is', () => {
+  const groups = (inspector) => Object.fromEntries(
+    [...inspector.querySelectorAll('.rb-inspector-household')].map((section) => [
+      section.querySelector('h5').textContent.replace(/\s*\d+\s*$/, '').trim(),
+      [...section.querySelectorAll('.rb-inspector-card')]
+        .map((card) => card.querySelector('h5').textContent.trim()).sort(),
+    ]));
+
+  it('gathers each household under the man at the top of its homage', () => {
+    // "Do something to Alfred's lot" is how a facilitator thinks about the
+    // board. Sorted alphabetically it was sixteen cards in an order nobody had
+    // a use for.
+    const inspector = mount('rb-state-inspector');
+    inspector.data = data;
+    inspector.state = fresh();
+
+    const found = groups(inspector);
+    expect(Object.keys(found).sort())
+      .toEqual(['Guthrum the Old', 'Halfdan Ragnarsson', 'King Alfred', 'Mercia']);
+    expect(found['King Alfred']).toHaveLength(4);
+    expect(found['King Alfred'].join(' ')).toContain('Cenred');
+    // Ecgberht is a Saxon king filed under the Dane he answers to, which is
+    // the whole point of grouping by homage rather than by team.
+    expect(found['Halfdan Ragnarsson'].join(' ')).toContain('Ecgberht');
+  });
+
+  it('falls back to the team for a lord who answers to nobody and holds nobody', () => {
+    // Mercia at the start: four lords sworn to nothing, held together by being
+    // Mercian and by nothing else. Four headings over one card each would be
+    // worse than the flat list this replaces.
+    const inspector = mount('rb-state-inspector');
+    inspector.data = data;
+    inspector.state = fresh();
+
+    expect(groups(inspector).Mercia)
+      .toEqual(['Abbess Wenyld', 'Ceowulf', 'Gainbeald', 'Uchtred']);
+  });
+
+  it('regroups the moment a Mercian takes homage', () => {
+    // And the special case dissolves itself: let the other three swear and the
+    // group becomes Ceowulf's by the ordinary rule, with no code for it.
+    const state = fresh();
+    for (const id of ['gainbeald', 'uchtred', 'abbess_wenyld']) {
+      state.roles[id].liegeId = 'ceowulf';
+    }
+    const inspector = mount('rb-state-inspector');
+    inspector.data = data;
+    inspector.state = state;
+
+    const found = groups(inspector);
+    expect(found.Mercia).toBeUndefined();
+    expect(found.Ceowulf).toHaveLength(4);
+  });
+
+  it('still shows every role exactly once', () => {
+    // The failure mode of grouping: a card filed twice, or dropped.
+    const inspector = mount('rb-state-inspector');
+    inspector.data = data;
+    inspector.state = fresh();
+    expect(inspector.querySelectorAll('.rb-inspector-card'))
+      .toHaveLength(Object.keys(fresh().roles).length);
+  });
+});
+
 describe('one card per role', () => {
   it('does nothing without the static dataset', () => {
     const inspector = mount('rb-state-inspector');

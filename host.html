@@ -99,7 +99,7 @@
              disagree with the maps that exist. -->
         <span id="fac-map-buttons" class="rb-map-buttons"></span>
         <button type="button" role="tab" data-pane="battle" id="tab-fac-battle" aria-selected="false">Battle</button>
-        <button type="button" role="tab" data-pane="crowns" id="tab-fac-crowns" aria-selected="false">Crowns &amp; consents</button>
+        <button type="button" role="tab" data-pane="crowns" id="tab-fac-crowns" aria-selected="false">Feudalism</button>
         <button type="button" role="tab" data-pane="envoys" id="tab-fac-envoys" aria-selected="false">Envoys</button>
         <button type="button" role="tab" data-pane="debrief" id="tab-fac-debrief" aria-selected="false">Debrief</button>
         <button type="button" role="tab" data-pane="inspector" aria-selected="false">Inspector</button>
@@ -128,8 +128,12 @@
       </div>
 
       <div data-pane-body="crowns" class="rb-pane" hidden>
+        <!-- "Feudalism" rather than "Crowns & consents", which named two of
+             the things on it and missed the one people come here for. Homage,
+             crowns, elections and rebellion are one system, and this is the
+             page you open to see the shape of it. -->
         <section class="rb-crown-panel">
-          <h2>Crowns and homage</h2>
+          <h2>Feudalism</h2>
           <rb-crown-panel id="crowns"></rb-crown-panel>
         </section>
 
@@ -183,8 +187,14 @@
           </div>
           <rb-epilogue id="epilogue"></rb-epilogue>
         </section>
+        <!-- Shown only in the lobby. It used to say the debrief filled in
+             "once you call time", which is not what happens and is why nobody
+             thought to look at it during a game: it starts filling the moment
+             play does, and is a preview from then on. -->
         <p id="debrief-waiting" class="rb-meta">
-          Nothing to read yet — this fills in once you call time.
+          Nothing to read yet. This starts filling the moment the game begins,
+          and you can watch the four counters move on it as the turns go by —
+          it is only the ending once you have called time.
         </p>
       </div>
 
@@ -216,7 +226,10 @@
             above once enough of the table has sat down — a seat can still be
             claimed or re-claimed after that, same as any late arrival.
           </p>
-          <div id="role-grid" class="rb-roles"></div>
+          <!-- Not .rb-roles: that is the player's picker, an auto-filling grid
+               of seats. This one is stacked team-blocks, each of which lays
+               out its own four across. -->
+          <div id="role-grid" class="rb-roles-by-team"></div>
         </section>
 
         <div class="rb-columns">

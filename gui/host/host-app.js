@@ -355,20 +355,44 @@ export async function startHostApp({ location = window.location } = {}) {
     for (const id of ['pause-clock', 'extend-clock', 'shorten-clock']) $(id).disabled = !running;
   }
 
-  /** The same grid a player's own lobby screen shows, read rather than clicked. */
+  /**
+   * The same roster a player's lobby shows, read rather than clicked — but
+   * dealt out a team to a row.
+   *
+   * The game is four teams of four, and every question a facilitator asks this
+   * grid is about a team: is Wessex all seated, has anybody from the Summer
+   * Army turned up. Flowed to fit the window it answered none of them, because
+   * where a row broke depended on how wide the browser happened to be. Four to
+   * a row puts each team on its own line and makes a gap in one of them
+   * visible without reading a single name.
+   *
+   * Ordered by the printed roster rather than alphabetically, so the seat a
+   * player is looking for is where it was last time.
+   */
   function renderRoleGrid(state, seats) {
     const holderOf = new Map(seats.filter((s) => s.roleId).map((s) => [s.roleId, s]));
-    $('role-grid').innerHTML = Object.keys(state.roles).map((roleId) => {
-      const printed = data.roles.roles[roleId] ?? {};
-      const seat = holderOf.get(roleId);
-      return `<div class="rb-role">
-          <span class="rb-role-name">${escape(printed.name ?? roleId)}</span>
-          <span class="rb-role-team">${title(printed.team)} · ${title(printed.archetype)}</span>
-          ${seat
+    const teams = new Map();
+    for (const roleId of Object.keys(state.roles)) {
+      const team = data.roles.roles[roleId]?.team ?? 'unaligned';
+      if (!teams.has(team)) teams.set(team, []);
+      teams.get(team).push(roleId);
+    }
+
+    $('role-grid').innerHTML = [...teams].map(([team, roleIds]) => `
+      <div class="rb-roles-team" data-team="${escape(team)}">
+        <h3 class="rb-roles-team-name">${escape(title(team))}</h3>
+        <div class="rb-roles-row">${roleIds.map((roleId) => {
+    const printed = data.roles.roles[roleId] ?? {};
+    const seat = holderOf.get(roleId);
+    return `<div class="rb-role">
+            <span class="rb-role-name">${escape(printed.name ?? roleId)}</span>
+            <span class="rb-role-team">${title(printed.archetype)}</span>
+            ${seat
     ? `<span class="rb-role-taken">${escape(seat.name)}${seat.connected ? '' : ' — away'}</span>`
     : '<span class="rb-meta">open</span>'}
-        </div>`;
-    }).join('');
+          </div>`;
+  }).join('')}</div>
+      </div>`).join('');
   }
 
   /** The facilitator acts as themselves — a seat of their own on this tab. */

@@ -66,6 +66,35 @@ export class RbStateInspector extends HTMLElement {
 
   // --- one card per role ----------------------------------------------------
 
+  /**
+   * Whose household a role belongs to, for grouping.
+   *
+   * Follow the homage to the top: a card belongs with the man it ultimately
+   * answers to, because that is how a facilitator thinks about the board — "do
+   * something to Alfred's lot" is a real instruction and "do something to the
+   * roles beginning with C" is not.
+   *
+   * A top-of-chain lord with nobody under him is not a household of one, and
+   * eleven headings each over a single card would be worse than the flat list
+   * this replaces. Those fall back to their team — which at the start is the
+   * whole of Mercia, four lords who have sworn to nothing and are held
+   * together by being Mercian and by nothing else. That is exactly the shape
+   * the board has until somebody wins the crown, and the moment one of them
+   * does, the other three swear and the group becomes his by the same rule.
+   */
+  _household(roleId) {
+    const roles = this._state.roles ?? {};
+    const seen = new Set();
+    let at = roleId;
+    while (roles[at]?.liegeId && !seen.has(at)) { seen.add(at); at = roles[at].liegeId; }
+    const hasVassals = Object.values(roles).some((r) => r.liegeId === at);
+    if (hasVassals) {
+      return { key: `liege:${at}`, name: this._data.roles.roles[at]?.name ?? at };
+    }
+    const team = this._data.roles.roles[at]?.team ?? 'unaligned';
+    return { key: `team:${team}`, name: title(team) };
+  }
+
   _renderCards() {
     const host = this.querySelector('.rb-inspector-cards');
     if (!this._data) { host.innerHTML = ''; return; }
@@ -74,8 +103,24 @@ export class RbStateInspector extends HTMLElement {
       .sort((a, b) => (this._data.roles.roles[a.id]?.name ?? a.id)
         .localeCompare(this._data.roles.roles[b.id]?.name ?? b.id));
 
+    const households = new Map();
+    for (const role of roles) {
+      const { key, name } = this._household(role.id);
+      if (!households.has(key)) households.set(key, { name, roles: [] });
+      households.get(key).roles.push(role);
+    }
+    // Biggest first, so the household a facilitator is most likely reaching
+    // for is not below three one-card groups.
+    const ordered = [...households.values()]
+      .sort((a, b) => b.roles.length - a.roles.length || a.name.localeCompare(b.name));
+
     host.innerHTML = `<h4>One card per role</h4>
-      <div class="rb-inspector-cardgrid">${roles.map((role) => this._card(role)).join('')}</div>`;
+      ${ordered.map((house) => `
+        <section class="rb-inspector-household">
+          <h5>${escape(house.name)} <span class="rb-meta">${house.roles.length}</span></h5>
+          <div class="rb-inspector-cardgrid">${
+  house.roles.map((role) => this._card(role)).join('')}</div>
+        </section>`).join('')}`;
 
     for (const button of host.querySelectorAll('[data-commit-adjust]')) {
       button.onclick = () => this._commitAdjust(button);

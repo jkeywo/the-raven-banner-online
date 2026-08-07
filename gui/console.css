@@ -337,6 +337,27 @@ rb-connection-dot[data-tone="connecting"] .rb-dot { animation: rb-pulse 1.4s eas
   margin: 1rem 0 0;
 }
 
+/* The facilitator's copy is dealt a team to a row instead. Four columns
+   always, not auto-fill: the point is that a team is a row, and a grid that
+   reflows to fit the window puts three of Wessex on one line and the fourth
+   on the next, which is exactly the gap it should be making obvious. */
+.rb-roles-by-team { margin: 1rem 0 0; }
+.rb-roles-team { margin: 0 0 0.9rem; }
+
+.rb-roles-team-name {
+  margin: 0 0 0.3rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--rb-muted);
+}
+
+.rb-roles-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
 .rb-role {
   display: flex;
   flex-direction: column;
@@ -444,6 +465,16 @@ a { color: var(--rb-blood); text-underline-offset: 0.15em; }
   background: var(--rb-ink);
   border-color: var(--rb-ink);
   color: var(--rb-paper);
+}
+
+/* Except the sheet that was last looked at, while the board is not the pane in
+   front. Which sheet is showing is not a fact about the page you are on, and
+   filling one of these in behind the Battle tab put two tabs up there looking
+   selected at once. Dimmed, yes — they are a way back — but not lit. */
+.rb-tabs .rb-map-buttons[data-active="false"] [aria-selected="true"] {
+  background: none;
+  border-color: var(--rb-rule);
+  color: inherit;
 }
 
 /* The map is the pane now. What used to be a second column beside it — the
@@ -1509,7 +1540,74 @@ rb-envoy-channel h4 { margin: 0 0 0.5rem; }
 /* --- elections ------------------------------------------------------------ */
 
 .rb-crown-panel { margin-bottom: 1.5rem; }
-.rb-crowns h3 { margin: 0.9rem 0 0.2rem; font-size: 0.95rem; }
+.rb-crowns h3,
+.rb-feudal h3 { margin: 0.9rem 0 0.2rem; font-size: 0.95rem; }
+.rb-feudal-main > h3:first-child,
+.rb-feudal-side > h3:first-child { margin-top: 0; }
+
+/* The standing arrangement on the left, the queue waiting on this desk on the
+   right. Collapses to one column on a narrow screen, tree first — the queue is
+   the shorter of the two and reads fine underneath, where the reverse would
+   bury it. */
+.rb-feudal {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 20rem);
+  gap: 1.4rem;
+  align-items: start;
+}
+
+@media (max-width: 60rem) {
+  .rb-feudal { grid-template-columns: minmax(0, 1fr); }
+}
+
+.rb-feudal-side {
+  border-left: 1px solid var(--rb-rule);
+  padding-left: 1.1rem;
+}
+
+@media (max-width: 60rem) {
+  .rb-feudal-side {
+    border-left: none;
+    border-top: 1px solid var(--rb-rule);
+    padding: 0.9rem 0 0;
+  }
+}
+
+/* The homage tree. Indented with a rule down the left of each generation, so
+   the eye can run up from any name to the man at the top of it — which is the
+   question this whole panel exists to answer. */
+.rb-tree { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.3rem; }
+
+.rb-tree .rb-tree {
+  margin: 0.3rem 0 0.1rem 0.55rem;
+  padding-left: 0.9rem;
+  border-left: 1px solid var(--rb-rule);
+}
+
+.rb-tree-name {
+  font-family: var(--rb-serif);
+  font-size: 0.95rem;
+}
+
+/* A crown on anyone wearing one, and which crown it is under the name. Said
+   twice on purpose: the glyph is what you find when scanning, and the word is
+   what you need once you have found it — there are eleven crowns in this game
+   and no glyph can tell you which. */
+.rb-tree-crown {
+  margin-right: 0.3rem;
+  color: var(--rb-gold, #8a6d1f);
+}
+
+.rb-tree-node[data-crowned="true"] > .rb-tree-name { font-weight: 700; }
+
+.rb-tree-crowns {
+  display: block;
+  margin-left: 0.1rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--rb-gold, #8a6d1f);
+}
 
 .rb-ballots { list-style: none; margin: 0 0 0.9rem; padding: 0; display: grid; gap: 0.6rem; }
 
@@ -1582,6 +1680,20 @@ rb-envoy-channel h4 { margin: 0 0 0.5rem; }
   grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
   gap: 0.8rem;
   margin-bottom: 1rem;
+}
+
+/* Cards are grouped by whose man each role is, so the heading has to read as a
+   band across the page rather than as another card. */
+.rb-inspector-household { margin: 0 0 0.6rem; }
+
+.rb-inspector-household h5 {
+  margin: 0 0 0.4rem;
+  padding-bottom: 0.2rem;
+  border-bottom: 1px solid var(--rb-rule);
+  font-size: 0.8rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--rb-muted);
 }
 
 .rb-inspector-card {

@@ -239,58 +239,130 @@ describe('the homage web on the crowns panel', () => {
 
   const fresh = () => createInitialState({ joinCode: 'RAVEN7Z', seed: 1, data });
 
-  it('lists each liege with the men who answer to them', () => {
+  /** The role a node sits under, or null when it is a root of the tree. */
+  const parentOf = (panel, roleId) => panel
+    .querySelector(`[data-role="${roleId}"]`)
+    ?.parentElement?.closest('[data-role]')?.dataset.role ?? null;
+
+  it('nests each man under the lord he answers to', () => {
     // The printed game opens with a full web already: Alfred holds three
-    // Saxons, and Halfdan holds Ecgberht, Ubba and Frida.
+    // Saxons, and Halfdan holds Ecgberht, Ubba and Frida. A flat list said
+    // this in pairs; the tree says it in one shape.
     const panel = mountPanel(fresh());
 
-    const alfred = panel.querySelector('[data-liege="king_alfred"]').textContent;
-    expect(alfred).toContain('King Alfred');
-    for (const man of ['Cenred', 'Godric', 'Æthelred']) expect(alfred).toContain(man);
+    for (const man of ['cenred', 'godric', 'archbishop_aethelred']) {
+      expect(parentOf(panel, man), man).toBe('king_alfred');
+    }
+    for (const man of ['king_ecgberht', 'ubba_ragnarsson', 'frida_anundottir']) {
+      expect(parentOf(panel, man), man).toBe('halfdan_ragnarsson');
+    }
+    // And the men at the top of their own chains hang off nothing.
+    for (const lord of ['king_alfred', 'halfdan_ragnarsson', 'ceowulf']) {
+      expect(parentOf(panel, lord), lord).toBe(null);
+    }
+    // Everybody is on it exactly once, which a tree can get wrong in a way a
+    // list cannot: a node drawn under two lords, or dropped entirely.
+    for (const id of Object.keys(fresh().roles)) {
+      expect(panel.querySelectorAll(`[data-role="${id}"]`), id).toHaveLength(1);
+    }
   });
 
-  it('shows a liege who is himself sworn to somebody, because the chain is the point', () => {
+  it('carries the whole chain, not just the pairs', () => {
     // Ecgberht answers to Halfdan and is answered to by nobody at the start,
-    // so give him a man and he should appear as both.
+    // so give him a man: he should appear once, under Halfdan, with Uchtred
+    // under him. That "grandchild" is the question the flat list could not
+    // answer without the reader joining two rows by hand.
     const state = fresh();
     expect(state.roles.king_ecgberht.liegeId).toBe('halfdan_ragnarsson');
     state.roles.uchtred.liegeId = 'king_ecgberht';
     const panel = mountPanel(state);
 
-    const row = panel.querySelector('[data-liege="king_ecgberht"]');
-    expect(row.textContent).toContain('sworn to Halfdan Ragnarsson');
-    expect(row.textContent).toContain('Uchtred');
+    expect(parentOf(panel, 'king_ecgberht')).toBe('halfdan_ragnarsson');
+    expect(parentOf(panel, 'uchtred')).toBe('king_ecgberht');
   });
 
-  it('names who is answering to nobody', () => {
+  it('puts a crown on whoever wears one, and says which', () => {
+    const state = fresh();
+    state.crownHolders = { mercia: 'ceowulf' };
+    const panel = mountPanel(state);
+
+    const node = panel.querySelector('[data-role="ceowulf"]');
+    expect(node.dataset.crowned).toBe('true');
+    expect(node.querySelector('.rb-tree-crowns').textContent).toContain('Mercia');
+    // Eleven crowns in this game, so the glyph alone cannot say which.
+    expect(node.querySelector('.rb-tree-crown')).toBeTruthy();
+    expect(panel.textContent).toContain('Crowns worn');
+
+    // And nobody else is wearing anything.
+    expect(panel.querySelectorAll('[data-crowned="true"]')).toHaveLength(1);
+  });
+
+  it('opens with the two crowns the guide seats, and no others', () => {
+    // Alfred wears Wessex and Ecgberht wears Northumbria from the first
+    // minute; Mercia is the one that starts without a king. Anything else
+    // crowned here means startingCrowns and this panel have drifted apart.
     const panel = mountPanel(fresh());
-
-    const unsworn = panel.querySelector('[data-unsworn]').textContent;
-    expect(unsworn).toContain('Answering to nobody');
-    expect(unsworn).toContain('Ceowulf');          // holds nothing, sworn to nobody
-    expect(unsworn).not.toContain('Cenred');       // he has a lord
-    expect(unsworn).not.toContain('King Alfred');  // he has men
+    const crowned = [...panel.querySelectorAll('[data-crowned="true"]')]
+      .map((node) => node.dataset.role).sort();
+    expect(crowned).toEqual(['king_alfred', 'king_ecgberht']);
+    expect(panel.querySelector('[data-role="king_alfred"] .rb-tree-crowns').textContent)
+      .toContain('Wessex');
+    expect(panel.textContent).toContain('Crowns worn');
   });
 
-  it('says plainly when the web is empty', () => {
+  it('says plainly when no crown is worn at all', () => {
+    const state = fresh();
+    state.crownHolders = {};
+    const panel = mountPanel(state);
+    expect(panel.textContent).toContain('still a claim');
+    expect(panel.querySelector('[data-crowned="true"]')).toBeNull();
+  });
+
+  it('draws every role as a root when nobody has sworn to anybody', () => {
     const state = fresh();
     for (const role of Object.values(state.roles)) role.liegeId = null;
     const panel = mountPanel(state);
-    expect(panel.textContent).toContain('Nobody has sworn to anybody');
+
+    const roots = [...panel.querySelectorAll('.rb-tree-root > [data-role]')];
+    expect(roots).toHaveLength(Object.keys(state.roles).length);
+  });
+
+  it('survives a homage loop rather than recursing forever', () => {
+    // Nothing should be able to make one — swearing checks for it — but this
+    // draws whatever the state says, and a save that has been hand-edited into
+    // a cycle should not take the facilitator's console down with it.
+    const state = fresh();
+    state.roles.ceowulf.liegeId = 'uchtred';
+    state.roles.uchtred.liegeId = 'ceowulf';
+    const panel = mountPanel(state);
+    expect(panel.textContent).toContain('homage loops here');
   });
 
   it('follows fealty as it is sworn, without being told', () => {
     // Derived from liegeId every render, so it cannot drift out of step with
-    // the rebellion two headings down that is about to change it.
+    // the rebellion in the column beside it that is about to change it.
     const state = fresh();
     const panel = mountPanel(state);
-    expect(panel.querySelector('[data-liege="ceowulf"]')).toBeNull();
+    expect(parentOf(panel, 'uchtred')).toBe(null);
 
     const sworn = apply(state, data, {
       verb: 'facilitator:set', payload: { path: ['roles', 'uchtred', 'liegeId'], value: 'ceowulf' },
     }, FACILITATOR, { ts: 0 }).state;
     panel.state = sworn;
 
-    expect(panel.querySelector('[data-liege="ceowulf"]').textContent).toContain('Uchtred');
+    expect(parentOf(panel, 'uchtred')).toBe('ceowulf');
+  });
+
+  it('keeps what is waiting on the facilitator out of the tree', () => {
+    // The split the two columns exist for: the standing arrangement on the
+    // left, the queue wanting a decision on the right. Mixed together, the
+    // queue sat below a tree that grows down the page and got missed.
+    const panel = mountPanel(fresh());
+    expect(panel.querySelector('.rb-feudal-main .rb-tree-root')).toBeTruthy();
+    expect(panel.querySelector('.rb-feudal-main .rb-ballots')).toBeNull();
+    const side = panel.querySelector('.rb-feudal-side');
+    expect(side.textContent).toContain('Elections');
+    expect(side.textContent).toContain('Rebellions');
+    expect(side.querySelector('.rb-tree')).toBeNull();
   });
 });

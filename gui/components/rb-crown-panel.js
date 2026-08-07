@@ -96,16 +96,24 @@ export class RbCrownPanel extends HTMLElement {
   }
 
   /**
-   * The feudal web, read off the board.
+   * The feudal web, read off the board and drawn as what it is: a tree.
    *
    * Homage is the thing on this panel with no control attached — it is sworn
    * and renounced by the players themselves — but it is what makes support,
    * elections and rebellion mean anything, and it was the one part of the
-   * arrangement a facilitator could not see anywhere. Derived from liegeId
-   * every render rather than kept, so it cannot fall out of step with the
-   * rebellion two headings down that is about to change it.
+   * arrangement a facilitator could not see anywhere.
+   *
+   * It used to be a flat list of "X answered by Y, Z", which is the pairs
+   * rather than the chain: a facilitator asking "who does this ultimately roll
+   * up to" had to hold three lines in their head and join them. Nesting says
+   * it in one glance, and the question people actually ask at the table —
+   * whose man is he, in the end — is answered by looking up the indent.
+   *
+   * Derived from liegeId every render rather than kept, so it cannot fall out
+   * of step with the rebellion in the column beside it that is about to change
+   * it.
    */
-  _homage(nameOf) {
+  _tree(nameOf, crownName) {
     const roles = Object.values(this._state.roles ?? {});
     const vassalsOf = new Map();
     for (const role of roles) {
@@ -114,31 +122,60 @@ export class RbCrownPanel extends HTMLElement {
       vassalsOf.get(role.liegeId).push(role.id);
     }
 
-    if (!vassalsOf.size) {
-      return '<p class="rb-empty">Nobody has sworn to anybody. Every role stands alone.</p>';
+    // Crown by holder rather than holder by crown, which is the way round the
+    // tree needs to read it — and a man may wear more than one.
+    const crownsOf = new Map();
+    for (const [crown, who] of Object.entries(this._state.crownHolders ?? {})) {
+      if (!who) continue;
+      if (!crownsOf.has(who)) crownsOf.set(who, []);
+      crownsOf.get(who).push(crown);
     }
 
-    // A liege who is himself sworn to somebody is shown under his own lord as
-    // well as over his men, which is the shape of the thing: the chain is the
-    // point, not the pairs.
-    const lieges = [...vassalsOf.keys()]
-      .sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
-    const alone = roles
-      .filter((role) => !role.liegeId && !vassalsOf.has(role.id))
-      .map((role) => role.id)
-      .sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
+    const byName = (a, b) => nameOf(a).localeCompare(nameOf(b));
 
-    return `
-      <ul class="rb-homage">${lieges.map((liege) => `
-        <li data-liege="${liege}">
-          <strong>${escape(nameOf(liege))}</strong>${this._state.roles[liege]?.liegeId
-    ? ` <span class="rb-meta">(sworn to ${escape(nameOf(this._state.roles[liege].liegeId))})</span>`
+    // Guarded against a homage loop, which is not the same problem as
+    // recursing forever. Nothing should be able to make one — swearing checks
+    // — but this draws whatever the state says, and two men sworn to each
+    // other have no root between them: walking down from the roots would drop
+    // them off the panel entirely rather than hang. Silently losing a role
+    // from the one place a facilitator goes to see the arrangement is the
+    // worse failure of the two, so anybody left over is drawn as their own
+    // root and labelled.
+    const drawn = new Set();
+    const branch = (id, seen) => {
+      const worn = crownsOf.get(id) ?? [];
+      const looped = seen.has(id);
+      drawn.add(id);
+      const under = looped ? [] : (vassalsOf.get(id) ?? []).slice().sort(byName);
+      return `
+        <li class="rb-tree-node" data-role="${id}"${worn.length ? ' data-crowned="true"' : ''}${
+  looped ? ' data-loop="true"' : ''}>
+          <span class="rb-tree-name">${worn.length
+    ? '<span class="rb-tree-crown" aria-hidden="true">♛</span>' : ''}${escape(nameOf(id))}</span>
+          ${looped ? '<span class="rb-meta">— homage loops here</span>' : ''}
+          ${worn.length
+    ? `<span class="rb-tree-crowns">${worn.map((c) => escape(crownName(c))).join(' &amp; ')}</span>`
     : ''}
-          <span class="rb-meta">answered by ${
-  vassalsOf.get(liege).map((id) => escape(nameOf(id))).join(', ')}</span>
-        </li>`).join('')}</ul>
-      ${alone.length ? `<p class="rb-meta" data-unsworn>Answering to nobody: ${
-  alone.map((id) => escape(nameOf(id))).join(', ')}.</p>` : ''}`;
+          ${under.length
+    ? `<ul class="rb-tree">${under.map((child) => branch(child, new Set([...seen, id]))).join('')}</ul>`
+    : ''}
+        </li>`;
+    };
+
+    // Households first, then the lords who stand alone. Sorted purely by name
+    // the four unsworn Mercians were dealt out between the three great
+    // households — Uchtred stranded below Alfred's men, reading like one of
+    // them. Whether a man has anybody under him is the more useful split, and
+    // it puts "everyone still on their own" together at the bottom where the
+    // shape of the board can be read off it.
+    const roots = roles.filter((role) => !role.liegeId).map((role) => role.id)
+      .sort((a, b) => (vassalsOf.has(b) ? 1 : 0) - (vassalsOf.has(a) ? 1 : 0) || byName(a, b));
+    let html = roots.map((id) => branch(id, new Set())).join('');
+    const orphans = roles.map((r) => r.id).filter((id) => !drawn.has(id)).sort(byName);
+    html += orphans.filter((id) => !drawn.has(id))
+      .map((id) => branch(id, new Set([id]))).join('');
+    if (!html) return '<p class="rb-empty">Nobody is at the top of anything.</p>';
+    return `<ul class="rb-tree rb-tree-root">${html}</ul>`;
   }
 
   _render() {
@@ -150,15 +187,25 @@ export class RbCrownPanel extends HTMLElement {
     const open = Object.values(this._state.votes ?? {}).filter((v) => !v.resolved);
     const worn = Object.entries(this._state.crownHolders ?? {});
 
+    // Two columns, and the split is by what the facilitator is doing rather
+    // than by subject. The left is the standing arrangement — who answers to
+    // whom, who wears what — which is read constantly and changes rarely. The
+    // right is the queue of things waiting on a decision from this desk, which
+    // is the opposite on both counts. Mixed together, the queue kept being
+    // missed because it sat below a tree that grows down the page.
     this.innerHTML = `
-      <div class="rb-crowns">
-        <h3>Crowns worn</h3>
-        <p class="rb-meta">${worn.length
-    ? worn.map(([crown, who]) => `${crownName(crown)}: ${nameOf(who)}`).join(' · ')
-    : 'None. Every crown is still a claim.'}</p>
+      <div class="rb-feudal">
+        <div class="rb-feudal-main">
+          <h3>Who answers to whom</h3>
+          <p class="rb-meta">${worn.length
+    ? `Crowns worn: ${worn.map(([crown, who]) => `${crownName(crown)} (${nameOf(who)})`).join(' · ')}`
+    : 'No crown is worn yet. Every one of them is still a claim.'}</p>
+          ${this._tree(nameOf, crownName)}
+        </div>
 
-        <h3>Elections</h3>
-        ${open.length ? `<ul class="rb-ballots">${open.map((vote) => {
+        <aside class="rb-feudal-side">
+          <h3>Elections</h3>
+          ${open.length ? `<ul class="rb-ballots">${open.map((vote) => {
     const silent = Object.keys(vote.electorate).filter((who) => !vote.cast[who]);
     return `
             <li class="rb-ballot" data-resolved="false">
@@ -174,13 +221,11 @@ export class RbCrownPanel extends HTMLElement {
             </li>`;
   }).join('')}</ul>` : '<p class="rb-empty">Nobody is standing for anything.</p>'}
 
-        <h3>Who answers to whom</h3>
-        ${this._homage(nameOf)}
+          <h3>Rebellions waiting on you</h3>
+          ${this._rebellions(nameOf)}
 
-        ${this._dead(nameOf, crownName)}
-
-        <h3>Rebellions waiting on you</h3>
-        ${this._rebellions(nameOf)}
+          ${this._dead(nameOf, crownName)}
+        </aside>
       </div>`;
 
     for (const form of this.querySelectorAll('[data-heir]')) {
