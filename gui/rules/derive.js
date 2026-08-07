@@ -69,6 +69,29 @@ export function factionsOf(state, data, roleId) {
   return [...letters];
 }
 
+/**
+ * The one letter a shire flies: whose side the ground is on.
+ *
+ * Not `factionsOf`, and deliberately not. That answers "which support boxes
+ * does this steward satisfy", which is a list because a man can speak for a
+ * crown he has claimed as well as for his own team — and printing that list on
+ * the map made Alfred "W K" and Cenred "Sx", which says who they *want* to be
+ * rather than who they answer to. A shire is held for somebody. Follow the
+ * homage up to the man at the top and print his team, and Cenred reads W
+ * because that is who he kneels to, whatever he means to claim later.
+ *
+ * Read off the live chain rather than the printed one, so the letter moves the
+ * moment somebody swears or rebels. A lord with no liege is the top of his own
+ * chain, which is how every Mercian reads M while Mercia has no king.
+ *
+ * @returns {string|null} one faction initial, or null for a role off the board
+ */
+export function bannerOf(state, data, roleId) {
+  const chain = liegeChain(state, roleId);
+  const top = chain.length ? chain[chain.length - 1] : roleId;
+  return data.factions.teamLetter[state.roles[top]?.teamId] ?? null;
+}
+
 /** Whether a role is Danish, which is about their archetype, not their team. */
 export function isDanish(state, data, roleId) {
   const archetype = data.roles.roles[roleId]?.archetype;
@@ -377,6 +400,7 @@ export function deriveAll(state, data) {
       danish: isDanish(state, data, id),
       pagan: isPagan(state, data, id),
       factions: factionsOf(state, data, id),
+      banner: bannerOf(state, data, id),
     };
   }
   return { shires, roles, aftermath: aftermath(state, data) };

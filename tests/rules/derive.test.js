@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { loadData } from '../helpers/load-data.js';
 import { createInitialState } from '../../gui/rules/state.js';
 import {
-  aftermath, hasSupport, incomeFor, factionsOf, reachableFrom, settlementsStanding,
+  aftermath, bannerOf, hasSupport, incomeFor, factionsOf, reachableFrom,
+  settlementsStanding,
 } from '../../gui/rules/derive.js';
 
 const data = await loadData();
@@ -38,6 +39,50 @@ describe('the opening position reproduces the printed tracker', () => {
     // The artwork's count, not the tracker's 74 — see KNOWN_DISCREPANCIES.
     expect(settlementsStanding(fresh())).toBe(75);
     expect(counters.prosperity.value).toBe(75);
+  });
+});
+
+describe('the letter a shire flies', () => {
+  // Every one of these was wrong on the board before the rule existed,
+  // because the map printed the crowns a steward could satisfy rather than
+  // the man he answers to. The list is the ruling, case by case.
+  const state = fresh();
+  const banner = (roleId) => bannerOf(state, data, roleId);
+
+  it('follows the homage to the top and prints that man\'s team', () => {
+    expect(banner('king_alfred')).toBe('W');            // was "W K": Kent is a claim
+    expect(banner('cenred')).toBe('W');                 // was "Sx": Sussex is a claim
+    expect(banner('archbishop_aethelred')).toBe('W');
+    expect(banner('uchtred')).toBe('M');                // was "M Ea"
+    expect(banner('gainbeald')).toBe('M');              // was "M L": he has no crown
+    expect(banner('king_ecgberht')).toBe('D');          // Saxon, but Halfdan's man
+  });
+
+  it('gives every Mercian M while Mercia has no king', () => {
+    // Nobody in Mercia has a liege at the start, so each of them is the top of
+    // their own chain — which is the same answer as "they are all Mercian",
+    // and stays right when one of them wins the crown and the others swear.
+    for (const id of ['ceowulf', 'gainbeald', 'uchtred', 'abbess_wenyld']) {
+      expect(banner(id), id).toBe('M');
+    }
+  });
+
+  it('moves the moment somebody swears', () => {
+    // Read off the live chain, not the printed roster. A Mercian who kneels to
+    // Alfred is holding his ground for Wessex from that moment, and the board
+    // has to say so — otherwise the map goes on showing a kingdom that has
+    // stopped existing.
+    const sworn = fresh();
+    sworn.roles.gainbeald.liegeId = 'king_alfred';
+    expect(bannerOf(sworn, data, 'gainbeald')).toBe('W');
+  });
+
+  it('is not the support rule, which still counts claims', () => {
+    // The two are deliberately different questions. Support asks which boxes a
+    // steward satisfies and is a list; this asks whose side the ground is on
+    // and is one letter. Collapsing them would move the turn-zero counters.
+    expect(factionsOf(state, data, 'king_alfred')).toContain('K');
+    expect(banner('king_alfred')).toBe('W');
   });
 });
 

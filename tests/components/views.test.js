@@ -124,7 +124,11 @@ describe('<rb-map>', () => {
     expect(bernicia.querySelector('.rb-cell-shire').textContent).toBe('Bernicia');
     // A long name is two lines in the frame, so read them together.
     expect(steward(bernicia)).toContain('King Ecgberht');
-    expect(steward(bernicia)).toContain('D N');   // the factions he speaks for
+    // One letter, and it is his liege's. Ecgberht claims Northumbria, and the
+    // frame used to read "D N" because of it — but a claim is an ambition, and
+    // the ground is held for the man he kneels to.
+    expect(steward(bernicia).trim().startsWith('D ')).toBe(true);
+    expect(steward(bernicia)).not.toContain('N');
     expect(bernicia.querySelector('.rb-cell-support').textContent).toContain('N, Be');
     expect(bernicia.querySelectorAll('.rb-cell-castle')).toHaveLength(2);
     expect(bernicia.querySelectorAll('.rb-settlement')).toHaveLength(4);
@@ -181,7 +185,23 @@ describe('<rb-map>', () => {
     const unsupported = [...map.querySelectorAll('path.is-unsupported')]
       .map((p) => p.dataset.shire).sort();
     expect(unsupported).toEqual(['jorvik', 'ribble']);   // east_anglia is eastern
-    expect(map.querySelectorAll('.rb-cell-support.is-lost')).toHaveLength(2);
+
+    // Said in words on the strip rather than by ruling a line through the
+    // crowns above it, and said either way round — a strip that only spoke up
+    // for bad news would leave "nothing printed" meaning both "supported" and
+    // "not worked out yet".
+    const verdicts = [...map.querySelectorAll('.rb-cell-verdict')];
+    expect(verdicts).toHaveLength(6);
+    const lost = verdicts.filter((t) => t.classList.contains('is-lost'));
+    expect(lost.map((t) => t.closest('[data-shire]').dataset.shire).sort())
+      .toEqual(['jorvik', 'ribble']);
+    // childNodes[0], not textContent: the unsupported one carries a <title>
+    // explaining itself, and textContent would read the tooltip in too.
+    expect(lost[0].childNodes[0].textContent).toBe('Not Supported');
+    expect(verdicts.find((t) => !t.classList.contains('is-lost')).textContent)
+      .toBe('Supported');
+    // And the crowns themselves are left legible.
+    expect(map.querySelector('.rb-cell-support.is-lost')).toBeNull();
   });
 
   it('raises the shire that was clicked, rather than deciding anything', () => {
@@ -206,11 +226,12 @@ describe('<rb-map>', () => {
       .toBe('assets/maps/eastern.svg');
   });
 
-  it('repeats a shire onto its other sheet as a copy that cannot be clicked', () => {
+  it('repeats a shire onto its other sheet, and clicking it goes there', () => {
     // Middle Anglia is played on the eastern sheet and printed again, greyed,
     // on the northern one — so a player looking north can see who holds the
-    // shire over the border. It is the same data, read-only: there is exactly
-    // one place to select a shire, and it is the sheet it lives on.
+    // shire over the border. It used to take no click at all, on the grounds
+    // that there is one place to select a shire; but a signpost you cannot
+    // follow is a worse answer than one you can, so it turns the page instead.
     const { view } = seatedView({
       move: (state) => { state.shires.middle_anglia.stewardRoleId = 'guthrum_the_old'; },
     });
@@ -223,13 +244,42 @@ describe('<rb-map>', () => {
     expect(ghost).toBeTruthy();
     expect(ghost.textContent).toContain('Middle Anglia');
     expect(ghost.textContent).toContain('Guthrum');
-    expect(ghost.querySelector('title').textContent).toContain('read-only');
-    // No shire to read off it, so a click cannot select one.
+    // The letter leads the name here too, and it is Guthrum's own — he kneels
+    // to nobody, so the top of his chain is himself.
+    expect(ghost.querySelector('.rb-cell-faction').textContent.trim()).toBe('D');
+    // Still not a shire in its own right: no outline, nothing to select here.
     expect(ghost.hasAttribute('data-shire')).toBe(false);
+
+    const sheets = [];
+    map.addEventListener('rb-sheet', (event) => sheets.push(event.detail.sheetId));
     let heard = 'unset';
     map.addEventListener('rb-shire', (event) => { heard = event.detail.shireId; });
     ghost.dispatchEvent(new Event('click', { bubbles: true }));
-    expect(heard).toBe(null);
+
+    expect(sheets).toEqual(['eastern']);
+    expect(map.getAttribute('sheet')).toBe('eastern');
+    expect(heard).toBe('middle_anglia');
+    expect(map.selected).toBe('middle_anglia');
+  });
+
+  it('does not toggle a shire shut on the way to its own sheet', () => {
+    // The ghost and the shire are the same id. Routed through the plain
+    // selection path, arriving from a ghost while that shire happened to be
+    // the one already open would read as a second click on it and close it —
+    // having just turned the page to look at it.
+    const { view } = seatedView();
+    const map = mount('rb-map');
+    map.setAttribute('sheet', 'eastern');
+    map.data = data;
+    map.view = view;
+    map.querySelector('path.rb-shire[data-shire="middle_anglia"]')
+      .dispatchEvent(new Event('click', { bubbles: true }));
+    expect(map.selected).toBe('middle_anglia');
+
+    map.setAttribute('sheet', 'northern');
+    map.querySelector('.rb-ghost[data-ghost-shire="middle_anglia"]')
+      .dispatchEvent(new Event('click', { bubbles: true }));
+    expect(map.selected).toBe('middle_anglia');
   });
 
   it('fills every ghost in before anything has happened', () => {
@@ -341,6 +391,110 @@ describe('<rb-map>', () => {
     jorvik().dispatchEvent(new Event('click', { bubbles: true }));
     map.querySelector('path[data-shire="ribble"]').dispatchEvent(new Event('click', { bubbles: true }));
     expect(map.selected).toBe('ribble');
+  });
+
+  it('moors a ship value off every coast, and nowhere inland', () => {
+    // The number sat on a boat out in the water on the printed sheets, and it
+    // belongs there: it is a fact about the water, not about the steward, and
+    // it used to be crammed into the end of the support strip instead.
+    const { view } = seatedView();
+    const map = mount('rb-map');
+    map.setAttribute('sheet', 'western');
+    map.data = data;
+    map.view = view;
+
+    for (const [id, printed] of Object.entries(data.shires.shires)) {
+      if (printed.map !== 'western') continue;
+      const boat = map.querySelector(`.rb-sea[data-sea="${id}"]`);
+      const coastal = printed.shipCost !== null && printed.shipCost !== undefined;
+      expect(Boolean(boat), id).toBe(coastal);
+      if (coastal) {
+        expect(boat.querySelector('.rb-sea-cost').textContent, id)
+          .toBe(String(printed.shipCost));
+        // Where the mooring says, not somewhere near the frame.
+        expect(boat.querySelector('.rb-sea-hull').getAttribute('d'), id)
+          .toContain(String(cells.sheets.western[id].sea.x - 17));
+      }
+    }
+    // And the strip it used to live in has let it go.
+    expect(map.querySelector('.rb-cell-sea')).toBeNull();
+  });
+
+  it('shows the ship value a contract or a fleet has moved, and says it moved', () => {
+    const { view } = seatedView({
+      move: (state) => { state.shires.wiltshire.shipCostDelta = -1; },
+    });
+    const map = mount('rb-map');
+    map.setAttribute('sheet', 'western');
+    map.data = data;
+    map.view = view;
+
+    const boat = map.querySelector('.rb-sea[data-sea="wiltshire"]');
+    expect(boat.querySelector('.rb-sea-cost').textContent)
+      .toBe(String(data.shires.shires.wiltshire.shipCost - 1));
+    expect(boat.classList.contains('is-moved')).toBe(true);
+  });
+
+  it('lets only a facilitator touch the ship value, one step at a time', () => {
+    const { view } = seatedView();
+    const player = mount('rb-map');
+    player.setAttribute('sheet', 'western');
+    player.data = data;
+    player.view = view;
+    expect(player.querySelector('.rb-sea-hit')).toBeNull();
+
+    const map = mount('rb-map');
+    map.setAttribute('sheet', 'western');
+    map.setAttribute('editable', '');
+    map.data = data;
+    map.view = view;
+
+    const sent = [];
+    map.addEventListener('rb-facilitate', (event) => sent.push(event.detail));
+    map.querySelector('.rb-sea[data-sea="wiltshire"] .rb-sea-hit')
+      .dispatchEvent(new Event('click', { bubbles: true }));
+
+    const panel = map.querySelector('.rb-map-sea');
+    expect(panel.hidden).toBe(false);
+    expect(panel.textContent).toContain('Wiltshire');
+    expect(panel.querySelector('.rb-map-sea-value').textContent)
+      .toBe(String(data.shires.shires.wiltshire.shipCost));
+
+    // A delta, like every other facilitator number — a contract and a fleet
+    // both write this field, and an absolute would clobber whichever landed
+    // in between.
+    panel.querySelector('[data-step="1"]').click();
+    expect(sent).toEqual([{
+      verb: 'facilitator:adjust',
+      payload: { path: ['shires', 'wiltshire', 'shipCostDelta'], delta: 1 },
+    }]);
+
+    // Clicking the boat again puts the panel away, same as everything else.
+    map.querySelector('.rb-sea[data-sea="wiltshire"] .rb-sea-hit')
+      .dispatchEvent(new Event('click', { bubbles: true }));
+    expect(map.querySelector('.rb-map-sea').hidden).toBe(true);
+  });
+
+  it('takes a click on the steward box as a click on that shire', () => {
+    // The frames are drawn wherever they fit, which for a narrow shire is out
+    // over a neighbour or over the sea. With the cells transparent to clicks,
+    // aiming at a steward's name either selected the shire underneath the box
+    // or nothing at all — which is why so many of them appeared dead.
+    const { view } = seatedView();
+    const map = mount('rb-map');
+    map.setAttribute('sheet', 'western');
+    map.data = data;
+    map.view = view;
+
+    for (const id of ['wiltshire', 'hwicce', 'redding', 'magonsets']) {
+      const heard = [];
+      map.addEventListener('rb-shire', (event) => heard.push(event.detail.shireId));
+      map.querySelector(`.rb-shire-cells[data-shire="${id}"] rect.rb-cell-frame`)
+        .dispatchEvent(new Event('click', { bubbles: true }));
+      expect(heard, id).toEqual([id]);
+      map.querySelector(`.rb-shire-cells[data-shire="${id}"] rect.rb-cell-frame`)
+        .dispatchEvent(new Event('click', { bubbles: true }));   // and shut again
+    }
   });
 
   it('gives a player no way to touch a settlement', () => {

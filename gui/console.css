@@ -527,9 +527,15 @@ rb-map { display: block; }
 
 /* --- the cells, which are the whole of what the art no longer says -------- */
 
-/* Ink on the sheet rather than an interface floating above it. None of them
-   take a click: the shire outline underneath is the hit target. */
+/* Ink on the sheet rather than an interface floating above it. The letters and
+   glyphs take no clicks; the shire outline underneath is the hit target.
+   The boxes are the exception, and have to be: a frame is drawn wherever it
+   fits, which for a narrow shire is out over its neighbour or over the sea,
+   and clicking straight at a steward's name there either selected the wrong
+   shire or nothing at all. They carry the shire's own id, so a click on the
+   box is a click on the shire it names whatever ground it happens to cover. */
 .rb-shire-cells, .rb-ghost { pointer-events: none; }
+.rb-cell-frame, .rb-cell-strip, .rb-ghost-box { pointer-events: all; cursor: pointer; }
 
 /* The Control/Steward box and the support strip ruled off beneath it, drawn as
    the printed sheet drew them. Filled rather than merely outlined, because
@@ -582,16 +588,6 @@ rb-map { display: block; }
   fill: var(--rb-blood);
 }
 
-.rb-cell-sea {
-  font: 10px var(--rb-sans);
-  letter-spacing: 0.06em;
-  fill: var(--rb-muted);
-  text-anchor: end;
-}
-
-/* Moved off the printed number by a contract or a defensive fleet. */
-.rb-cell-sea.is-moved { fill: var(--rb-blood); font-weight: 700; }
-
 .rb-cell-support {
   font: 600 11px var(--rb-sans);
   letter-spacing: 0.08em;
@@ -599,10 +595,53 @@ rb-map { display: block; }
   text-anchor: start;
 }
 
-.rb-cell-support.is-lost {
-  fill: var(--rb-blood);
-  text-decoration: line-through;
+/* The verdict, spelled out on the strip's second row. Said in words rather
+   than by ruling a line through the crowns above it: a line reads as "these
+   are cancelled", and what is meant is that none of them is behind the man
+   holding the ground. Red when it is bad news, but the words carry it on their
+   own — a facilitator reading a projected sheet from across a room should not
+   have to resolve a colour to know which way it went. */
+.rb-cell-verdict {
+  font: 600 11px var(--rb-sans);
+  letter-spacing: 0.08em;
+  fill: var(--rb-ink);
+  fill-opacity: 0.7;
+  text-anchor: middle;
 }
+
+.rb-cell-verdict.is-lost { fill: var(--rb-blood); fill-opacity: 1; }
+
+/* The ship value, out on the water where the printed sheet drew it. */
+.rb-sea-hull {
+  fill: var(--rb-paper);
+  fill-opacity: 0.94;
+  stroke: var(--rb-ink);
+  stroke-opacity: 0.7;
+  stroke-width: 1.5;
+}
+
+.rb-sea-cost {
+  font: 700 13px var(--rb-sans);
+  fill: var(--rb-ink);
+  text-anchor: middle;
+}
+
+/* Moved off the printed number by a contract or a defensive fleet. */
+.rb-sea.is-moved .rb-sea-hull { stroke: var(--rb-blood); stroke-opacity: 1; }
+.rb-sea.is-moved .rb-sea-cost { fill: var(--rb-blood); }
+
+.rb-sea.is-selected .rb-sea-hull { stroke: var(--rb-gold, #8a6d1f); stroke-width: 2.5; }
+
+/* Same bargain as the settlement letters: the cells take no clicks, so the
+   boat has to put them back on for itself, and only on a facilitator's map. */
+.rb-sea-hit {
+  fill: var(--rb-ink);
+  fill-opacity: 0;
+  pointer-events: all;
+  cursor: pointer;
+}
+
+.rb-sea-hit:hover { fill-opacity: 0.08; }
 
 /* Outlined as well as filled: the stack stands off the frame's edge on open
    ground, where a solid silhouette would read as a blot. */
@@ -717,7 +756,8 @@ rb-map { display: block; }
    `anchor()` in rb-map.js, which is the one piece of code that decides which
    side of a point either of them opens on. */
 .rb-map-card,
-.rb-map-settlement {
+.rb-map-settlement,
+.rb-map-sea {
   position: absolute;
   z-index: 2;
   background: var(--rb-parchment);
@@ -741,11 +781,43 @@ rb-map { display: block; }
 }
 
 .rb-map-card[data-x="left"],
-.rb-map-settlement[data-x="left"] { --rb-card-dx: 0%; }
+.rb-map-settlement[data-x="left"],
+.rb-map-sea[data-x="left"] { --rb-card-dx: 0%; }
 .rb-map-card[data-x="right"],
-.rb-map-settlement[data-x="right"] { --rb-card-dx: -100%; }
+.rb-map-settlement[data-x="right"],
+.rb-map-sea[data-x="right"] { --rb-card-dx: -100%; }
 .rb-map-card[data-y="above"],
-.rb-map-settlement[data-y="above"] { --rb-card-dy: -100%; }
+.rb-map-settlement[data-y="above"],
+.rb-map-sea[data-y="above"] { --rb-card-dy: -100%; }
+
+/* Two buttons and the number between them. Same size and same manners as the
+   settlement panel next door: it opens over the board and wants dismissing as
+   soon as it has been used. */
+.rb-map-sea { padding: 0.4rem 0.55rem; }
+
+.rb-map-sea-name {
+  margin: 0 0 0.25rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.rb-map-sea-row { display: flex; align-items: center; gap: 0.45rem; }
+
+.rb-map-sea-row button {
+  min-width: 1.6rem;
+  padding: 0.05rem 0.3rem;
+  font-size: 0.95rem;
+  line-height: 1.3;
+}
+
+.rb-map-sea-row button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.rb-map-sea-value {
+  min-width: 1.1rem;
+  font-weight: 700;
+  text-align: center;
+}
 
 /* Three radios and the word "Church". Deliberately the smallest control on the
    page: it opens on top of the board the facilitator is reading, so it has to

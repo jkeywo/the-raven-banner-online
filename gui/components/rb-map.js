@@ -154,6 +154,7 @@ export class RbMap extends HTMLElement {
           <div class="rb-map-card-body"></div>
         </div>
         <div class="rb-map-settlement" role="group" hidden></div>
+        <div class="rb-map-sea" role="group" hidden></div>
       </div>`;
 
     // Built rather than written into the markup above: `<image>` inside an
@@ -186,6 +187,17 @@ export class RbMap extends HTMLElement {
           glyph.dataset.settlement);
         return;
       }
+      const boat = this.editable ? event.target.closest('[data-sea]') : null;
+      if (boat) { this._selectSea(boat.dataset.sea); return; }
+
+      // A neighbour repeated on this sheet is a signpost, not a shire: it says
+      // who holds the ground over the border, and the thing anybody wants
+      // after reading it is to go and look. So it turns the page rather than
+      // opening a card here, where the shire it names has no outline to
+      // select and no cells of its own.
+      const ghost = event.target.closest('[data-ghost-shire]');
+      if (ghost) { this.showShire(ghost.dataset.ghostShire); return; }
+
       const hit = event.target.closest('[data-shire]');
       this._select(hit ? hit.dataset.shire : null);
     });
@@ -208,14 +220,39 @@ export class RbMap extends HTMLElement {
    */
   _select(shireId) {
     this._selected = shireId === this._selected ? null : shireId;
-    // Only one thing on the sheet is being looked at at a time. Both panels
-    // are pinned to points a few millimetres apart — a settlement sits inside
-    // its own shire — so leaving both open would mean one covering the other.
+    // Only one thing on the sheet is being looked at at a time. Every panel is
+    // pinned to a point a few millimetres from the others — a settlement sits
+    // inside its own shire, a boat just off its coast — so leaving two open
+    // would mean one covering the other.
     this._settlement = null;
+    this._sea = null;
     this.dispatchEvent(new CustomEvent('rb-shire', {
       bubbles: true, detail: { shireId: this._selected },
     }));
     this._render();
+  }
+
+  /**
+   * Turn to the sheet a shire is played on and open it there.
+   *
+   * The one way into a shire that is not on the sheet in front of you, which
+   * is what a repeated neighbour needs and what a page around this element can
+   * use to follow a link from anywhere else.
+   */
+  showShire(shireId) {
+    const sheet = this._data?.shires?.shires?.[shireId]?.map;
+    if (!sheet) return;
+    this._selected = null;   // so the toggle in _select cannot swallow it
+    if (sheet !== this.sheet) {
+      this.setAttribute('sheet', sheet);
+      // Both consoles draw the sheet buttons themselves, so the map turning
+      // its own page has to say so or the row would go on pointing at the
+      // sheet that was showing a moment ago.
+      this.dispatchEvent(new CustomEvent('rb-sheet', {
+        bubbles: true, detail: { sheetId: sheet },
+      }));
+    }
+    this._select(shireId);
   }
 
   /** The same gesture on a settlement: click it to open, click it to close. */
@@ -226,8 +263,38 @@ export class RbMap extends HTMLElement {
     // Through _select so the page hears the card go away and empties it,
     // rather than being left holding a shire nothing is pointing at.
     if (this.selected !== null) this._select(null);
+    this._sea = null;
     this._settlement = { shireId, settlementId };
     this._render();
+  }
+
+  /** And the same again on a shire's boat. */
+  _selectSea(shireId) {
+    if (this._sea === shireId) { this._sea = null; this._render(); return; }
+    if (this.selected !== null) this._select(null);
+    this._settlement = null;
+    this._sea = shireId;
+    this._render();
+  }
+
+  /**
+   * What a shire costs to reach by sea, nudged by a facilitator.
+   *
+   * A delta on shipCostDelta rather than a new absolute value, for the reason
+   * every other facilitator number is a delta: a trade contract and a
+   * defensive fleet both move this field, and a number typed against what was
+   * on screen a moment ago would overwrite whichever of them landed in
+   * between. Two buttons rather than a box, because the only edits anybody
+   * makes here are by one.
+   */
+  _adjustSea(shireId, delta) {
+    this.dispatchEvent(new CustomEvent('rb-facilitate', {
+      bubbles: true,
+      detail: {
+        verb: 'facilitator:adjust',
+        payload: { path: ['shires', shireId, 'shipCostDelta'], delta },
+      },
+    }));
   }
 
   /**
@@ -310,6 +377,7 @@ export class RbMap extends HTMLElement {
 
     this._renderCard(sheetCells, width, height);
     this._renderSettlementPanel(sheetCells, width, height);
+    this._renderSeaPanel(sheetCells, width, height);
   }
 
   /**
@@ -380,6 +448,10 @@ export class RbMap extends HTMLElement {
       group.append(...this._supportCell(id, printed, support));
       if (cell?.castles) group.append(...castleStack(cell.castles, live.castles));
     }
+    // Null when the projection has no ship cost to show — append() would turn
+    // that into the text "null" out in the water.
+    const boat = cell?.sea ? this._seaMark(id, printed, cell.sea) : null;
+    if (boat) group.append(boat);
 
     const anchors = printed.settlements.map((was, index) =>
       cell?.settlements?.[index] ?? anchorOf(outline, index));
@@ -424,23 +496,21 @@ export class RbMap extends HTMLElement {
       ? this._data.roles.roles[steward]?.name ?? steward
       : 'unheld';
 
-    // The faction letters lead the name on one line, as they do in print,
-    // because the letters in the support strip below only mean anything read
-    // against them: "support M" is support from the man's own side or from a
-    // rival depending entirely on this. They eat into the width the name has,
-    // so they come out of its wrapping budget — otherwise the two shires whose
-    // steward speaks for two factions push their names into the castles.
-    const factions = this._factionsOf(steward);
-    const lines = wrapWords(name, NAME_WRAP - factions.join(' ').length);
+    // One letter leads the name, as it does in print: whose side the ground is
+    // on. Not the steward's claims — those say who he means to become, and a
+    // shire is held for whoever he answers to now. It eats into the width the
+    // name has, so it comes out of the wrapping budget.
+    const banner = this._bannerOf(steward);
+    const lines = wrapWords(name, NAME_WRAP - (banner?.length ?? 0));
     lines.forEach((line, index) => {
       const text = document.createElementNS(SVG_NS, 'text');
       text.setAttribute('class', 'rb-cell-steward');
       text.setAttribute('x', midX);
       text.setAttribute('y', frame.y0 + 45 + index * 23 - (lines.length - 1) * 11);
-      if (index === 0 && factions.length) {
+      if (index === 0 && banner) {
         const mark = document.createElementNS(SVG_NS, 'tspan');
         mark.setAttribute('class', 'rb-cell-faction');
-        mark.textContent = `${factions.join(' ')} `;
+        mark.textContent = `${banner} `;
         text.append(mark);
       }
       text.append(document.createTextNode(line));
@@ -457,46 +527,98 @@ export class RbMap extends HTMLElement {
   }
 
   /**
-   * The support strip: who is behind the steward, and what it costs to arrive
-   * by sea.
+   * The support strip: which crowns this ground answers to, and whether one of
+   * them is actually behind the man holding it.
    *
-   * The ship number sat on a little boat out in the water on the printed
-   * sheet, and there is no transcription of where those boats were, so it
-   * moves to the free end of this strip. It is drawn from the derived value
-   * rather than the printed one, which is the same number until a contract or
-   * a defensive fleet moves it.
+   * The verdict is spelled out rather than struck through. A line through the
+   * letters was the compact way to say it, but it reads as "these crowns are
+   * cancelled" when what is meant is "none of these is behind him" — and a
+   * facilitator squinting at a sheet across a table should not have to tell a
+   * ruled line from a printed one. Two words cannot be misread, and the strip
+   * grew a second row to hold them.
+   *
+   * The ship number is gone from here. It belongs out on the water where the
+   * sheet printed it, which is where _seaMark draws it now.
    */
   _supportCell(id, printed, support) {
-    const nodes = [label(support.x0 + 7, support.y1 - 3, 'Support')];
+    const nodes = [label(support.x0 + 7, support.y0 + 11, 'Support')];
     const text = document.createElementNS(SVG_NS, 'text');
     text.setAttribute('class', 'rb-cell-support');
     text.setAttribute('x', support.x0 + 56);
-    text.setAttribute('y', support.y1 - 3);
+    text.setAttribute('y', support.y0 + 11);
     // Not upper-cased: the printed legend distinguishes N (Northumbria) from
     // Be (Bernicia) and Ea (East Anglia) by that second lower-case letter.
     text.textContent = printed.support.join(', ');
-    if (this._supported(id) === false) {
-      text.classList.add('is-lost');
-      text.append(titleFor('Held without support: defended settlements pay nothing here'));
-    }
     nodes.push(text);
 
+    // Silent rather than guessing while the projection has not said. "Not
+    // supported" is a claim about the board, and printing it from a missing
+    // value would put a lie on the map for anybody whose console is a beat
+    // behind.
+    const supported = this._supported(id);
+    if (supported === undefined) return nodes;
+
+    const verdict = document.createElementNS(SVG_NS, 'text');
+    verdict.setAttribute('class', 'rb-cell-verdict');
+    verdict.setAttribute('x', (support.x0 + support.x1) / 2);
+    verdict.setAttribute('y', support.y1 - 5);
+    verdict.textContent = supported ? 'Supported' : 'Not Supported';
+    if (!supported) {
+      verdict.classList.add('is-lost');
+      verdict.append(titleFor('Held without support: defended settlements pay nothing here'));
+    }
+    nodes.push(verdict);
+    return nodes;
+  }
+
+  /**
+   * What it costs to arrive here by sea, out on the water where it was
+   * printed.
+   *
+   * The sheets drew this on a little boat off the coast rather than in the
+   * frame, and it belongs there: it is a fact about the water, not about the
+   * steward, and a raider reading the map is looking at the coastline when the
+   * question comes up. The number is the derived one, which is the printed one
+   * until a trade contract or a defensive fleet moves it — and when it has
+   * moved, it says so, because a changed sea is the kind of thing a table
+   * argues about.
+   */
+  _seaMark(id, printed, at) {
     const derived = this._view.derived?.shires?.[id];
     const cost = derived && 'shipCost' in derived ? derived.shipCost : printed.shipCost;
-    if (cost !== null && cost !== undefined) {
-      const sea = document.createElementNS(SVG_NS, 'text');
-      sea.setAttribute('class', 'rb-cell-sea');
-      sea.setAttribute('x', support.x1 - 7);
-      sea.setAttribute('y', support.y1 - 3);
-      sea.textContent = `sea ${cost}`;
-      if (cost !== printed.shipCost) {
-        sea.classList.add('is-moved');
-        sea.append(titleFor(
-          `Reachable by sea for ${cost}, not the ${printed.shipCost} the sheet was printed with`));
-      }
-      nodes.push(sea);
+    if (cost === null || cost === undefined) return null;
+
+    const group = document.createElementNS(SVG_NS, 'g');
+    group.setAttribute('class', 'rb-sea');
+    group.dataset.sea = id;
+    if (cost !== printed.shipCost) group.classList.add('is-moved');
+    if (this._sea === id) group.classList.add('is-selected');
+
+    const hull = document.createElementNS(SVG_NS, 'path');
+    hull.setAttribute('class', 'rb-sea-hull');
+    hull.setAttribute('d', boatPath(at.x, at.y));
+    group.append(hull);
+
+    const text = document.createElementNS(SVG_NS, 'text');
+    text.setAttribute('class', 'rb-sea-cost');
+    text.setAttribute('x', at.x);
+    text.setAttribute('y', at.y + 5);
+    text.textContent = String(cost);
+    group.append(text);
+
+    if (this.editable) {
+      const hit = document.createElementNS(SVG_NS, 'circle');
+      hit.setAttribute('class', 'rb-sea-hit');
+      hit.setAttribute('cx', at.x);
+      hit.setAttribute('cy', at.y);
+      hit.setAttribute('r', 20);
+      group.append(hit);
     }
-    return nodes;
+
+    group.append(titleFor(cost === printed.shipCost
+      ? `${printed.name} — ${cost} ships to reach by sea`
+      : `${printed.name} — ${cost} ships to reach by sea, not the ${printed.shipCost} printed`));
+    return group;
   }
 
   /**
@@ -540,13 +662,24 @@ export class RbMap extends HTMLElement {
     who.setAttribute('class', 'rb-ghost-steward');
     who.setAttribute('x', midX);
     who.setAttribute('y', ghost.y1 - 14);
-    who.textContent = steward
+    // The letter leads the name here too. Without it the whole point of
+    // repeating a neighbour is missed: what a steward looking over the border
+    // needs to know first is whose side that ground is on, and a name alone
+    // only answers it for somebody who has the roster memorised.
+    const banner = this._bannerOf(steward);
+    if (banner) {
+      const mark = document.createElementNS(SVG_NS, 'tspan');
+      mark.setAttribute('class', 'rb-cell-faction');
+      mark.textContent = `${banner} `;
+      who.append(mark);
+    }
+    who.append(document.createTextNode(steward
       ? this._data.roles.roles[steward]?.name ?? steward
-      : 'unheld';
+      : 'unheld'));
     group.append(who);
 
     group.append(titleFor(
-      `${printed.name} — a read-only copy. It is played on the ${printed.map} sheet.`));
+      `${printed.name} — held on the ${printed.map} sheet. Click to go there.`));
     return group;
   }
 
@@ -641,11 +774,64 @@ export class RbMap extends HTMLElement {
     const state = settlementState(live);
     for (const input of panel.querySelectorAll('input')) input.checked = input.value === state;
 
+    this._pin(panel, at, width, height, SETTLEMENT_REACH);
+  }
+
+  /**
+   * The chosen shire's ship value, as two buttons over its boat.
+   *
+   * The value is shown but not typed into. It is the derived number, which a
+   * contract or a fleet may already have moved off the printed one, and a box
+   * holding a total invites somebody to correct the total rather than to say
+   * what they are changing — see _adjustSea.
+   */
+  _renderSeaPanel(sheetCells, width, height) {
+    const panel = this.querySelector('.rb-map-sea');
+    const id = this.editable ? this._sea : null;
+    const printed = id ? this._data.shires.shires[id] : null;
+    const at = printed?.map === this.sheet ? sheetCells?.[id]?.sea : null;
+    if (!at) { panel.hidden = true; panel.dataset.key = ''; return; }
+    panel.hidden = false;
+
+    if (panel.dataset.key !== id) {
+      panel.dataset.key = id;
+      panel.innerHTML = `
+        <p class="rb-map-sea-name"></p>
+        <div class="rb-map-sea-row">
+          <button type="button" data-step="-1" aria-label="Easier to reach by sea">−</button>
+          <span class="rb-map-sea-value"></span>
+          <button type="button" data-step="1" aria-label="Harder to reach by sea">+</button>
+        </div>`;
+      panel.querySelector('.rb-map-sea-name').textContent = printed.name;
+      panel.setAttribute('aria-label', `Ships to reach ${printed.name}`);
+      for (const button of panel.querySelectorAll('[data-step]')) {
+        button.onclick = () => this._adjustSea(id, Number(button.dataset.step));
+      }
+    }
+
+    const derived = this._view.derived?.shires?.[id];
+    const cost = derived && 'shipCost' in derived ? derived.shipCost : printed.shipCost;
+    panel.querySelector('.rb-map-sea-value').textContent = String(cost ?? '—');
+    // Nothing is reachable by sea for nothing, and the reducer refuses a delta
+    // that would go below zero. Saying so on the button is cheaper than
+    // sending a command to be told no.
+    panel.querySelector('[data-step="-1"]').disabled = !(cost > 0);
+
+    this._pin(panel, at, width, height, 20);
+  }
+
+  /**
+   * Put a small panel beside a point on the sheet, on whichever side it fits.
+   *
+   * Shared by the settlement panel and the sea panel because they want exactly
+   * the same thing: a box pinned near a point, clear of the glyph it is about,
+   * and still on the sheet when that glyph is down in a corner.
+   */
+  _pin(panel, at, width, height, clear) {
     const stage = this.querySelector('.rb-map-stage').getBoundingClientRect();
     const box = panel.getBoundingClientRect();
     const panelWidth = stage.width ? (box.width / stage.width) * 100 : 12;
     const panelHeight = stage.height ? (box.height / stage.height) * 100 : 10;
-    const clear = SETTLEMENT_REACH;
 
     const across = anchor(
       (at.x / width) * 100, panelWidth,
@@ -664,12 +850,13 @@ export class RbMap extends HTMLElement {
     return this._view.derived?.shires?.[shireId]?.supported;
   }
 
-  _factionsOf(roleId) {
-    return roleId ? this._view.derived?.roles?.[roleId]?.factions ?? [] : [];
+  /** The one letter a shire flies — see bannerOf() in the rules. */
+  _bannerOf(roleId) {
+    return roleId ? this._view.derived?.roles?.[roleId]?.banner ?? null : null;
   }
 
   _tintFor(roleId) {
-    return this._factionsOf(roleId).map((f) => FACTION_TINT[f]).find(Boolean);
+    return FACTION_TINT[this._bannerOf(roleId)];
   }
 
   /** The one-line answer a hover gives, whether or not anything is drawn. */
@@ -777,6 +964,20 @@ function castlePath(cx, cy, size) {
     + `L${x + 2 * m} ${y + m} L${x + 2 * m} ${y} L${x + 3 * m} ${y} `
     + `L${x + 3 * m} ${y + m} L${x + 4 * m} ${y + m} L${x + 4 * m} ${y} `
     + `L${x + 5 * m} ${y} L${x + 5 * m} ${y + h} Z`;
+}
+
+/**
+ * A hull with a sail, small enough to read as a token rather than as scenery.
+ *
+ * Drawn rather than lettered because the printed sheets drew one, and because
+ * a bare number floating in the sea would read as a depth sounding. The number
+ * sits in the hull.
+ */
+function boatPath(cx, cy) {
+  const w = 17;
+  return `M${cx - w} ${cy - 4} L${cx + w} ${cy - 4} L${cx + w - 6} ${cy + 10} `
+    + `L${cx - w + 6} ${cy + 10} Z `
+    + `M${cx} ${cy - 6} L${cx} ${cy - 20} L${cx + 11} ${cy - 9} Z`;
 }
 
 /**

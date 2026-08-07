@@ -174,6 +174,17 @@ export async function startPlayerApp({ location = window.location } = {}) {
   document.addEventListener('rb-shire', (event) => onShireClicked(event.detail.shireId));
   document.addEventListener('rb-command', (event) => dispatch(event.detail.verb, event.detail.payload));
 
+  // The map turns its own page when a repeated neighbour is clicked. Only the
+  // buttons are set here: the map has already changed the sheet, and setting
+  // it again would be a second opinion about which page is showing.
+  document.addEventListener('rb-sheet', (event) => {
+    for (const button of $('map-buttons').children) {
+      button.setAttribute('aria-selected',
+        String(button.dataset.sheet === event.detail.sheetId));
+    }
+    selectPane('map');
+  });
+
   /**
    * A shire was clicked, either on its own or while an action's chooser is
    * open.

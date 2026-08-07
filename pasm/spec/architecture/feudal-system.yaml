@@ -40,6 +40,39 @@ entities:
           rewrite, and crowning Ceowulf takes Gainbeald's Mercian support, his
           income and his place outside the Disorder count.
 
+  - mechanic: shire-banner
+    core:
+      status: implemented
+      confidence: confirmed
+      title: The Letter A Shire Flies
+      summary: >-
+        One faction initial per shire, taken from the team of whoever sits at
+        the top of its steward's homage — not from the crowns that steward
+        claims.
+      rationale:
+        - "Deliberately not crown-and-support, and the two must not be collapsed. Support asks which of a shire's printed crowns a steward satisfies, and is a list because a man can speak for a crown he has claimed as well as for his own team. The banner asks whose side the ground is on, and there is only ever one answer to that."
+        - "Printing the support list on the map was the bug this fixes. It made Alfred \"W K\" and Cenred \"Sx\" and Uchtred \"M Ea\" -- which is who each of them means to become, not who they answer to. Worst of all it gave Gainbeald an L for a crown of Lindsey he does not hold and may never win."
+        - "Follow the homage to the top and print that man's team. A lord with no liege is the top of his own chain, which is how every Mercian reads M while Mercia has no king -- the same reading crownless-kingdom-support-gap already takes for support, arrived at from the other direction."
+        - "Ecgberht is the case that proves it is about homage rather than archetype: a Saxon king, seated by the guide as Halfdan's man, holding Bernicia. The ground is Danish because he kneels to a Dane, and the sheet says D."
+        - Read off the live liege chain rather than the printed roster, so the letter moves the moment somebody swears or rebels. A map that kept showing a kingdom which had stopped existing would be worse than one that showed nothing.
+        - "bannerOf sits in gui/rules/derive.js beside the support rule it is not, and that file stays declared under crown-and-support rather than being claimed twice. A file has one owner here: claiming it again took derive.js off crown-and-support and turned two real edges into it -- from command-admission and from the view projector -- into warnings about edges nobody could observe any more."
+      references:
+        - crown-and-support
+        - homage
+    implementation:
+      status: declared
+      tests:
+        - npm test
+    evidence:
+      - kind: test
+        reference: tests/rules/derive.test.js
+        summary: >-
+          Alfred reads W rather than "W K", Cenred W rather than Sx, Uchtred M
+          rather than "M Ea", Gainbeald M rather than "M L", and Ecgberht D;
+          every Mercian reads M while the crown is unworn; and a Mercian who
+          swears to Alfred reads W from that moment. Support still counts the
+          claims the banner ignores.
+
   - mechanic: crown-election
     core:
       status: implemented

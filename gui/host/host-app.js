@@ -384,6 +384,18 @@ export async function startHostApp({ location = window.location } = {}) {
     $('shire-editor').shireId = event.detail.shireId;
   });
 
+  // The map turns its own page when a repeated neighbour is clicked, and this
+  // row has to follow it. Only the buttons are set here, not the sheet: the
+  // map has already changed that, and setting it again would be a second
+  // opinion about which page is showing.
+  document.addEventListener('rb-sheet', (event) => {
+    for (const button of $('fac-map-buttons').children) {
+      button.setAttribute('aria-selected',
+        String(button.dataset.sheet === event.detail.sheetId));
+    }
+    selectFacilitatorPane('map');
+  });
+
   // --- the facilitator's own tabs -------------------------------------------
   // One clock and one set of setup details stay on screen throughout; the
   // rest — battle, crowns, envoys, the debrief, the inspector — are each a
