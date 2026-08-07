@@ -252,21 +252,19 @@ describe('<rb-map>', () => {
 
     const sheets = [];
     map.addEventListener('rb-sheet', (event) => sheets.push(event.detail.sheetId));
-    let heard = 'unset';
-    map.addEventListener('rb-shire', (event) => { heard = event.detail.shireId; });
     ghost.dispatchEvent(new Event('click', { bubbles: true }));
 
+    // It turns the page and stops there. Selecting the shire as well would be
+    // deciding what somebody wants to do next on a sheet they have not seen
+    // yet — and would leave a card open over ground they had not chosen.
     expect(sheets).toEqual(['eastern']);
     expect(map.getAttribute('sheet')).toBe('eastern');
-    expect(heard).toBe('middle_anglia');
-    expect(map.selected).toBe('middle_anglia');
+    expect(map.selected).toBe(null);
   });
 
-  it('does not toggle a shire shut on the way to its own sheet', () => {
-    // The ghost and the shire are the same id. Routed through the plain
-    // selection path, arriving from a ghost while that shire happened to be
-    // the one already open would read as a second click on it and close it —
-    // having just turned the page to look at it.
+  it('arrives at a sheet holding nothing, however it got there', () => {
+    // Whatever was open on the old sheet is put down on the way: through a
+    // repeated neighbour, or a tab, or a page setting the attribute itself.
     const { view } = seatedView();
     const map = mount('rb-map');
     map.setAttribute('sheet', 'eastern');
@@ -277,9 +275,11 @@ describe('<rb-map>', () => {
     expect(map.selected).toBe('middle_anglia');
 
     map.setAttribute('sheet', 'northern');
+    expect(map.selected).toBe(null);
     map.querySelector('.rb-ghost[data-ghost-shire="middle_anglia"]')
       .dispatchEvent(new Event('click', { bubbles: true }));
-    expect(map.selected).toBe('middle_anglia');
+    expect(map.getAttribute('sheet')).toBe('eastern');
+    expect(map.selected).toBe(null);
   });
 
   it('fills every ghost in before anything has happened', () => {
@@ -320,15 +320,44 @@ describe('<rb-map>', () => {
     expect(card.style.left).toMatch(/%$/);
     expect(card.style.top).toMatch(/%$/);
 
-    // The shire is on another sheet now, so there is nothing to anchor to.
+    // Turning the page puts it down — and leaves it down on the way back.
+    // A selection is about a shire on the sheet in front of you, and one
+    // carried across a change is a highlight on ground nobody is looking at.
     map.setAttribute('sheet', 'eastern');
     expect(card.hidden).toBe(true);
+    expect(map.selected).toBe(null);
 
     map.setAttribute('sheet', 'northern');
+    expect(card.hidden).toBe(true);
+
+    map.querySelector('path[data-shire="jorvik"]')
+      .dispatchEvent(new Event('click', { bubbles: true }));
     expect(card.hidden).toBe(false);
     map.querySelector('.rb-map-card-close').click();
     expect(card.hidden).toBe(true);
     expect(map.selected).toBe(null);
+  });
+
+  it('tells the page it has put the selection down, rather than just forgetting', () => {
+    // The page owns the card's contents. If the map cleared quietly, the
+    // facilitator's editor would be left pointing at a shire on a sheet that
+    // is no longer showing, and the next edit would land on it.
+    const { view } = seatedView();
+    const map = mount('rb-map');
+    map.setAttribute('sheet', 'northern');
+    map.data = data;
+    map.view = view;
+
+    const heard = [];
+    map.addEventListener('rb-shire', (event) => heard.push(event.detail.shireId));
+    map.querySelector('path[data-shire="jorvik"]')
+      .dispatchEvent(new Event('click', { bubbles: true }));
+    map.setAttribute('sheet', 'eastern');
+    expect(heard).toEqual(['jorvik', null]);
+
+    // And a sheet change with nothing held says nothing at all.
+    map.setAttribute('sheet', 'western');
+    expect(heard).toEqual(['jorvik', null]);
   });
 
   it('carries the facilitator’s editor into the card and edits through it', () => {
@@ -409,15 +438,20 @@ describe('<rb-map>', () => {
       const coastal = printed.shipCost !== null && printed.shipCost !== undefined;
       expect(Boolean(boat), id).toBe(coastal);
       if (coastal) {
-        expect(boat.querySelector('.rb-sea-cost').textContent, id)
-          .toBe(String(printed.shipCost));
-        // Where the mooring says, not somewhere near the frame.
-        expect(boat.querySelector('.rb-sea-hull').getAttribute('d'), id)
-          .toContain(String(cells.sheets.western[id].sea.x - 17));
+        const cost = boat.querySelector('.rb-sea-cost');
+        expect(cost.textContent, id).toBe(String(printed.shipCost));
+        // On the sail of the ship the printed map moored there, which is a
+        // transcribed position and not one this app chose.
+        expect(Number(cost.getAttribute('x')), id).toBe(cells.sheets.western[id].sea.x);
+        // And no second boat drawn over the artist's.
+        expect(boat.querySelector('.rb-sea-hull'), id).toBeNull();
       }
     }
-    // And the strip it used to live in has let it go.
+    // The strip it used to live in has let it go.
     expect(map.querySelector('.rb-cell-sea')).toBeNull();
+    // The ships and the arrows are artwork, laid over the sheet.
+    expect(map.querySelector('.rb-map-marks').getAttribute('href'))
+      .toBe('assets/maps/marks-western.svg');
   });
 
   it('shows the ship value a contract or a fleet has moved, and says it moved', () => {
@@ -725,10 +759,13 @@ describe('<rb-map>', () => {
       .dispatchEvent(new Event('click', { bubbles: true }));
     expect(map.querySelector('.rb-map-settlement').hidden).toBe(false);
 
+    // And leaving the sheet puts it down for good, like everything else the
+    // map holds — coming back does not re-open it.
     map.setAttribute('sheet', 'eastern');
     expect(map.querySelector('.rb-map-settlement').hidden).toBe(true);
+    expect(map.selectedSettlement).toBe(null);
     map.setAttribute('sheet', 'western');
-    expect(map.querySelector('.rb-map-settlement').hidden).toBe(false);
+    expect(map.querySelector('.rb-map-settlement').hidden).toBe(true);
   });
 
   it('trims "England" off its own sheet tabs, being already inside the board', () => {

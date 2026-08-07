@@ -70,18 +70,9 @@ export class RbShireEditor extends HTMLElement {
         <span class="rb-inspector-error" data-error-for="shires.${shireId}.castles"></span>
       </div>
 
-      ${printed.shipCost === null ? '' : `
-        <div class="rb-inspector-stat">
-          <span class="rb-inspector-stat-label">Ship value</span>
-          <span class="rb-inspector-stat-value">${printed.shipCost + (shire.shipCostDelta ?? 0)}</span>
-          <input type="number" step="1" placeholder="+/-" data-adjust="shires.${shireId}.shipCostDelta">
-          <button type="button" data-commit-adjust="shires.${shireId}.shipCostDelta">Commit</button>
-          <span class="rb-inspector-error" data-error-for="shires.${shireId}.shipCostDelta"></span>
-        </div>
-        <p class="rb-meta">Printed at ${printed.shipCost}. A contract or a defensive
-          fleet already moves this — this adjusts it further, on top of either.</p>`}
-
-      <p class="rb-meta">Click a settlement letter on the map to circle or strike it.</p>`;
+      <p class="rb-meta">Click a settlement letter on the map to circle or
+        strike it${printed.shipCost === null ? ''
+    : ', or the ship off the coast to change what it costs to reach by sea'}.</p>`;
 
     this.querySelector('[data-steward]').onchange = (event) => {
       this._emit('facilitator:set-steward', { shireId, roleId: event.target.value || null });

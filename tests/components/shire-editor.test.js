@@ -84,36 +84,21 @@ describe('<rb-shire-editor>', () => {
     });
   });
 
-  it('offers a ship value only for a coastal shire', () => {
+  it('leaves the ship value to the ship, and says where it went', () => {
+    // It was a second control for a number that now has one out on the water,
+    // on the longship the printed map moored off that coast. Two places to set
+    // one value is how the two come to disagree. The test that drove it from
+    // here went with it, to the <rb-map> block in views.test.js.
     const editor = mount();
     editor.data = data;
     editor.state = fresh();
 
     editor.shireId = 'wiltshire';   // coastal, ship cost 2 in the printed data
-    expect(editor.querySelector('[data-adjust="shires.wiltshire.shipCostDelta"]')).toBeTruthy();
+    expect(editor.querySelector('[data-adjust="shires.wiltshire.shipCostDelta"]')).toBeNull();
+    expect(editor.textContent).toContain('ship off the coast');
 
-    editor.shireId = 'south_mercia';   // landlocked
-    expect(editor.querySelector('[data-adjust="shires.south_mercia.shipCostDelta"]')).toBeNull();
-  });
-
-  it('adjusts the ship value on top of whatever a contract or fleet already did', () => {
-    const editor = mount();
-    editor.data = data;
-    const state = fresh();
-    state.shires.wiltshire.shipCostDelta = -2;
-    editor.state = state;
-    editor.shireId = 'wiltshire';
-
-    const printed = data.shires.shires.wiltshire.shipCost;
-    expect(editor.querySelector('.rb-inspector-stat-value').textContent.trim())
-      .not.toBe(String(printed));
-
-    let raised = null;
-    document.addEventListener('rb-facilitate', (event) => { raised = event.detail; });
-    const input = editor.querySelector('[data-adjust="shires.wiltshire.shipCostDelta"]');
-    input.value = '-1';
-    editor.querySelector('[data-commit-adjust="shires.wiltshire.shipCostDelta"]').click();
-    expect(raised.payload).toEqual({ path: ['shires', 'wiltshire', 'shipCostDelta'], delta: -1 });
+    editor.shireId = 'south_mercia';   // landlocked: no ship, so nothing to say
+    expect(editor.textContent).not.toContain('ship off the coast');
   });
 
   it('refuses to send an empty or zero adjustment', () => {

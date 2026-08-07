@@ -92,35 +92,34 @@ GHOSTS = {
 }
 
 
-# Where each coastal shire's ship number is moored, in the same points as the
-# frames above.
+# Where each coastal shire's ship number is moored: the sail of the longship
+# the printed sheet drew there, in the same points as the frames above.
 #
-# The printed sheets drew the number on a little boat out in the water, and
-# nothing transcribed where those boats were, so these were found rather than
-# read off: each sheet was rendered at this resolution, the sea picked out by
-# the two blues the artist used for it, and each shire's outline walked for the
-# longest stretch whose seaward side is open water -- its beach rather than its
-# borders. The midpoint of that stretch, pushed out into the water, is what is
-# written here.
+# Not chosen -- read off. An earlier version of this guessed a spot by walking
+# each coastline for its longest open-water stretch, which put every number
+# somewhere plausible and none of them where the map actually has a ship. The
+# boats are still in the printed PDF, so the honest answer was to go and get
+# them: tools/export_map_marks.py pulls the hulls out by the gold the artist
+# used for them, matches each to the nearest coastal outline, and prints this
+# table. It refuses to print a partial one -- every coastal shire on a sheet
+# must come out with exactly one ship, or the reading is wrong somewhere.
 #
-# Kept as a table rather than as the code that found it. That code wanted a
-# browser to rasterise with and an imaging library to read the pixels back,
-# which is a great deal of machinery to carry in a build tool for twelve pairs
-# of numbers that only move if the artwork is redrawn -- and if it is redrawn,
-# these want checking by eye anyway. Same bargain as GHOSTS above.
+# Kept as a table rather than as that code, which wants a PDF library this
+# build does not otherwise need, for twelve pairs of numbers that only move if
+# the map is redrawn. Same bargain as GHOSTS above.
 SEA_ANCHORS = {
-    "bernicia": (554, 255),
-    "jorvik": (952, 710),
-    "lindsey": (1082, 1049),
-    "ribble": (77, 809),
-    "wrekinsets": (63, 1178),
-    "hwicce": (261, 1109),
-    "wiltshire": (689, 1472),
-    "west_country": (110, 1142),
-    "east_anglia": (861, 247),
-    "essex": (861, 1026),
-    "kent": (990, 1282),
-    "sussex": (543, 1503),
+    "bernicia": (549, 290),
+    "jorvik": (924, 705),
+    "ribble": (48, 985),
+    "lindsey": (1023, 1086),
+    "wrekinsets": (74, 1209),
+    "hwicce": (325, 1026),
+    "wiltshire": (692, 1452),
+    "west_country": (375, 1478),
+    "east_anglia": (1103, 580),
+    "essex": (916, 917),
+    "kent": (924, 1318),
+    "sussex": (545, 1472),
 }
 
 

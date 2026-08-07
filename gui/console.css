@@ -642,15 +642,9 @@ rb-map { display: block; }
 
 .rb-cell-verdict.is-lost { fill: var(--rb-blood); fill-opacity: 1; }
 
-/* The ship value, out on the water where the printed sheet drew it. */
-.rb-sea-hull {
-  fill: var(--rb-paper);
-  fill-opacity: 0.94;
-  stroke: var(--rb-ink);
-  stroke-opacity: 0.7;
-  stroke-width: 1.5;
-}
-
+/* The ship value, on the sail of the longship the printed map moored there.
+   The boat itself is artwork — see .rb-map-marks — so all that is drawn here
+   is the digit. */
 .rb-sea-cost {
   font: 700 13px var(--rb-sans);
   fill: var(--rb-ink);
@@ -658,10 +652,10 @@ rb-map { display: block; }
 }
 
 /* Moved off the printed number by a contract or a defensive fleet. */
-.rb-sea.is-moved .rb-sea-hull { stroke: var(--rb-blood); stroke-opacity: 1; }
 .rb-sea.is-moved .rb-sea-cost { fill: var(--rb-blood); }
 
-.rb-sea.is-selected .rb-sea-hull { stroke: var(--rb-gold, #8a6d1f); stroke-width: 2.5; }
+.rb-sea.is-selected .rb-sea-cost { fill: var(--rb-gold, #8a6d1f); }
+.rb-sea.is-selected .rb-sea-hit { fill-opacity: 0.14; }
 
 /* Same bargain as the settlement letters: the cells take no clicks, so the
    boat has to put them back on for itself, and only on a facilitator's map. */

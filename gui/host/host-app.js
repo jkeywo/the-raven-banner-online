@@ -405,7 +405,10 @@ export async function startHostApp({ location = window.location } = {}) {
     asFacilitator(event.detail.verb, event.detail.payload));
 
   document.addEventListener('rb-shire', (event) => {
-    $('shire-editor').shireId = event.detail.shireId;
+    // Reached for rather than assumed: this listener is on the document and
+    // outlives any particular page, so a late event from a map that is on its
+    // way out must not take the console with it.
+    if ($('shire-editor')) $('shire-editor').shireId = event.detail.shireId;
   });
 
   // The map turns its own page when a repeated neighbour is clicked, and this

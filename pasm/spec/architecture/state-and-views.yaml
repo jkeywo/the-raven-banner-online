@@ -250,6 +250,7 @@ entities:
         - Renders a projection and nothing else. It holds no game state, patches nothing and predicts nothing, so a reconnect costs nothing to reconcile -- the next projection is simply what is true now.
         - It cannot leak what it was never sent. Another player's resources are absent from the projection rather than present and hidden, so no rendering mistake could show them.
         - "The map art is geography and nothing else -- terrain, coastline, borders, sea -- so the overlay owns the whole board and draws every shire's frame, steward, support, castles and settlements every turn. Art that stated a fact about the game could not be corrected when the fact moved; art that states none of them can never be wrong."
+        - "A second art layer sits between the two, and the line it draws is 'fixed property of the board' rather than 'geography'. The longships moored off each coast and the black double-headed arrows across the borders were true when the map was drawn and are true now: no command moves them and no projection carries them. They were lost when the clean sheets replaced the printed ones, and tools/export_map_marks.py recovers them from the printed PDF as vector paths rather than having the app draw its own. What the overlay adds on top is the one part of a ship that is game state -- the number on its sail."
     architecture:
       kind: client-interface
       authority: non-authoritative

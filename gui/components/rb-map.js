@@ -135,7 +135,13 @@ export class RbMap extends HTMLElement {
     this._render();
   }
 
-  attributeChangedCallback() { this._render(); }
+  attributeChangedCallback(name, was, now) {
+    // However the sheet was turned — a tab, a repeated neighbour, a page
+    // setting it directly — arriving at one puts down whatever was being held
+    // on the last. See _clearSelection.
+    if (name === 'sheet' && was !== null && was !== now) this._clearSelection();
+    this._render();
+  }
 
   _build() {
     this._built = true;
@@ -159,6 +165,19 @@ export class RbMap extends HTMLElement {
 
     // Built rather than written into the markup above: `<image>` inside an
     // HTML-parsed `<svg>` is a corner of the parser worth not relying on.
+    // Two layers of artwork, both from the artist. The sheet underneath is
+    // terrain, coastline and sea and says nothing about the game. The marks on
+    // top are the longships and the adjacency arrows, recovered from the
+    // printed map — fixed properties of the board rather than game state, so
+    // they belong with the art rather than with the overlay that draws what is
+    // true this turn.
+    const marks = document.createElementNS(SVG_NS, 'image');
+    marks.setAttribute('class', 'rb-map-marks');
+    marks.setAttribute('x', '0');
+    marks.setAttribute('y', '0');
+    marks.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+    this.querySelector('.rb-map-sheet').prepend(marks);
+
     const art = document.createElementNS(SVG_NS, 'image');
     art.setAttribute('class', 'rb-map-art');
     art.setAttribute('x', '0');
@@ -241,18 +260,39 @@ export class RbMap extends HTMLElement {
    */
   showShire(shireId) {
     const sheet = this._data?.shires?.shires?.[shireId]?.map;
-    if (!sheet) return;
-    this._selected = null;   // so the toggle in _select cannot swallow it
-    if (sheet !== this.sheet) {
-      this.setAttribute('sheet', sheet);
-      // Both consoles draw the sheet buttons themselves, so the map turning
-      // its own page has to say so or the row would go on pointing at the
-      // sheet that was showing a moment ago.
-      this.dispatchEvent(new CustomEvent('rb-sheet', {
-        bubbles: true, detail: { sheetId: sheet },
-      }));
-    }
-    this._select(shireId);
+    if (!sheet || sheet === this.sheet) return;
+    this.setAttribute('sheet', sheet);
+    // Both consoles draw the sheet buttons themselves, so the map turning its
+    // own page has to say so or the row would go on pointing at the sheet that
+    // was showing a moment ago.
+    this.dispatchEvent(new CustomEvent('rb-sheet', {
+      bubbles: true, detail: { sheetId: sheet },
+    }));
+  }
+
+  /**
+   * Turning the page puts everything down.
+   *
+   * A selection is about a shire on the sheet in front of you. Carried across
+   * a sheet change it is a card for something nobody can see, a highlight on a
+   * different sheet's worth of ground, and — when the shire you came back to
+   * was the one still held — a first click that reads as a second and closes
+   * what you were trying to open. Clearing on the change makes every arrival
+   * at a sheet the same arrival.
+   */
+  _clearSelection() {
+    if (this._selected === null && !this._settlement && !this._sea) return;
+    this._selected = null;
+    this._settlement = null;
+    this._sea = null;
+    // Only announced from a map that is on a page. attributeChangedCallback
+    // fires on a detached element too — during an upgrade, or after the page
+    // around it has been torn down — and the pages that listen for this reach
+    // for their own card by id, which by then is not there.
+    if (!this.isConnected) return;
+    this.dispatchEvent(new CustomEvent('rb-shire', {
+      bubbles: true, detail: { shireId: null },
+    }));
   }
 
   /** The same gesture on a settlement: click it to open, click it to close. */
@@ -346,10 +386,15 @@ export class RbMap extends HTMLElement {
     svg.setAttribute('width', width);
     svg.setAttribute('height', height);
 
-    const art = this.querySelector('.rb-map-art');
-    art.setAttribute('href', `assets/maps/${this.sheet}.svg`);
-    art.setAttribute('width', width);
-    art.setAttribute('height', height);
+    for (const [selector, file] of [
+      ['.rb-map-art', `${this.sheet}.svg`],
+      ['.rb-map-marks', `marks-${this.sheet}.svg`],
+    ]) {
+      const layer = this.querySelector(selector);
+      layer.setAttribute('href', `assets/maps/${file}`);
+      layer.setAttribute('width', width);
+      layer.setAttribute('height', height);
+    }
 
     const sheetCells = cells?.sheets?.[this.sheet] ?? {};
     const overlay = this.querySelector('.rb-map-overlay');
@@ -594,11 +639,11 @@ export class RbMap extends HTMLElement {
     if (cost !== printed.shipCost) group.classList.add('is-moved');
     if (this._sea === id) group.classList.add('is-selected');
 
-    const hull = document.createElementNS(SVG_NS, 'path');
-    hull.setAttribute('class', 'rb-sea-hull');
-    hull.setAttribute('d', boatPath(at.x, at.y));
-    group.append(hull);
-
+    // No hull drawn here. The ship is already on the sheet, recovered from the
+    // printed map by tools/export_map_marks.py and laid down with the arrows —
+    // so all this adds is the digit on its sail, which is the one part of it
+    // that is game state. A second hand-drawn boat over the artist's was the
+    // previous answer and looked exactly like what it was.
     const text = document.createElementNS(SVG_NS, 'text');
     text.setAttribute('class', 'rb-sea-cost');
     text.setAttribute('x', at.x);
@@ -610,8 +655,8 @@ export class RbMap extends HTMLElement {
       const hit = document.createElementNS(SVG_NS, 'circle');
       hit.setAttribute('class', 'rb-sea-hit');
       hit.setAttribute('cx', at.x);
-      hit.setAttribute('cy', at.y);
-      hit.setAttribute('r', 20);
+      hit.setAttribute('cy', at.y + 8);
+      hit.setAttribute('r', 22);
       group.append(hit);
     }
 
@@ -964,20 +1009,6 @@ function castlePath(cx, cy, size) {
     + `L${x + 2 * m} ${y + m} L${x + 2 * m} ${y} L${x + 3 * m} ${y} `
     + `L${x + 3 * m} ${y + m} L${x + 4 * m} ${y + m} L${x + 4 * m} ${y} `
     + `L${x + 5 * m} ${y} L${x + 5 * m} ${y + h} Z`;
-}
-
-/**
- * A hull with a sail, small enough to read as a token rather than as scenery.
- *
- * Drawn rather than lettered because the printed sheets drew one, and because
- * a bare number floating in the sea would read as a depth sounding. The number
- * sits in the hull.
- */
-function boatPath(cx, cy) {
-  const w = 17;
-  return `M${cx - w} ${cy - 4} L${cx + w} ${cy - 4} L${cx + w - 6} ${cy + 10} `
-    + `L${cx - w + 6} ${cy + 10} Z `
-    + `M${cx} ${cy - 6} L${cx} ${cy - 20} L${cx + 11} ${cy - 9} Z`;
 }
 
 /**
