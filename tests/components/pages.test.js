@@ -80,6 +80,36 @@ describe('the facilitator console', () => {
       .resolves.not.toThrow();
   });
 
+  it('beeps three times when a phase runs out, then once every ten seconds', async () => {
+    // A facilitator running a room is listening to the table, not watching
+    // this screen. The clock has to say it, not only show it.
+    await loadPage('host.html');
+    const beeps = [];
+    const beeper = { beep: (count, hz) => beeps.push(`${count}@${hz}`) };
+    const { startHostApp } = await import('../../gui/host/host-app.js');
+    await startHostApp({ location: { hash: '', href: 'http://x/host.html' }, beeper });
+    document.getElementById('new-game').click();
+    document.getElementById('advance-phase').click();     // lobby -> team
+
+    const clock = document.getElementById('clock');
+    const { endsAt } = clock._phase;
+    expect(endsAt).toBeTruthy();
+    const tick = (at) => { clock.now = () => at; clock.phase = clock._phase; };
+
+    tick(endsAt - 1_000);
+    expect(beeps).toEqual([]);
+
+    tick(endsAt + 500);
+    expect(beeps).toEqual(['3@880']);
+
+    tick(endsAt + 5_000);                                 // still the first ten
+    expect(beeps).toEqual(['3@880']);
+
+    tick(endsAt + 11_000);
+    tick(endsAt + 22_000);
+    expect(beeps).toEqual(['3@880', '1@660', '1@660']);
+  });
+
   it('finds every control it wires', async () => {
     // The failure this guards against is a control renamed in the markup and
     // not in the script: `$('take-over')` returning null, and the page dying

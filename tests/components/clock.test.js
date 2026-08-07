@@ -28,6 +28,95 @@ function clockAt({ endsAt = null, paused = false, pausedRemainingMs = null,
 
 beforeEach(() => { document.body.innerHTML = ''; });
 
+describe('the clock saying when it has crossed a line', () => {
+  /** Re-render at a moment, as a tick would, and collect what was raised. */
+  const tick = (clock, at) => { clock.now = () => at; clock.phase = clock._phase; };
+
+  const listening = (clock) => {
+    const heard = [];
+    for (const kind of ['rb-time-up', 'rb-overtime']) {
+      clock.addEventListener(kind, (e) => heard.push(`${kind}@${Math.round(e.detail.overMs)}`));
+    }
+    return heard;
+  };
+
+  it('says nothing while there is time left', () => {
+    const clock = clockAt({ endsAt: 5 * MINUTE }, 0);
+    const heard = listening(clock);
+    tick(clock, 4 * MINUTE);
+    tick(clock, 5 * MINUTE - 1);
+    expect(heard).toEqual([]);
+  });
+
+  it('says the time is up once, however often it is asked', () => {
+    const clock = clockAt({ endsAt: 5 * MINUTE }, 0);
+    const heard = listening(clock);
+    tick(clock, 5 * MINUTE + 100);
+    tick(clock, 5 * MINUTE + 600);
+    tick(clock, 5 * MINUTE + 1_100);
+    expect(heard).toEqual(['rb-time-up@100']);
+  });
+
+  it('marks each ten seconds of overtime, once each', () => {
+    const clock = clockAt({ endsAt: 5 * MINUTE }, 0);
+    const heard = listening(clock);
+    tick(clock, 5 * MINUTE + 1_000);        // time up
+    tick(clock, 5 * MINUTE + 9_000);        // still the first ten seconds
+    tick(clock, 5 * MINUTE + 10_500);       // second step
+    tick(clock, 5 * MINUTE + 15_000);       // same step, nothing new
+    tick(clock, 5 * MINUTE + 21_000);       // third
+    expect(heard).toEqual([
+      'rb-time-up@1000', 'rb-overtime@10500', 'rb-overtime@21000',
+    ]);
+  });
+
+  it('does not empty a backlog at a facilitator who was on Discord', () => {
+    // The reason this counts steps rather than elapsed time. A background tab
+    // is throttled and can come back a long way behind; three minutes away
+    // should be one beep on return, not eighteen.
+    const clock = clockAt({ endsAt: 5 * MINUTE }, 0);
+    const heard = listening(clock);
+    tick(clock, 5 * MINUTE + 500);
+    tick(clock, 8 * MINUTE);
+    expect(heard).toEqual(['rb-time-up@500', 'rb-overtime@180000']);
+  });
+
+  it('starts again on the next phase', () => {
+    const clock = clockAt({ endsAt: 5 * MINUTE }, 0);
+    const heard = listening(clock);
+    // First sight of this clock is already twelve seconds over, which is one
+    // crossing and not two: the step it landed in is the step it starts from.
+    tick(clock, 5 * MINUTE + 12_000);
+    expect(heard).toEqual(['rb-time-up@12000']);
+
+    clock.phase = { turn: 1, name: 'battle', endsAt: 20 * MINUTE, paused: false };
+    tick(clock, 20 * MINUTE + 300);
+    expect(heard).toEqual(['rb-time-up@12000', 'rb-time-up@300']);
+  });
+
+  it('goes quiet while paused, and does not shout on resume', () => {
+    // A paused clock is not running out of anything. And the pause has to
+    // clear what was counted, or resuming into overtime would say nothing
+    // until the step it was already past came round again.
+    const clock = clockAt({ endsAt: 5 * MINUTE }, 0);
+    const heard = listening(clock);
+    clock.phase = { turn: 1, name: 'team', endsAt: 5 * MINUTE, paused: true, pausedRemainingMs: -5_000 };
+    tick(clock, 9 * MINUTE);
+    expect(heard).toEqual([]);
+
+    clock.phase = { turn: 1, name: 'team', endsAt: 5 * MINUTE, paused: false };
+    tick(clock, 9 * MINUTE);
+    expect(heard).toEqual(['rb-time-up@240000']);
+  });
+
+  it('says nothing in the lobby or the aftermath, which have no deadline', () => {
+    const clock = clockAt({ endsAt: null, name: 'lobby' }, 9 * MINUTE);
+    const heard = listening(clock);
+    tick(clock, 99 * MINUTE);
+    expect(heard).toEqual([]);
+  });
+});
+
 describe('<rb-phase-clock>', () => {
   it('reads the time off the wall rather than counting ticks', () => {
     // The reason the component takes a deadline: a background tab has its

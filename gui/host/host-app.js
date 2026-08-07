@@ -18,6 +18,7 @@ import {
 } from './persistence.js';
 import { PrimarySession, CoFacilitatorSession } from './session.js';
 import { eventPumpFor } from './event-pump.js';
+import { createBeeper } from '../sound.js';
 import { installSessionToken } from '../net/session-token.js';
 import { loadSavedName, saveName } from '../net/name-storage.js';
 import {
@@ -41,7 +42,7 @@ import '../components/rb-shire-editor.js';
 
 const $ = (id) => document.getElementById(id);
 
-export async function startHostApp({ location = window.location } = {}) {
+export async function startHostApp({ location = window.location, beeper = createBeeper() } = {}) {
   const data = await loadData();
   const persistence = new Persistence({
     onError: () => {
@@ -410,6 +411,17 @@ export async function startHostApp({ location = window.location } = {}) {
     // way out must not take the console with it.
     if ($('shire-editor')) $('shire-editor').shireId = event.detail.shireId;
   });
+
+  // --- the clock, out loud ----------------------------------------------------
+  // A facilitator running a room is not looking at this screen. They are
+  // listening to a negotiation across the table, and the one thing they must
+  // not miss is a phase running out — so the clock says it rather than only
+  // showing it. Three at the deadline because three is unmistakably a signal
+  // and not a notification; one every ten seconds after, because past the
+  // deadline the question has changed from "how long" to "are you going to
+  // call it", and that wants nagging rather than announcing.
+  document.addEventListener('rb-time-up', () => beeper.beep(3, 880));
+  document.addEventListener('rb-overtime', () => beeper.beep(1, 660));
 
   // The map turns its own page when a repeated neighbour is clicked, and this
   // row has to follow it. Only the buttons are set here, not the sheet: the

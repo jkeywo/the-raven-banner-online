@@ -31,6 +31,7 @@ import { admit } from '../rules/admission.js';
 import { payloadFrom, shireTargetsFor } from '../rules/commands.js';
 import '../components/rb-connection-dot.js';
 import '../components/rb-seat-roster.js';
+import { createBeeper, createPhaseAnnouncer } from '../sound.js';
 import '../components/rb-map.js';
 import '../components/rb-private-sheet.js';
 import '../components/rb-aftermath.js';
@@ -43,7 +44,7 @@ import '../components/rb-ballot.js';
 
 const $ = (id) => document.getElementById(id);
 
-export async function startPlayerApp({ location = window.location } = {}) {
+export async function startPlayerApp({ location = window.location, beeper = createBeeper() } = {}) {
   const client = new ClientState();
   const manager = new ConnectionManager();
   window.connectionManager = manager;      // what command-gateway resolves to
@@ -294,6 +295,8 @@ export async function startPlayerApp({ location = window.location } = {}) {
 
   client.subscribe(render);
 
+  const announcePhase = createPhaseAnnouncer({ beeper });
+
   function render() {
     $('connection').setAttribute('status', client.status);
 
@@ -353,6 +356,7 @@ export async function startPlayerApp({ location = window.location } = {}) {
     // with the tabs for the top of the game panel.
     $('bar-status').hidden = false;
     $('bar-role').textContent = data.roles.roles[mine]?.name ?? mine;
+    announcePhase(view.phase);
     $('clock').phase = view.phase;
     $('actions').data = data;
     $('actions').view = view;

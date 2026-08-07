@@ -95,6 +95,47 @@ export class RbPhaseClock extends HTMLElement {
       : (left !== null && left < 0)
         ? 'Over time — the facilitator will call it'
         : PHASE_NOTES[phase.name] ?? '';
+
+    this._announce(phase, left);
+  }
+
+  /**
+   * Says when the clock crosses a line. It does not decide what that is worth.
+   *
+   * Both consoles mount this component and only one of them makes a noise, so
+   * the knowledge that a phase has run out belongs here and the choice to beep
+   * about it belongs to the page — the same split as everywhere else.
+   *
+   * Counted in whole ten-second steps of overtime rather than by elapsed
+   * ticks, and at most one event per render however many steps went by. A tab
+   * in the background has its timers throttled to about once a second and can
+   * come back a long way behind; a facilitator who alt-tabs to Discord for
+   * three minutes should hear one beep on their return, not eighteen.
+   */
+  _announce(phase, left) {
+    const deadline = phase.paused ? null : phase.endsAt;
+    if (deadline !== this._deadline) {
+      // A new phase, or a pause: whatever was counted was counted against a
+      // clock that no longer exists.
+      this._deadline = deadline;
+      this._step = null;
+    }
+    if (deadline === null || left === null || left >= 0) return;
+
+    const step = Math.floor(-left / 10_000);
+    if (this._step === null) {
+      this._step = step;
+      this.dispatchEvent(new CustomEvent('rb-time-up', {
+        bubbles: true, detail: { overMs: -left },
+      }));
+      return;
+    }
+    if (step > this._step) {
+      this._step = step;
+      this.dispatchEvent(new CustomEvent('rb-overtime', {
+        bubbles: true, detail: { overMs: -left },
+      }));
+    }
   }
 }
 
