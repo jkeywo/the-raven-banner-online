@@ -8,6 +8,13 @@ or similar — and uses this app for the board, their private sheet, and the dic
 
 **Status: in development. Not yet playable.**
 
+The current build is live at
+**[jkeywo.github.io/the-raven-banner-online](https://jkeywo.github.io/the-raven-banner-online/)**
+— players land on that page, facilitators want
+[host.html](https://jkeywo.github.io/the-raven-banner-online/host.html). It is
+published from `gh-pages` by CI, so whatever is up there is a revision whose
+tests passed.
+
 ## Playing
 
 **Players** open the link the facilitator gives you, enter your name, and claim

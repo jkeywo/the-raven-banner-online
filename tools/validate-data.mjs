@@ -198,11 +198,14 @@ export async function validateData() {
   if (pagan.length !== CHECKSUMS.paganShires) {
     fail(`expected ${CHECKSUMS.paganShires} pagan shires at turn 0, found ${pagan.length}`);
   }
-  // TODO(M2): the unsupported count needs the real support rule -- you have
+  // The third turn-zero number, the unsupported count, is asserted in
+  // tests/rules/derive.test.js instead of here. It cannot be read off the data
+  // the way the two above can: it needs the support rule itself -- you have
   // support where you or your liege hold a crown named in the shire's support
-  // box -- which lives in gui/rules/derive.js. That the published answer is 3,
-  // and that the three Danish shires are exactly the three that can have no
-  // support at turn 0, is the check that will pin the rule down.
+  // box -- and that lives in gui/rules/derive.js, which this validator does
+  // not load. The check is the same one, and it is the check that pinned the
+  // rule down: the published answer is 3, and the three Danish shires are
+  // exactly the three that can have no support when the game opens.
 
   // --- tactic table ---------------------------------------------------------
   if (Object.keys(tactics).length !== 5) fail(`expected 5 tactic cards, found ${Object.keys(tactics).length}`);
