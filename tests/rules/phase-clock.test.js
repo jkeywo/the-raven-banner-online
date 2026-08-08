@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { loadData } from '../helpers/load-data.js';
 import { createInitialState, PHASES } from '../../gui/rules/state.js';
 import { apply } from '../../gui/rules/reducer.js';
-import { admit } from '../../gui/rules/admission.js';
+import { admit, availableTo } from '../../gui/rules/admission.js';
 import { remainingMs } from '../../gui/rules/commands.js';
 
 const data = await loadData();
@@ -21,6 +21,91 @@ function at(state, ts, verb, payload = {}) {
   if (!result.ok) throw new Error(`${verb} refused: ${result.reason}`);
   return result.state;
 }
+
+describe('the two ends of the game', () => {
+  const asPlayer = (roleId) => ({ seatId: `s-${roleId}`, kind: 'player', roleId });
+
+  const seatedFresh = () => {
+    const state = fresh();
+    state.seats.s1 = {
+      id: 's1', token: 't1', name: 'Jo', roleId: null, kind: 'player',
+      connected: true, lastSeen: 0,
+    };
+    return state;
+  };
+
+  it('holds the pregame at nothing rather than leaving it without a clock', () => {
+    // A phase of no length, held. Not "no clock", which is what a null
+    // deadline gives and which leaves the facilitator's controls dead.
+    expect(fresh().phase).toMatchObject({
+      name: 'lobby', turn: 1, paused: true, pausedRemainingMs: 0, endsAt: null,
+    });
+    expect(remainingMs(fresh().phase, 999)).toBe(0);
+  });
+
+  it('cannot run out, so nothing can be over time before the game starts', () => {
+    // Held means held: however long the room takes to sit down, the pregame
+    // never crosses a deadline and never beeps at anybody.
+    const phase = fresh().phase;
+    expect(remainingMs(phase, 0)).toBe(0);
+    expect(remainingMs(phase, 10 * MINUTE)).toBe(0);
+    expect(remainingMs(phase, 10_000 * MINUTE)).not.toBeLessThan(0);
+  });
+
+  it('refuses a player their game actions before the game begins', () => {
+    const state = seatedFresh();
+    for (const verb of ['cast-vote', 'answer-consent', 'envoy-message',
+      'confirm-rebel', 'cancel-rebel']) {
+      expect(admit(state, data, { verb, payload: {} }, asPlayer('cenred')).reason, verb)
+        .toBe('the game has not begun yet');
+    }
+  });
+
+  it('refuses a player their game actions once time is called', () => {
+    const over = at(seatedFresh(), 0, 'facilitator:end-game');
+    expect(over.phase.name).toBe('epilogue');
+    for (const verb of ['cast-vote', 'answer-consent', 'envoy-message']) {
+      expect(admit(over, data, { verb, payload: {} }, asPlayer('cenred')).reason, verb)
+        .toBe('the game is over');
+    }
+  });
+
+  it('still lets somebody take a character at either end', () => {
+    // The whole business of the pregame; and after time is called it changes
+    // nothing on the board, so refusing it would only strand a reconnection.
+    const state = seatedFresh();
+    const claim = { verb: 'claim-role', payload: { roleId: 'cenred' } };
+    expect(admit(state, data, claim, { seatId: 's1', kind: 'player', roleId: null }))
+      .toMatchObject({ ok: true });
+
+    const over = at(state, 0, 'facilitator:end-game');
+    expect(admit(over, data, claim, { seatId: 's1', kind: 'player', roleId: null }))
+      .toMatchObject({ ok: true });
+  });
+
+  it('leaves the facilitator every one of their own controls', () => {
+    // Blocking play is about players. An umpire fixing the board before the
+    // room sits down, or correcting the record afterwards, is the reason the
+    // inspector exists.
+    const state = seatedFresh();
+    for (const phase of [state, at(state, 0, 'facilitator:end-game')]) {
+      expect(admit(phase, data, {
+        verb: 'facilitator:set-steward', payload: { shireId: 'kent', roleId: 'cenred' },
+      }, FACILITATOR)).toMatchObject({ ok: true });
+    }
+  });
+
+  it('offers a player nothing out of play but taking a character', () => {
+    // What is listed, not what is legal: a console renders this list, so an
+    // action still in it out of play is one a player can see and press and be
+    // refused for. In a playing phase the same call has plenty to say.
+    const state = seatedFresh();
+    const offered = (s) => availableTo(s, data, asPlayer('cenred')).map((e) => e.verb);
+    expect(offered(state)).toEqual(['claim-role']);
+    expect(offered(at(state, 0, 'facilitator:end-game'))).toEqual(['claim-role']);
+    expect(offered(at(state, 0, 'facilitator:advance-phase')).length).toBeGreaterThan(5);
+  });
+});
 
 describe('the clock is a deadline, not a countdown', () => {
   it('sets an end time from the printed length of the phase', () => {
@@ -90,8 +175,18 @@ describe('pausing', () => {
   });
 
   it('refuses when there is no clock to pause', () => {
+    // The pregame is one of the two ends of the game, held at nothing. It
+    // reads as paused, but starting it would run a zero-second phase straight
+    // into overtime and beep at a room that has not sat down; the way out of
+    // it is Next phase.
     expect(admit(fresh(), data, { verb: 'facilitator:pause-clock' }, FACILITATOR))
       .toMatchObject({ ok: false, reason: 'there is no clock running' });
+
+    const over = at(fresh(), 0, 'facilitator:end-game');
+    expect(admit(over, data, { verb: 'facilitator:pause-clock' }, FACILITATOR))
+      .toMatchObject({ ok: false, reason: 'there is no clock running' });
+    expect(admit(over, data, { verb: 'facilitator:extend-clock', payload: { minutes: 1 } },
+      FACILITATOR)).toMatchObject({ ok: false, reason: 'there is no clock running' });
   });
 
   it('starts the next phase running, whatever the last one was doing', () => {

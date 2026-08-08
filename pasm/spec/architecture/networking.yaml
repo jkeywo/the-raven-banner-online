@@ -279,6 +279,7 @@ entities:
         dies. The only copy of authoritative state is in that tab.
       rationale:
         - This is the one failure that can end a three-hour game outright, so it gets three independent recoveries rather than one good one.
+        - "The rolling autosave is a single slot that follows the game, which recovers a dead tab and nothing else: by the time anybody notices the last twenty minutes went wrong — a battle resolved against the wrong shire, a phase advanced twice — the only save there is has that in it too. So one frozen copy is kept per turn as well, never overwritten, because the whole point of it is being the game as it stood when that turn began. A turn boundary is also the thing a facilitator can name out loud in front of a waiting room, and five of them cost a few kilobytes between them."
     game_design:
       causes:
         - facilitator refreshes the page

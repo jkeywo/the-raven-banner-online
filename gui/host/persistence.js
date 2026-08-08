@@ -22,9 +22,22 @@
  */
 
 export const SAVE_PREFIX = 'rbo:save:';
+/**
+ * One frozen copy per turn, kept beside the rolling one.
+ *
+ * The autosave is a single slot that follows the game, which recovers a dead
+ * tab and nothing else: by the time anybody realises the last twenty minutes
+ * went wrong — a battle resolved against the wrong shire, a phase advanced
+ * twice — the only save there is has that in it too. A turn boundary is the
+ * natural place to be able to go back to, it is the point the facilitator can
+ * actually describe out loud ("we were at the start of turn three"), and five
+ * of them cost a few kilobytes between them.
+ */
+export const TURN_PREFIX = 'rbo:turn:';
 export const DEBOUNCE_MS = 250;
 
 const keyFor = (joinCode) => `${SAVE_PREFIX}${joinCode}`;
+const turnKeyFor = (joinCode, turn) => `${TURN_PREFIX}${joinCode}:${String(turn).padStart(2, '0')}`;
 
 /**
  * Autosave, wired to a host.
@@ -79,6 +92,49 @@ export class Persistence {
     }
   }
 
+  /**
+   * Freeze a copy at the start of a turn, once.
+   *
+   * Never overwritten: the whole value of this copy is that it is the game as
+   * it stood when that turn began, so a second call for a turn already kept is
+   * the one that would destroy what was being kept. Written straight through
+   * rather than debounced, because the moment worth catching is this one and
+   * the debounce exists for the storm of little changes between them.
+   *
+   * @returns {boolean} whether anything was written
+   */
+  checkpoint(save, turn) {
+    if (!this._storage || !save?.joinCode || !(turn >= 1)) return false;
+    const key = turnKeyFor(save.joinCode, turn);
+    try {
+      if (this._storage.getItem(key) !== null) return false;
+      this._storage.setItem(key, JSON.stringify({ ...save, turn }));
+      this.lastError = null;
+      return true;
+    } catch (error) {
+      // Same bargain as the autosave: a full quota must not take the running
+      // game down, and the rolling save and the download are both still there.
+      this.lastError = error;
+      this._onError(error);
+      return false;
+    }
+  }
+
+  /** The turn checkpoints kept for a game, earliest turn first. */
+  checkpoints(joinCode) {
+    if (!this._storage) return [];
+    const found = [];
+    for (let i = 0; i < this._storage.length; i++) {
+      const key = this._storage.key(i);
+      if (!key?.startsWith(`${TURN_PREFIX}${joinCode}:`)) continue;
+      try {
+        const save = JSON.parse(this._storage.getItem(key));
+        if (save?.joinCode) found.push(save);
+      } catch { /* a corrupt entry is not worth failing the list over */ }
+    }
+    return found.sort((a, b) => (a.turn ?? 0) - (b.turn ?? 0));
+  }
+
   /** The save for a join code, or null. */
   read(joinCode) {
     if (!this._storage) return null;
@@ -105,8 +161,18 @@ export class Persistence {
     return saves.sort((a, b) => (b.savedAt ?? 0) - (a.savedAt ?? 0));
   }
 
+  /** Delete a game and every turn kept for it — "delete" has to mean it. */
   forget(joinCode) {
-    try { this._storage?.removeItem(keyFor(joinCode)); } catch { /* nothing to do */ }
+    try {
+      this._storage?.removeItem(keyFor(joinCode));
+      // Collected before removing: the indices shift underneath a live scan.
+      const keys = [];
+      for (let i = 0; i < (this._storage?.length ?? 0); i++) {
+        const key = this._storage.key(i);
+        if (key?.startsWith(`${TURN_PREFIX}${joinCode}:`)) keys.push(key);
+      }
+      for (const key of keys) this._storage.removeItem(key);
+    } catch { /* nothing to do */ }
   }
 
   /** Stop any queued write. */

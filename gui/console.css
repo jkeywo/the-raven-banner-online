@@ -411,7 +411,22 @@ rb-connection-dot[data-tone="connecting"] .rb-dot { animation: rb-pulse 1.4s eas
 /* --- host odds and ends -------------------------------------------------- */
 
 .rb-resumes { list-style: none; margin: 0.5rem 0 0; padding: 0; display: grid; gap: 0.4rem; }
-.rb-resumes li { display: flex; gap: 0.4rem; align-items: stretch; }
+.rb-resumes li { display: flex; gap: 0.4rem; align-items: stretch; flex-wrap: wrap; }
+
+/* The turns kept for a game, on their own line under it. Quiet, because going
+   back to one undoes everything since — it is a rope to grab, not a control
+   anybody should reach for by accident. */
+.rb-resume-turns {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.72rem;
+  color: var(--rb-muted);
+}
+
+.rb-resume-turns button { font-size: 0.72rem; padding: 0.05rem 0.4rem; }
 .rb-resume { display: flex; justify-content: space-between; gap: 1rem; flex: 1; }
 .rb-resume span { color: var(--rb-muted); font-size: 0.85rem; }
 .rb-resume-forget { flex: none; color: var(--rb-blood); }

@@ -18,6 +18,20 @@ export const SCHEMA_VERSION = 1;
 export const PHASES = ['team', 'battle', 'maintenance', 'encounter'];
 
 /**
+ * The two phases that bracket the game rather than being part of it.
+ *
+ * `lobby` is the pregame: people are arriving and taking characters, and
+ * nothing on the board is meant to be happening yet. `epilogue` is the
+ * postgame: time has been called, the debrief is being read, and the board is
+ * the record of what happened rather than something still being played.
+ *
+ * Neither admits a player's game actions — see admission.js. They are named
+ * here rather than tested for by string in five places, because "is the game
+ * being played right now" is one question and deserves one answer.
+ */
+export const OUT_OF_PLAY = ['lobby', 'epilogue'];
+
+/**
  * The three initiative tokens, in the order the sheets name them — which is
  * also their order of precedence.
  *
@@ -209,7 +223,13 @@ export function createInitialState({ joinCode, seed, data, roleIds }) {
     joinCode,
     seed,
     rngCursor: 0,
-    phase: { turn: 1, name: 'lobby', endsAt: null, paused: false, pausedRemainingMs: null },
+    // The pregame is a phase of no length, held. Not "no clock at all", which
+    // is what a null deadline gives and which leaves the facilitator's clock
+    // controls dead until the game starts: held at zero, the same +1 min that
+    // stretches any other phase will give a briefing however long it needs,
+    // and the same Next phase starts the game. It cannot run out while it is
+    // held, so nothing beeps at a room that has not sat down yet.
+    phase: { turn: 1, name: 'lobby', endsAt: null, paused: true, pausedRemainingMs: 0 },
     // Keyed by a short public seat id, never by the seat token. A projection
     // can redact a value but not a key -- the key is structure -- so anything
     // secret has to not be one. The token is the credential that resumes a

@@ -12,6 +12,7 @@
  */
 
 import { COMMANDS, subjectOf, probeFor } from './commands.js';
+import { OUT_OF_PLAY } from './state.js';
 
 /** @typedef {{seatId: string, kind: 'player'|'facilitator', roleId: string|null}} Actor */
 
@@ -34,6 +35,21 @@ export function admit(state, data, cmd, actor) {
       ok: false,
       reason: `that belongs to the ${spec.phases.join(' or ')} phase, `
         + `and this is the ${state.phase.name} phase`,
+    };
+  }
+  // Before the game starts and after it ends, a player does nothing to the
+  // board. `phases: '*'` means "whenever the game is being played" and not
+  // "always" — an envoy reply or a vote landing during the debrief would edit
+  // the record everyone is being read, and one landing in the lobby would be
+  // playing a game that has not begun. Taking a character is the exception,
+  // and says so: that is the whole business of the pregame, and somebody
+  // arriving late needs it in the middle of the game too.
+  if (spec.actor === 'player' && !spec.outOfPlay && OUT_OF_PLAY.includes(state.phase.name)) {
+    return {
+      ok: false,
+      reason: state.phase.name === 'lobby'
+        ? 'the game has not begun yet'
+        : 'the game is over',
     };
   }
 
@@ -59,6 +75,10 @@ export function availableTo(state, data, actor) {
   return Object.entries(COMMANDS)
     .filter(([, spec]) => spec.actor === actor.kind || actor.kind === 'facilitator')
     .filter(([, spec]) => spec.phases === '*' || spec.phases.includes(state.phase.name))
+    // The same gate as admit(), so a console does not offer a player an action
+    // the host is about to refuse for being out of play.
+    .filter(([, spec]) => spec.actor !== 'player' || spec.outOfPlay
+      || !OUT_OF_PLAY.includes(state.phase.name))
     .map(([verb, spec]) => {
       // A client calls this against a redacted projection, which is
       // state-shaped but has holes where other people's secrets were. A rule

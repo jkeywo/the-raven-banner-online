@@ -23,6 +23,17 @@ const PHASE_NAMES = {
   epilogue: 'The Aftermath',
 };
 
+/**
+ * The two ends of the game, which are not phases anybody plays in.
+ *
+ * Said plainly on both consoles, because the thing a player most needs to know
+ * in either is why the board will not let them do anything.
+ */
+const BRACKET_NOTES = {
+  lobby: 'Not started. Take a character — the game begins when the facilitator says so.',
+  epilogue: 'Time has been called. The board is the record now; nothing more can be played.',
+};
+
 /** What each phase is for, for anyone who has not run one before. */
 const PHASE_NOTES = {
   team: 'Talk to your own team only. Declare targets, transfer stewardship.',
@@ -90,11 +101,15 @@ export class RbPhaseClock extends HTMLElement {
       this.dataset.state = phase.paused ? 'paused' : over ? 'over' : left < 60_000 ? 'soon' : 'running';
     }
 
-    this.querySelector('.rb-clock-note').textContent = phase.paused
-      ? 'Paused by the facilitator'
-      : (left !== null && left < 0)
-        ? 'Over time — the facilitator will call it'
-        : PHASE_NOTES[phase.name] ?? '';
+    // The two ends of the game are held rather than running, so "paused" would
+    // read as though somebody had stopped a clock that was going. They get
+    // their own line, and it is the one the phase is actually about.
+    this.querySelector('.rb-clock-note').textContent = BRACKET_NOTES[phase.name]
+      ?? (phase.paused
+        ? 'Paused by the facilitator'
+        : (left !== null && left < 0)
+          ? 'Over time — the facilitator will call it'
+          : PHASE_NOTES[phase.name] ?? '');
 
     this._announce(phase, left);
   }

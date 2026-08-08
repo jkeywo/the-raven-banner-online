@@ -197,6 +197,73 @@ describe('autosave', () => {
     };
   }
 
+  describe('one copy kept per turn', () => {
+    it('keeps the first copy of a turn and never overwrites it', () => {
+      // The whole value of this copy is that it is the game as it stood when
+      // the turn began. A second write for the same turn is the one that would
+      // destroy what was being kept.
+      const storage = fakeStorage();
+      const persistence = new Persistence({ storage });
+      const host = newHost();
+
+      expect(persistence.checkpoint(host.save(), 1)).toBe(true);
+      const first = persistence.checkpoints(CODE)[0];
+
+      host.submit({ verb: 'facilitator:advance-phase', payload: {} },
+        { seatId: 'f', kind: 'facilitator', roleId: null });
+      expect(persistence.checkpoint(host.save(), 1)).toBe(false);
+
+      expect(persistence.checkpoints(CODE)).toHaveLength(1);
+      expect(persistence.checkpoints(CODE)[0].log).toEqual(first.log);
+    });
+
+    it('keeps one per turn, in order', () => {
+      const persistence = new Persistence({ storage: fakeStorage() });
+      const host = newHost();
+      for (const turn of [3, 1, 2]) persistence.checkpoint(host.save(), turn);
+      expect(persistence.checkpoints(CODE).map((s) => s.turn)).toEqual([1, 2, 3]);
+    });
+
+    it('keeps games apart', () => {
+      const storage = fakeStorage();
+      const persistence = new Persistence({ storage });
+      persistence.checkpoint({ joinCode: CODE, seed: 1, log: [] }, 1);
+      persistence.checkpoint({ joinCode: 'OTHER99', seed: 1, log: [] }, 1);
+      expect(persistence.checkpoints(CODE)).toHaveLength(1);
+      expect(persistence.checkpoints('OTHER99')).toHaveLength(1);
+    });
+
+    it('goes when the game goes, because "delete" has to mean it', () => {
+      const storage = fakeStorage();
+      const persistence = new Persistence({ storage });
+      const host = newHost();
+      persistence.write(host.save());
+      for (const turn of [1, 2, 3]) persistence.checkpoint(host.save(), turn);
+      persistence.checkpoint({ joinCode: 'OTHER99', seed: 1, log: [] }, 1);
+      expect(storage.map.size).toBe(5);
+
+      persistence.forget(CODE);
+
+      expect(persistence.checkpoints(CODE)).toEqual([]);
+      expect(persistence.read(CODE)).toBeNull();
+      // And the other game is untouched.
+      expect(persistence.checkpoints('OTHER99')).toHaveLength(1);
+    });
+
+    it('survives a full quota, like every other write here', () => {
+      const errors = [];
+      const persistence = new Persistence({
+        storage: {
+          setItem() { throw new Error('QuotaExceededError'); },
+          getItem: () => null, removeItem() {}, key: () => null, length: 0,
+        },
+        onError: (e) => errors.push(e),
+      });
+      expect(persistence.checkpoint({ joinCode: CODE, seed: 1, log: [] }, 1)).toBe(false);
+      expect(errors).toHaveLength(1);
+    });
+  });
+
   beforeEach(() => vi.useFakeTimers());
 
   it('collapses a burst of changes into one write', () => {

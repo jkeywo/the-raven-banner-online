@@ -25,7 +25,7 @@ import {
   mintJoinCode, mintFacilitatorPin, playerLink, normaliseJoinCode, isValidJoinCode,
 } from '../net/join-code.js';
 import { mintSeed } from '../rules/rng.js';
-import { rosterFor } from '../rules/state.js';
+import { rosterFor, PHASES, OUT_OF_PLAY } from '../rules/state.js';
 import { projectView } from '../rules/views.js';
 import { KNOWN_GAPS } from '../rules/gaps.js';
 import '../components/rb-connection-dot.js';
@@ -95,7 +95,25 @@ export async function startHostApp({ location = window.location, beeper = create
         </button>
         <button type="button" class="rb-resume-forget" data-forget="${save.joinCode}"
                 aria-label="Delete game ${save.joinCode}">Delete</button>
+        ${turnsFor(save.joinCode)}
       </li>`).join('');
+  }
+
+  /**
+   * The turns kept for a game, as a row of ways back into it.
+   *
+   * Offered rather than merely stored. A checkpoint nobody can reach is a
+   * checkpoint that is not there, and the reason for keeping these is a
+   * facilitator saying "that went wrong, put us back to the start of turn
+   * three" — which has to be one press, in front of a room that is waiting.
+   */
+  function turnsFor(joinCode) {
+    const kept = persistence.checkpoints(joinCode);
+    if (!kept.length) return '';
+    return `<span class="rb-resume-turns">Back to the start of:${kept.map((save) => `
+      <button type="button" data-turn="${joinCode}|${save.turn}"
+              aria-label="Resume game ${joinCode} from the start of turn ${save.turn}"
+              >turn ${save.turn}</button>`).join('')}</span>`;
   }
 
   // Prefilled from whoever last typed one on this machine.
@@ -167,6 +185,19 @@ export async function startHostApp({ location = window.location, beeper = create
         `Delete the saved game ${code}? This cannot be undone.`) === false) return;
       persistence.forget(code);
       renderResumes();
+      return;
+    }
+    // Going back to a turn before going back to the game, for the same reason
+    // deleting is tested for first: both sit inside the resume button's <li>.
+    const back = event.target.closest('[data-turn]');
+    if (back) {
+      const [code, turn] = back.dataset.turn.split('|');
+      // Everything after that turn began is about to stop having happened.
+      // eslint-disable-next-line no-alert
+      if (globalThis.confirm?.(`Put game ${code} back to the start of turn ${turn}? `
+        + 'Everything played since then is undone.') === false) return;
+      const kept = persistence.checkpoints(code).find((s) => String(s.turn) === turn);
+      if (kept) resume(kept);
       return;
     }
     const button = event.target.closest('[data-code]');
@@ -251,7 +282,17 @@ export async function startHostApp({ location = window.location, beeper = create
     // whole of the takeover: by the time it is needed, the game is already on
     // this machine.
     const save = session.save();
-    if (save) persistence.schedule(save);
+    if (save) {
+      persistence.schedule(save);
+      // And a copy of the moment each turn began, kept for good. The rolling
+      // save above follows the game and so has any mistake in it by the time
+      // anybody notices; a turn boundary is somewhere a facilitator can
+      // actually ask to go back to. Written from a playing phase only, so the
+      // lobby does not claim to be the start of turn one before anything has
+      // happened in it.
+      const { turn, name } = session.state.phase;
+      if (name === PHASES[0] && persistence.checkpoint(save, turn)) renderResumes();
+    }
     render();
   }
 
@@ -352,7 +393,9 @@ export async function startHostApp({ location = window.location, beeper = create
     $('advance-phase').disabled = phase.name === 'epilogue';
     $('pause-clock').textContent = phase.paused ? 'Resume' : 'Pause';
     // Nothing to pause or stretch before the game starts, or after it ends.
-    const running = phase.endsAt !== null || phase.paused;
+    // The pregame is held at zero rather than having no clock at all, so
+    // "is it paused" no longer answers this on its own.
+    const running = !OUT_OF_PLAY.includes(phase.name) && (phase.endsAt !== null || phase.paused);
     for (const id of ['pause-clock', 'extend-clock', 'shorten-clock']) $(id).disabled = !running;
   }
 

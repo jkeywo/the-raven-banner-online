@@ -22,6 +22,11 @@ export const LOBBY_COMMANDS = {
     // The one command a seat issues before it has a role, so it is exempt
     // from the check that a player command must have one.
     roleless: true,
+    // And the one player command that still works when the game is not being
+    // played. Taking a character is the whole business of the pregame; after
+    // time is called it changes nothing on the board, and refusing it would
+    // only strand somebody who reconnected during the debrief.
+    outOfPlay: true,
     admit(ctx) {
       const { state, cmd } = ctx;
       const roleId = cmd.payload?.roleId;

@@ -15,7 +15,7 @@
  * whose `admit` simply always says yes.
  */
 
-import { PHASES, TOKENS } from '../state.js';
+import { PHASES, TOKENS, OUT_OF_PLAY } from '../state.js';
 import { no, ok } from './shared.js';
 
 /**
@@ -90,6 +90,11 @@ export const FACILITATOR_COMMANDS = {
     phases: '*',
     actor: 'facilitator',
     admit(ctx) {
+      // The two ends of the game are held at nothing by definition, so there
+      // is no clock there either — and starting the pregame's would run a
+      // zero-second phase straight into overtime and beep at a room that has
+      // not sat down. "Next phase" is how the pregame is left.
+      if (OUT_OF_PLAY.includes(ctx.state.phase.name)) return no('there is no clock running');
       return ctx.state.phase.endsAt === null && !ctx.state.phase.paused
         ? no('there is no clock running') : ok();
     },
@@ -113,6 +118,11 @@ export const FACILITATOR_COMMANDS = {
     admit(ctx) {
       const minutes = Number(ctx.cmd.payload?.minutes);
       if (!Number.isFinite(minutes) || minutes === 0) return no('say how many minutes');
+      // The two ends of the game are held at nothing by definition, so there
+      // is no clock there either — and starting the pregame's would run a
+      // zero-second phase straight into overtime and beep at a room that has
+      // not sat down. "Next phase" is how the pregame is left.
+      if (OUT_OF_PLAY.includes(ctx.state.phase.name)) return no('there is no clock running');
       return ctx.state.phase.endsAt === null && !ctx.state.phase.paused
         ? no('there is no clock running') : ok();
     },

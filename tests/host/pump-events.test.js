@@ -69,7 +69,9 @@ describe('deriving events', () => {
       data: {
         turn: 1,
         phase: 'lobby',
-        paused: false,
+        // The pregame is held rather than running — a phase of no length that
+        // the facilitator leaves with Next phase.
+        paused: true,
         seats: [
           { seatId: 's1', name: 'Alice', roleId: 'cenred', kind: 'player' },
           { seatId: 's2', name: 'Bryn', roleId: 'guthrum_the_old', kind: 'player' },
@@ -98,7 +100,9 @@ describe('deriving events', () => {
 
   it('treats a pause as a phase event, because to the room it is one', () => {
     const before = seated();
-    before.phase.name = 'team';
+    // From a phase that is actually running: the pregame is held from the
+    // start, so pausing it is not a change anybody in the room would notice.
+    before.phase = { turn: 1, name: 'team', endsAt: 60, paused: false, pausedRemainingMs: null };
     const after = structuredClone(before);
     after.phase.paused = true;
 
