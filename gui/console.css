@@ -1106,29 +1106,50 @@ rb-phase-clock[data-state="paused"] .rb-clock-time::after { content: ' paused'; 
 
 .rb-game-body > * { min-height: 0; }
 
+/* The rails are tabs only where they have to be. Above the breakpoint they are
+   columns that are always in view, and a tab selecting something already on
+   screen would do nothing at all. */
+.rb-tab-rail { display: none; }
+
 @media (max-width: 75rem) {
-  /* Board first, then what you can do, then your own sheet last: the two
-     rails still stack, but the map is what a shrinking window keeps. */
+  /* One thing at a time. The rails stop being columns and become two more
+     tabs beside the board, the battle and the tracker.
+
+     They used to stack instead — board, then actions, then your sheet, in one
+     long scroll. That reads fine on paper and badly in play: a phase is five
+     minutes, and "what can I do" was three screens of map away from the map
+     it was about. A tab is one press from anywhere. */
   .rb-game-body {
     grid-template-columns: 1fr;
-    /* Stacked, there is no shared row height left to divide between three
-       panels — falling back to this one box's own scroll (rather than the
-       page's) is the honest answer on a window this narrow, so the header
-       still stays put. */
     display: block;
+    min-height: 0;
+  }
+  .rb-tab-rail { display: inline-block; }
+  /* Five panes and three sheets is more than a phone has room for on one
+     line, and a row that merely overflows puts the last tab somewhere it
+     cannot be pressed. Wrapping costs nothing at the wide end of this range,
+     where it all fits on one line anyway. */
+  #game-tabs, #game-tabs .rb-map-buttons { flex-wrap: wrap; }
+  /* Whichever one is showing owns the height and does its own scrolling, the
+     same bargain the three columns make above the breakpoint — so the header
+     and the tab row stay put and only the panel under them moves. */
+  .rb-game-body > :not([hidden]) {
+    height: 100%;
+    max-height: 100%;
     overflow-y: auto;
   }
-  .rb-game-main { order: -1; }
-  /* The fixed-height, internally-scrolling treatment above only makes sense
-     when the three columns share one row — stacked, each reverts to normal
-     block flow and lets .rb-game-body do the one scroll that is needed. */
-  .rb-rail, .rb-game-main, .rb-game-main > [data-pane-body] {
-    height: auto;
-    max-height: none;
-    overflow: visible;
-    flex: initial;
-  }
+  .rb-rail { border-radius: 3px; }
 }
+
+/* Above the breakpoint the rails are furniture rather than panes, and simply
+   never carry `hidden` — see applyPanes() in player-app.js. Overruling the
+   attribute here instead was the first attempt and the wrong one: `[hidden]`
+   is `!important` on purpose at the top of this file, so that a pane is
+   actually hidden and not merely dimmed by whatever class it carries, and
+   beating it with a second `!important` would spend that guarantee to save a
+   line of script. The script asks this stylesheet where the breakpoint is by
+   looking at whether the rail tabs are showing, so the number still lives in
+   exactly one place. */
 
 .rb-rail {
   background: var(--rb-parchment);
@@ -1332,6 +1353,7 @@ rb-clash-panel { display: block; }
 .rb-settle > p { flex-basis: 100%; margin: 0; }
 
 #tab-battle[data-live="true"],
+#tab-actions[data-live="true"],
 #facilitator-tabs [data-live="true"] { border-color: var(--rb-blood); font-weight: 600; }
 
 #facilitator-tabs { margin: 1.2rem 0 -1px; }

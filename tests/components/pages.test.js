@@ -462,6 +462,39 @@ describe('the player console', () => {
     expect(document.querySelector('#game-tabs [data-pane="map"]')).toBeNull();
   });
 
+  it('offers the two rails as tabs of their own, for a screen with no room', async () => {
+    // On a narrow window the rails stop being columns and become two more
+    // tabs. The stylesheet decides where that happens; what is checked here is
+    // that selecting one puts the right thing on screen and takes the rest off
+    // — including the box the other three panes live in, which is not a pane
+    // itself and would otherwise sit there empty.
+    await loadPage('index.html');
+    const { startPlayerApp } = await import('../../gui/client/player-app.js');
+    await startPlayerApp({ location: { hash: '' } });
+
+    const rail = document.getElementById('action-rail');
+    const sheet = document.getElementById('character-rail');
+    const main = document.getElementById('game-main');
+
+    document.getElementById('tab-actions').click();
+    expect(rail.hidden).toBe(false);
+    expect(sheet.hidden).toBe(true);
+    expect(main.hidden).toBe(true);
+
+    document.getElementById('tab-you').click();
+    expect(rail.hidden).toBe(true);
+    expect(sheet.hidden).toBe(false);
+    expect(main.hidden).toBe(true);
+
+    // And back to the board: the middle column returns because one of the
+    // panes inside it did.
+    document.querySelector('#map-buttons [data-sheet="northern"]').click();
+    expect(main.hidden).toBe(false);
+    expect(rail.hidden).toBe(true);
+    expect(sheet.hidden).toBe(true);
+    expect(document.getElementById('map').closest('[data-pane-body]').hidden).toBe(false);
+  });
+
   it('switches the map to the sheet clicked, and shows the board to do it', async () => {
     await loadPage('index.html');
     const { startPlayerApp } = await import('../../gui/client/player-app.js');

@@ -133,19 +133,60 @@ export async function startPlayerApp({ location = window.location, beeper = crea
     if (button) selectPane(button.dataset.pane);
   });
 
+  /** The two panes that are columns on a wide window and tabs on a narrow one. */
+  const RAIL_PANES = new Set(['actions', 'you']);
+  let currentPane = 'map';
+  /** The last pane that was actually the middle column, to go back to. */
+  let boardPane = 'map';
+
+  /**
+   * Whether the rails are tabs at the moment.
+   *
+   * Asked of the stylesheet rather than answered here. The breakpoint is a
+   * layout decision and belongs in the layout; duplicating the number in a
+   * matchMedia query would give two places to change it and one of them would
+   * eventually be missed. The rail tabs exist exactly when the rails are tabs,
+   * so their own visibility is the honest question.
+   */
+  const railsAreTabs = () => getComputedStyle($('tab-actions')).display !== 'none';
+
   function selectPane(pane) {
+    currentPane = pane;
+    if (!RAIL_PANES.has(pane)) boardPane = pane;
+    applyPanes();
+  }
+
+  function applyPanes() {
+    const asTabs = railsAreTabs();
+    // A window that grew while a rail was open: the rail is a column again and
+    // its tab has gone, so the selection falls back to the board it left.
+    if (!asTabs && RAIL_PANES.has(currentPane)) currentPane = boardPane;
+    const shown = asTabs ? currentPane : boardPane;
+
     // The sheet buttons live in the same bar and answer a different question —
-    // "which corner of England?" rather than "which of these three screens?" —
-    // so they carry their own selected state, set in selectSheet.
+    // "which corner of England?" rather than "which of these screens?" — so
+    // they carry their own selected state, set in selectSheet.
     for (const button of $('game-tabs').querySelectorAll('[data-pane]')) {
-      button.setAttribute('aria-selected', String(button.dataset.pane === pane));
+      button.setAttribute('aria-selected', String(button.dataset.pane === currentPane));
     }
     for (const section of document.querySelectorAll('[data-pane-body]')) {
-      section.hidden = section.dataset.paneBody !== pane;
+      const rail = RAIL_PANES.has(section.dataset.paneBody);
+      // A rail that is not a tab is always in view, and must not be left
+      // carrying `hidden` — that attribute is !important in the stylesheet, on
+      // purpose, so nothing here can put it back on screen afterwards.
+      section.hidden = rail && !asTabs ? false : section.dataset.paneBody !== shown;
     }
-    // Only one of the three is the board, so the sheet row is lit only there.
-    $('map-buttons').dataset.active = String(pane === 'map');
+    // The middle column is not a pane; it is the box three of them sit in, so
+    // it is in view exactly when one of them is.
+    $('game-main').hidden = !$('game-main').querySelector('[data-pane-body]:not([hidden])');
+    // Only one of them is the board, so the sheet row is lit only there.
+    $('map-buttons').dataset.active = String(shown === 'map');
   }
+
+  // A phone turned on its side crosses the breakpoint, and so does a laptop
+  // window dragged wider. Re-asked rather than remembered, because the answer
+  // is the stylesheet's and it has just changed its mind.
+  window.addEventListener('resize', applyPanes);
 
   /**
    * The three printed sheets, as three buttons rather than one "The board" tab.
@@ -366,11 +407,14 @@ export async function startPlayerApp({ location = window.location, beeper = crea
     $('consents').view = view;
     $('ballot').data = data;
     $('ballot').view = view;
-    // The action rail is always in view now, whichever tab is open, so an
-    // answer somebody is waiting on can mark the rail itself rather than a
-    // tab a player might not be looking at.
-    $('action-rail').dataset.waiting = String(
-      $('consents').pending.length > 0 || $('ballot').pending.length > 0);
+    // Somebody is waiting on an answer from this seat. Said twice, because
+    // where the rail is depends on the window: beside the board on a wide one,
+    // where marking the rail itself is enough, and behind a tab on a narrow
+    // one, where marking the rail would be marking something nobody can see.
+    // Both are set every time and the stylesheet shows whichever applies.
+    const waiting = $('consents').pending.length > 0 || $('ballot').pending.length > 0;
+    $('action-rail').dataset.waiting = String(waiting);
+    $('tab-actions').dataset.live = String(waiting);
 
     $('clash').data = data;
     $('clash').view = view;

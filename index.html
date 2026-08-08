@@ -80,12 +80,20 @@
           <span id="map-buttons" class="rb-map-buttons"></span>
           <button type="button" role="tab" data-pane="battle" id="tab-battle" aria-selected="false">Battle</button>
           <button type="button" role="tab" data-pane="aftermath" aria-selected="false">Aftermath</button>
+          <!-- The two rails, for a screen with no room to put them beside the
+               board. They are tabs only there: on a wide window the rails are
+               always in view and a tab that selects something already on
+               screen is a tab that does nothing. -->
+          <button type="button" role="tab" data-pane="actions" id="tab-actions"
+                  class="rb-tab-rail" aria-selected="false">Actions</button>
+          <button type="button" role="tab" data-pane="you" id="tab-you"
+                  class="rb-tab-rail" aria-selected="false">Your sheet</button>
         </nav>
       </header>
 
       <div class="rb-game-body">
         <!-- what you can do, always in view whichever tab the main pane shows -->
-        <aside id="action-rail" class="rb-rail rb-action-rail">
+        <aside id="action-rail" class="rb-rail rb-action-rail" data-pane-body="actions">
           <rb-ballot id="ballot"></rb-ballot>
           <rb-consent-panel id="consents"></rb-consent-panel>
           <h2>What you can do</h2>
@@ -100,7 +108,7 @@
         </aside>
 
         <!-- the board, or how England is doing, or a battle -->
-        <div class="rb-game-main">
+        <div id="game-main" class="rb-game-main">
           <div data-pane-body="map" class="rb-pane rb-pane-map">
             <!-- What a shire is worth is a card on the shire, not a column
                  beside the map: the answer to "who holds this?" belongs next
@@ -122,8 +130,8 @@
           </div>
         </div>
 
-        <!-- your own sheet, always in view -->
-        <aside id="character-rail" class="rb-rail rb-character-rail">
+        <!-- your own sheet, always in view where there is room for it -->
+        <aside id="character-rail" class="rb-rail rb-character-rail" data-pane-body="you">
           <rb-private-sheet id="sheet"></rb-private-sheet>
         </aside>
       </div>
