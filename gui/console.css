@@ -301,12 +301,26 @@ rb-connection-dot[data-tone="connecting"] .rb-dot { animation: rb-pulse 1.4s eas
 
 .rb-seat {
   display: grid;
-  grid-template-columns: 0.6rem 1fr auto auto;
+  grid-template-columns: 0.6rem 1fr auto auto auto;
   align-items: center;
   gap: 0.6rem;
   padding: 0.4rem 0;
   border-bottom: 1px solid var(--rb-rule);
 }
+
+/* Only on the facilitator's copy, and quiet there. It empties somebody's
+   chair, so it should take a deliberate press and never catch the eye of an
+   umpire reaching for something else — until the seat has actually dropped,
+   which is when it becomes the useful button on the row. */
+.rb-seat-clear {
+  font-size: 0.7rem;
+  padding: 0.1rem 0.45rem;
+  opacity: 0.55;
+}
+
+.rb-seat-clear:hover,
+.rb-seat-clear:focus-visible { opacity: 1; }
+.rb-seat[data-connected="false"] .rb-seat-clear { opacity: 1; border-color: var(--rb-blood); }
 
 .rb-seat-dot {
   width: 0.55rem;

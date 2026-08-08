@@ -55,6 +55,9 @@ entities:
       rationale:
         - "\"Prefill from the starting rules, then let the facilitator modify before committing\" is a client-side concern rather than a server-side negotiation: the form fills in data.roles.roles[id].start, its printed claims and whichever shires the sheet names as its stewardship, the facilitator edits whatever they like, and one command carries the final values. There is no draft state on the host to go stale."
         - "Removing cascades rather than leaving dangling references: their shires go unheld, a seat playing them is freed, an initiative token or crown they held is cleared, and anyone sworn to them loses their liege exactly as though that liege had died without an heir — the same shape rebel and heir-arrives already use."
+        - "Taking a person out of a chair is a different command from taking a character out of the game, and conflating the two would be the expensive mistake. remove-role cascades across the board; remove-seat touches nothing on it. Half a game in, a player going home almost never means their character should stop existing — it means two shires and a crown are sitting there and somebody at the table would like to pick them up exactly as they are."
+        - "Clearing a seat takes its token with it. Left behind, the browser that owned it resumes straight back into the chair the facilitator has just emptied, which is the one thing the command exists to prevent. Whoever it was rejoins as a new seat and takes a character again, down the same road every late arrival walks."
+        - "It does not refuse a seat that looks connected, though that is the case the console offers the button for. Connection is a guess about a network rather than a fact about a person: a seat reads as connected because a tab is open on a laptop in somebody's bag. The umpire is looking at the room, so the command asks once and then does as it is told."
     game_design:
       participating_roles:
         - facilitator
@@ -146,7 +149,7 @@ entities:
       status: proposed
       confidence: confirmed
       title: Roster Edit Commands
-      summary: set-steward, set-settlement, add-claim, remove-claim, assign-initiative, add-role and remove-role — the structured edits a role or shire card can make. Structured rather than unconditional — assign-initiative refuses to leave a role holding two of the three tokens, which is the one facilitator edit with an invariant of its own.
+      summary: set-steward, set-settlement, add-claim, remove-claim, assign-initiative, add-role, remove-role and remove-seat — the structured edits a role, shire or roster row can make. Structured rather than unconditional — assign-initiative refuses to leave a role holding two of the three tokens, which is the one facilitator edit with an invariant of its own.
     architecture:
       authority: request
       producer:

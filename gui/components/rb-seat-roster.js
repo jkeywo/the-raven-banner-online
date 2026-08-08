@@ -11,12 +11,26 @@
  */
 
 export class RbSeatRoster extends HTMLElement {
+  static observedAttributes = ['editable'];
+
   set seats(value) { this._seats = value ?? []; this._render(); }
 
   get seats() { return this._seats ?? []; }
 
   /** Optional map of roleId -> display name, for showing a role properly. */
   set roles(value) { this._roles = value ?? {}; this._render(); }
+
+  /**
+   * Whether each seat offers a way to clear it out.
+   *
+   * An attribute the facilitator's page grants, not something inferred here.
+   * Every console shows this roster and only one of them may empty a chair —
+   * and unlike most of what the umpire can do, this one is aimed at a person
+   * rather than at the board.
+   */
+  get editable() { return this.hasAttribute('editable'); }
+
+  attributeChangedCallback() { this._render(); }
 
   connectedCallback() { this._render(); }
 
@@ -33,12 +47,18 @@ export class RbSeatRoster extends HTMLElement {
       const role = seat.roleId
         ? (this._roles?.[seat.roleId]?.name ?? seat.roleName ?? seat.roleId)
         : null;
+      const who = seat.name || 'Unnamed';
       return `
         <li class="rb-seat" data-connected="${seat.connected}">
           <span class="rb-seat-dot" aria-hidden="true"></span>
-          <span class="rb-seat-name">${escape(seat.name || 'Unnamed')}</span>
+          <span class="rb-seat-name">${escape(who)}</span>
           <span class="rb-seat-role">${role ? escape(role) : '<em>choosing</em>'}</span>
           ${seat.kind === 'facilitator' ? '<span class="rb-seat-tag">facilitator</span>' : ''}
+          ${this.editable ? `
+            <button type="button" class="rb-seat-clear" data-clear-seat="${escape(seat.id)}"
+                    data-who="${escape(who)}" data-role="${role ? escape(role) : ''}"
+                    aria-label="Clear ${escape(who)} out of ${
+  role ? escape(role) : 'their seat'}">Clear</button>` : ''}
         </li>`;
     }).join('');
 
@@ -46,6 +66,27 @@ export class RbSeatRoster extends HTMLElement {
     this.innerHTML = `
       <ul class="rb-roster">${rows}</ul>
       <p class="rb-meta">${playing} player${playing === 1 ? '' : 's'} seated.</p>`;
+
+    for (const button of this.querySelectorAll('[data-clear-seat]')) {
+      button.onclick = () => {
+        const { who, role } = button.dataset;
+        // Asked out loud, like taking a role out of the game. This one is
+        // aimed at a person: the character keeps its lands and its silver and
+        // stays on the board, but whoever was in the chair is out of it and
+        // cannot resume — and at a live table the umpire is one misread row
+        // away from clearing somebody who is only in the loo.
+        // eslint-disable-next-line no-alert
+        const sure = globalThis.confirm?.(role
+          ? `Clear ${who} out of ${role}? ${role} stays in the game, with everything they hold, `
+            + 'and anyone can take them. This person will have to join again.'
+          : `Clear ${who} out? They have not taken a character. They will have to join again.`);
+        if (sure === false) return;
+        this.dispatchEvent(new CustomEvent('rb-facilitate', {
+          bubbles: true,
+          detail: { verb: 'facilitator:remove-seat', payload: { seatId: button.dataset.clearSeat } },
+        }));
+      };
+    }
   }
 }
 

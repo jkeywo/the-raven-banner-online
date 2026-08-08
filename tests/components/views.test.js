@@ -914,4 +914,51 @@ describe('<rb-seat-roster>', () => {
     expect(roster.querySelector('.rb-seat').dataset.connected).toBe('false');
     expect(roster.textContent).toContain('cenred');
   });
+
+  it('gives a player no way to clear anybody out', () => {
+    // Every console shows this roster and only one of them may empty a chair.
+    const roster = mount('rb-seat-roster');
+    roster.seats = [{ id: 's1', name: 'Alice', roleId: 'cenred', kind: 'player', connected: false }];
+    expect(roster.editable).toBe(false);
+    expect(roster.querySelector('[data-clear-seat]')).toBeNull();
+  });
+
+  it('offers the facilitator a way to clear each seat', () => {
+    const roster = mount('rb-seat-roster');
+    roster.setAttribute('editable', '');
+    roster.roles = data.roles.roles;
+    roster.seats = [
+      { id: 's1', name: 'Alice', roleId: 'cenred', kind: 'player', connected: false },
+      { id: 's2', name: 'Bob', roleId: null, kind: 'player', connected: true },
+    ];
+    expect(roster.querySelectorAll('[data-clear-seat]')).toHaveLength(2);
+
+    const sent = [];
+    roster.addEventListener('rb-facilitate', (event) => sent.push(event.detail));
+    globalThis.confirm = () => true;
+    roster.querySelector('[data-clear-seat="s1"]').click();
+    expect(sent).toEqual([{
+      verb: 'facilitator:remove-seat', payload: { seatId: 's1' },
+    }]);
+  });
+
+  it('asks first, and sends nothing when the answer is no', () => {
+    // It empties somebody's chair, and at a live table the umpire is one
+    // misread row away from clearing a player who is only in the loo.
+    const roster = mount('rb-seat-roster');
+    roster.setAttribute('editable', '');
+    roster.seats = [{ id: 's1', name: 'Alice', roleId: 'cenred', kind: 'player', connected: false }];
+
+    const sent = [];
+    roster.addEventListener('rb-facilitate', (event) => sent.push(event.detail));
+    let asked = '';
+    globalThis.confirm = (text) => { asked = text; return false; };
+    roster.querySelector('[data-clear-seat="s1"]').click();
+
+    expect(sent).toEqual([]);
+    // And the question says what survives, since that is the part an umpire
+    // is actually worried about.
+    expect(asked).toContain('Alice');
+    expect(asked).toContain('stays in the game');
+  });
 });

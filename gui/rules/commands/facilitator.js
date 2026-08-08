@@ -403,6 +403,45 @@ export const FACILITATOR_COMMANDS = {
     },
   },
 
+  /**
+   * Clear a seat out of the roster, freeing whatever it was playing.
+   *
+   * Not the same job as remove-role, and the difference is the whole point.
+   * remove-role takes a *character* out of the game and cascades: their shires
+   * go unheld, their vassals lose a liege. This takes a *person* out of the
+   * chair and touches nothing on the board — the character stays exactly as
+   * they were, lands, silver and all, waiting for somebody else to pick them
+   * up. Half a game in, that is almost always what an umpire means: a laptop
+   * died, a player went home, and Cenred still holds two shires that somebody
+   * at the table would like to play.
+   *
+   * The token goes with the seat. Leaving it would let the browser that owned
+   * it resume straight back into a chair the facilitator has just cleared,
+   * which is the one thing this command exists to prevent. A player who is
+   * genuinely still there rejoins as a new seat and takes a character again,
+   * which is the same road every late arrival walks.
+   *
+   * It does not refuse a connected seat. "Disconnected" is what the console
+   * offers the button for, but connection is a guess about a network and not
+   * a fact about a person: a seat can read as connected because a tab is open
+   * on a laptop in a bag. The umpire is looking at the room and this panel is
+   * the pencil, so it does what it is told and asks first.
+   */
+  'facilitator:remove-seat': {
+    phases: '*',
+    actor: 'facilitator',
+    admit(ctx) {
+      return ctx.state.seats[ctx.cmd.payload?.seatId] ? ok() : no('no such seat');
+    },
+    effects(draft, ctx) {
+      const { seatId } = ctx.cmd.payload;
+      delete draft.seats[seatId];
+      for (const [token, id] of Object.entries(draft.seatByToken)) {
+        if (id === seatId) delete draft.seatByToken[token];
+      }
+    },
+  },
+
   'facilitator:set': {
     phases: '*',
     actor: 'facilitator',

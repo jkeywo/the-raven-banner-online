@@ -280,7 +280,14 @@
           <div>
             <h2>Who is here</h2>
             <p id="seated-count" class="rb-meta"></p>
-            <rb-seat-roster id="roster"></rb-seat-roster>
+            <p class="rb-meta">
+              Clearing a seat empties the chair, not the character: whoever was
+              in it can no longer resume, and their role stays on the board with
+              everything it holds for somebody else to take.
+            </p>
+            <!-- `editable` is the whole of what separates this roster from the
+                 identical one every player has open. -->
+            <rb-seat-roster id="roster" editable></rb-seat-roster>
 
             <h2>Connections</h2>
             <pre id="host-log" class="rb-log"></pre>

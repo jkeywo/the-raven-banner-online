@@ -287,6 +287,83 @@ describe('adding a role mid-game', () => {
   });
 });
 
+describe('clearing a seat out of the roster', () => {
+  const seated = (extra = {}) => {
+    const state = fresh();
+    state.seats.s1 = {
+      id: 's1', token: 'tok-1', name: 'Jo', roleId: 'king_alfred', kind: 'player',
+      connected: false, lastSeen: 0, ...extra,
+    };
+    state.seatByToken['tok-1'] = 's1';
+    return state;
+  };
+
+  it('refuses a seat that is not there', () => {
+    expect(refusal(fresh(), FACILITATOR, 'facilitator:remove-seat', { seatId: 'nobody' }))
+      .toBe('no such seat');
+  });
+
+  it('empties the chair without touching the character', () => {
+    // The whole difference from remove-role. Half a game in, a player going
+    // home must not take two shires and their silver off the board with them —
+    // somebody at the table would like to pick Alfred up exactly as he is.
+    const state = seated();
+    const held = Object.keys(state.shires)
+      .filter((id) => state.shires[id].stewardRoleId === 'king_alfred');
+    expect(held.length).toBeGreaterThan(0);
+
+    const after = run(state, FACILITATOR, 'facilitator:remove-seat', { seatId: 's1' });
+
+    expect(after.seats.s1).toBeUndefined();
+    expect(after.roles.king_alfred).toBeTruthy();
+    expect(after.roles.king_alfred.silver).toBe(state.roles.king_alfred.silver);
+    for (const id of held) expect(after.shires[id].stewardRoleId).toBe('king_alfred');
+    expect(after.crownHolders.wessex).toBe('king_alfred');
+  });
+
+  it('takes the token with it, so the seat cannot let itself back in', () => {
+    // The one thing this command exists to prevent. A token left behind is a
+    // browser that resumes straight back into the chair just cleared.
+    const after = run(seated(), FACILITATOR, 'facilitator:remove-seat', { seatId: 's1' });
+    expect(after.seatByToken['tok-1']).toBeUndefined();
+    expect(Object.values(after.seatByToken)).not.toContain('s1');
+  });
+
+  it('frees the role for somebody else to take', () => {
+    let state = seated();
+    state = run(state, FACILITATOR, 'facilitator:remove-seat', { seatId: 's1' });
+    state.seats.s2 = {
+      id: 's2', token: 'tok-2', name: 'Sam', roleId: null, kind: 'player',
+      connected: true, lastSeen: 0,
+    };
+    const after = run(state, { seatId: 's2', kind: 'player', roleId: null },
+      'claim-role', { roleId: 'king_alfred' });
+    expect(after.seats.s2.roleId).toBe('king_alfred');
+  });
+
+  it('does not argue about whether they look connected', () => {
+    // Connection is a guess about a network, not a fact about a person: a seat
+    // reads as connected because a tab is open on a laptop in somebody's bag.
+    // The console offers the button where it is obviously right; the command
+    // does what the umpire in the room tells it.
+    const after = run(seated({ connected: true }), FACILITATOR,
+      'facilitator:remove-seat', { seatId: 's1' });
+    expect(after.seats.s1).toBeUndefined();
+  });
+
+  it('leaves every other seat where it is', () => {
+    const state = seated();
+    state.seats.s2 = {
+      id: 's2', token: 'tok-2', name: 'Sam', roleId: 'cenred', kind: 'player',
+      connected: true, lastSeen: 0,
+    };
+    state.seatByToken['tok-2'] = 's2';
+    const after = run(state, FACILITATOR, 'facilitator:remove-seat', { seatId: 's1' });
+    expect(after.seats.s2).toMatchObject({ roleId: 'cenred', name: 'Sam' });
+    expect(after.seatByToken['tok-2']).toBe('s2');
+  });
+});
+
 describe('removing a role mid-game', () => {
   it('refuses a role not in the game', () => {
     const state = createInitialState({
