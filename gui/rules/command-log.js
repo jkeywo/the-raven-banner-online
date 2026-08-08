@@ -1,0 +1,74 @@
+/**
+ * gui/rules/command-log.js — an append-only record of everything that happened.
+ *
+ * Together with the seed, the log *is* the game: `replay(seed, log)` rebuilds
+ * the state from nothing. That buys three things at once — a save file that is
+ * a few kilobytes rather than a whole board, a way to reconstruct a disputed
+ * clash roll by roll, and a test that exercises every reducer path at once by
+ * asserting a replay equals the state it was recorded from.
+ *
+ * A five-turn game is a few thousand entries, so nothing here is trimmed.
+ */
+
+/**
+ * @typedef {object} LogEntry
+ * @property {number} seq        the host's own counter, not the client's
+ * @property {number} ts
+ * @property {string} seatId
+ * @property {string|null} roleId
+ * @property {string} verb
+ * @property {object} payload
+ * @property {number} rngCursorBefore   where the dice were when this ran
+ * @property {boolean} override         a facilitator setting something directly
+ */
+
+/**
+ * Record an accepted command. Returns a new array — the log is treated as
+ * immutable like the rest of state, so a projection can hold one safely.
+ *
+ * @param {LogEntry[]} log
+ * @param {Omit<LogEntry, 'seq'>} entry
+ * @returns {LogEntry[]}
+ */
+export function append(log, entry) {
+  return [...log, { seq: log.length + 1, ...entry }];
+}
+
+/** The entries that touched a given role, for a facilitator answering a query. */
+export function entriesFor(log, roleId) {
+  return log.filter((e) => e.roleId === roleId || e.payload?.roleId === roleId);
+}
+
+/** Every override, which is the honest answer to "what did the umpire change?". */
+export function overrides(log) {
+  return log.filter((e) => e.override);
+}
+
+/**
+ * What a save file holds.
+ *
+ * Deliberately not the state: a seed and a log replay to the state, and cannot
+ * disagree with it.
+ *
+ * Seats ride along beside the history rather than inside it. They are not
+ * game events — nobody *did* sitting down — so they are not commanded, not
+ * logged and not replayed. But they are exactly what a host coming back from a
+ * crash needs, because without the token-to-seat binding every returning
+ * player is a stranger and loses the role they were playing. So: replay the
+ * history, then put everyone back in their chairs.
+ */
+export function toSave(state) {
+  return {
+    schemaVersion: state.schemaVersion,
+    joinCode: state.joinCode,
+    seed: state.seed,
+    // The roster rides along too. Which roles were dealt in is part of the
+    // opening position rather than something anybody did, so a short-handed
+    // game cannot be rebuilt from the log alone.
+    roleIds: Object.keys(state.roles),
+    log: state.log,
+    seats: state.seats,
+    seatByToken: state.seatByToken,
+    savedAt: null,      // stamped by the host, which owns the clock
+  };
+}

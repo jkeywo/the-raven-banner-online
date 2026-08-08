@@ -1,0 +1,654 @@
+{
+ "_generated": "raven_banner gamespec @ analogue-projects fbc9bbc via tools/export_web_data.py",
+ "_doNotEdit": true,
+ "sheets": [
+  {
+   "id": "northern",
+   "display_name": "Northern England"
+  },
+  {
+   "id": "western",
+   "display_name": "Western England"
+  },
+  {
+   "id": "eastern",
+   "display_name": "Eastern England"
+  }
+ ],
+ "shires": {
+  "bernicia": {
+   "id": "bernicia",
+   "name": "Bernicia",
+   "map": "northern",
+   "initialSteward": "king_ecgberht",
+   "initialFaction": "D",
+   "support": [
+    "N",
+    "Be"
+   ],
+   "castles": 2,
+   "shipCost": 1,
+   "settlements": [
+    {
+     "id": "bernicia_farm_1",
+     "type": "farm",
+     "defended": false
+    },
+    {
+     "id": "bernicia_farm_2",
+     "type": "farm",
+     "defended": false
+    },
+    {
+     "id": "bernicia_church_1",
+     "type": "church",
+     "defended": true
+    },
+    {
+     "id": "bernicia_church_2",
+     "type": "church",
+     "defended": true
+    }
+   ]
+  },
+  "ribble": {
+   "id": "ribble",
+   "name": "Ribble",
+   "map": "northern",
+   "initialSteward": "halfdan_ragnarsson",
+   "initialFaction": "D",
+   "support": [
+    "N"
+   ],
+   "castles": 2,
+   "shipCost": 3,
+   "settlements": [
+    {
+     "id": "ribble_town_1",
+     "type": "town",
+     "defended": false
+    },
+    {
+     "id": "ribble_farm_1",
+     "type": "farm",
+     "defended": false
+    }
+   ]
+  },
+  "jorvik": {
+   "id": "jorvik",
+   "name": "Jorvik",
+   "map": "northern",
+   "initialSteward": "halfdan_ragnarsson",
+   "initialFaction": "D",
+   "support": [
+    "N"
+   ],
+   "castles": 3,
+   "shipCost": 1,
+   "settlements": [
+    {
+     "id": "jorvik_town_1",
+     "type": "town",
+     "defended": false
+    },
+    {
+     "id": "jorvik_farm_1",
+     "type": "farm",
+     "defended": false
+    },
+    {
+     "id": "jorvik_town_2",
+     "type": "town",
+     "defended": false
+    }
+   ]
+  },
+  "lindsey": {
+   "id": "lindsey",
+   "name": "Lindsey",
+   "map": "northern",
+   "initialSteward": "gainbeald",
+   "initialFaction": "M",
+   "support": [
+    "M",
+    "L"
+   ],
+   "castles": 3,
+   "shipCost": 1,
+   "settlements": [
+    {
+     "id": "lindsey_church_1",
+     "type": "church",
+     "defended": false
+    },
+    {
+     "id": "lindsey_farm_1",
+     "type": "farm",
+     "defended": false
+    },
+    {
+     "id": "lindsey_farm_2",
+     "type": "farm",
+     "defended": false
+    },
+    {
+     "id": "lindsey_farm_3",
+     "type": "farm",
+     "defended": true
+    },
+    {
+     "id": "lindsey_church_2",
+     "type": "church",
+     "defended": true
+    }
+   ]
+  },
+  "wrekinsets": {
+   "id": "wrekinsets",
+   "name": "Wrekinsets",
+   "map": "northern",
+   "initialSteward": "ceowulf",
+   "initialFaction": "M",
+   "support": [
+    "M"
+   ],
+   "castles": 3,
+   "shipCost": 3,
+   "settlements": [
+    {
+     "id": "wrekinsets_farm_1",
+     "type": "farm",
+     "defended": false
+    },
+    {
+     "id": "wrekinsets_farm_2",
+     "type": "farm",
+     "defended": false
+    },
+    {
+     "id": "wrekinsets_church_1",
+     "type": "church",
+     "defended": true
+    }
+   ]
+  },
+  "north_mercia": {
+   "id": "north_mercia",
+   "name": "North Mercia",
+   "map": "northern",
+   "initialSteward": "gainbeald",
+   "initialFaction": "M",
+   "support": [
+    "M"
+   ],
+   "castles": 4,
+   "shipCost": null,
+   "settlements": [
+    {
+     "id": "north_mercia_church_1",
+     "type": "church",
+     "defended": false
+    },
+    {
+     "id": "north_mercia_farm_1",
+     "type": "farm",
+     "defended": false
+    },
+    {
+     "id": "north_mercia_town_1",
+     "type": "town",
+     "defended": true
+    },
+    {
+     "id": "north_mercia_church_2",
+     "type": "church",
+     "defended": true
+    }
+   ]
+  },
+  "magonsets": {
+   "id": "magonsets",
+   "name": "Magonsets",
+   "map": "western",
+   "initialSteward": "ceowulf",
+   "initialFaction": "M",
+   "support": [
+    "M"
+   ],
+   "castles": 2,
+   "shipCost": null,
+   "settlements": [
+    {
+     "id": "magonsets_farm_1",
+     "type": "farm",
+     "defended": false
+    },
+    {
+     "id": "magonsets_farm_2",
+     "type": "farm",
+     "defended": false
+    },
+    {
+     "id": "magonsets_church_1",
+     "type": "church",
+     "defended": false
+    }
+   ]
+  },
+  "south_mercia": {
+   "id": "south_mercia",
+   "name": "South Mercia",
+   "map": "western",
+   "initialSteward": "abbess_wenyld",
+   "initialFaction": "M",
+   "support": [
+    "M"
+   ],
+   "castles": 4,
+   "shipCost": null,
+   "settlements": [
+    {
+     "id": "south_mercia_church_1",
+     "type": "church",
+     "defended": false
+    },
+    {
+     "id": "south_mercia_farm_1",
+     "type": "farm",
+     "defended": false
+    },
+    {
+     "id": "south_mercia_church_2",
+     "type": "church",
+     "defended": false
+    },
+    {
+     "id": "south_mercia_church_3",
+     "type": "church",
+     "defended": false
+    },
+    {
+     "id": "south_mercia_town_1",
+     "type": "town",
+     "defended": false
+    }
+   ]
+  },
+  "hwicce": {
+   "id": "hwicce",
+   "name": "Hwicce",
+   "map": "western",
+   "initialSteward": "abbess_wenyld",
+   "initialFaction": "M",
+   "support": [
+    "M"
+   ],
+   "castles": 2,
+   "shipCost": 3,
+   "settlements": [
+    {
+     "id": "hwicce_farm_1",
+     "type": "farm",
+     "defended": false
+    },
+    {
+     "id": "hwicce_farm_2",
+     "type": "farm",
+     "defended": false
+    },
+    {
+     "id": "hwicce_church_1",
+     "type": "church",
+     "defended": false
+    }
+   ]
+  },
+  "redding": {
+   "id": "redding",
+   "name": "Redding",
+   "map": "western",
+   "initialSteward": "cenred",
+   "initialFaction": "W",
+   "support": [
+    "W",
+    "M"
+   ],
+   "castles": 3,
+   "shipCost": null,
+   "settlements": [
+    {
+     "id": "redding_town_1",
+     "type": "town",
+     "defended": false
+    },
+    {
+     "id": "redding_church_1",
+     "type": "church",
+     "defended": false
+    },
+    {
+     "id": "redding_farm_1",
+     "type": "farm",
+     "defended": false
+    }
+   ]
+  },
+  "wiltshire": {
+   "id": "wiltshire",
+   "name": "Wiltshire",
+   "map": "western",
+   "initialSteward": "king_alfred",
+   "initialFaction": "W",
+   "support": [
+    "W"
+   ],
+   "castles": 4,
+   "shipCost": 2,
+   "settlements": [
+    {
+     "id": "wiltshire_town_1",
+     "type": "town",
+     "defended": false
+    },
+    {
+     "id": "wiltshire_town_2",
+     "type": "town",
+     "defended": false
+    },
+    {
+     "id": "wiltshire_church_1",
+     "type": "church",
+     "defended": false
+    },
+    {
+     "id": "wiltshire_church_2",
+     "type": "church",
+     "defended": false
+    },
+    {
+     "id": "wiltshire_church_3",
+     "type": "church",
+     "defended": false
+    },
+    {
+     "id": "wiltshire_church_4",
+     "type": "church",
+     "defended": false
+    }
+   ]
+  },
+  "west_country": {
+   "id": "west_country",
+   "name": "West Country",
+   "map": "western",
+   "initialSteward": "king_alfred",
+   "initialFaction": "W",
+   "support": [
+    "W"
+   ],
+   "castles": 2,
+   "shipCost": 2,
+   "settlements": [
+    {
+     "id": "west_country_farm_1",
+     "type": "farm",
+     "defended": false
+    },
+    {
+     "id": "west_country_church_1",
+     "type": "church",
+     "defended": false
+    },
+    {
+     "id": "west_country_farm_2",
+     "type": "farm",
+     "defended": false
+    },
+    {
+     "id": "west_country_farm_3",
+     "type": "farm",
+     "defended": false
+    }
+   ]
+  },
+  "east_anglia": {
+   "id": "east_anglia",
+   "name": "East Anglia",
+   "map": "eastern",
+   "initialSteward": "guthrum_the_old",
+   "initialFaction": "D",
+   "support": [
+    "Ea"
+   ],
+   "castles": 2,
+   "shipCost": 1,
+   "settlements": [
+    {
+     "id": "east_anglia_farm_1",
+     "type": "farm",
+     "defended": false
+    },
+    {
+     "id": "east_anglia_farm_2",
+     "type": "farm",
+     "defended": false
+    },
+    {
+     "id": "east_anglia_farm_3",
+     "type": "farm",
+     "defended": false
+    }
+   ]
+  },
+  "middle_anglia": {
+   "id": "middle_anglia",
+   "name": "Middle Anglia",
+   "map": "eastern",
+   "initialSteward": "uchtred",
+   "initialFaction": "M",
+   "support": [
+    "M"
+   ],
+   "castles": 2,
+   "shipCost": null,
+   "settlements": [
+    {
+     "id": "middle_anglia_church_1",
+     "type": "church",
+     "defended": true
+    },
+    {
+     "id": "middle_anglia_church_2",
+     "type": "church",
+     "defended": false
+    },
+    {
+     "id": "middle_anglia_farm_1",
+     "type": "farm",
+     "defended": false
+    },
+    {
+     "id": "middle_anglia_farm_2",
+     "type": "farm",
+     "defended": false
+    }
+   ]
+  },
+  "essex": {
+   "id": "essex",
+   "name": "Essex",
+   "map": "eastern",
+   "initialSteward": "cenred",
+   "initialFaction": "W",
+   "support": [
+    "W",
+    "Ex"
+   ],
+   "castles": 3,
+   "shipCost": 1,
+   "settlements": [
+    {
+     "id": "essex_farm_1",
+     "type": "farm",
+     "defended": false
+    },
+    {
+     "id": "essex_farm_2",
+     "type": "farm",
+     "defended": true
+    },
+    {
+     "id": "essex_church_1",
+     "type": "church",
+     "defended": false
+    },
+    {
+     "id": "essex_church_2",
+     "type": "church",
+     "defended": true
+    }
+   ]
+  },
+  "lundenwic": {
+   "id": "lundenwic",
+   "name": "Lundenwic",
+   "map": "eastern",
+   "initialSteward": "uchtred",
+   "initialFaction": "M",
+   "support": [
+    "M",
+    "W"
+   ],
+   "castles": 3,
+   "shipCost": null,
+   "settlements": [
+    {
+     "id": "lundenwic_town_1",
+     "type": "town",
+     "defended": true
+    },
+    {
+     "id": "lundenwic_town_2",
+     "type": "town",
+     "defended": false
+    },
+    {
+     "id": "lundenwic_town_3",
+     "type": "town",
+     "defended": false
+    },
+    {
+     "id": "lundenwic_church_1",
+     "type": "church",
+     "defended": false
+    },
+    {
+     "id": "lundenwic_church_2",
+     "type": "church",
+     "defended": true
+    }
+   ]
+  },
+  "kent": {
+   "id": "kent",
+   "name": "Kent",
+   "map": "eastern",
+   "initialSteward": "archbishop_aethelred",
+   "initialFaction": "W",
+   "support": [
+    "W",
+    "K"
+   ],
+   "castles": 4,
+   "shipCost": 2,
+   "settlements": [
+    {
+     "id": "kent_church_1",
+     "type": "church",
+     "defended": false
+    },
+    {
+     "id": "kent_church_2",
+     "type": "church",
+     "defended": false
+    },
+    {
+     "id": "kent_town_1",
+     "type": "town",
+     "defended": false
+    },
+    {
+     "id": "kent_farm_1",
+     "type": "farm",
+     "defended": false
+    },
+    {
+     "id": "kent_church_3",
+     "type": "church",
+     "defended": true
+    },
+    {
+     "id": "kent_church_4",
+     "type": "church",
+     "defended": true
+    },
+    {
+     "id": "kent_church_5",
+     "type": "church",
+     "defended": true
+    },
+    {
+     "id": "kent_town_2",
+     "type": "town",
+     "defended": true
+    }
+   ]
+  },
+  "sussex": {
+   "id": "sussex",
+   "name": "Sussex",
+   "map": "eastern",
+   "initialSteward": "cenred",
+   "initialFaction": "W",
+   "support": [
+    "W",
+    "Sx"
+   ],
+   "castles": 3,
+   "shipCost": 2,
+   "settlements": [
+    {
+     "id": "sussex_farm_1",
+     "type": "farm",
+     "defended": false
+    },
+    {
+     "id": "sussex_church_1",
+     "type": "church",
+     "defended": false
+    },
+    {
+     "id": "sussex_church_2",
+     "type": "church",
+     "defended": false
+    },
+    {
+     "id": "sussex_town_1",
+     "type": "town",
+     "defended": false
+    },
+    {
+     "id": "sussex_church_3",
+     "type": "church",
+     "defended": true
+    },
+    {
+     "id": "sussex_farm_2",
+     "type": "farm",
+     "defended": false
+    }
+   ]
+  }
+ }
+}

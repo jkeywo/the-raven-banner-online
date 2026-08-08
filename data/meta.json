@@ -1,0 +1,193 @@
+{
+ "_generated": "raven_banner gamespec @ analogue-projects fbc9bbc via tools/export_web_data.py",
+ "_doNotEdit": true,
+ "turns": 5,
+ "phases": [
+  {
+   "id": "team",
+   "name": "Team Phase",
+   "minutes": 5
+  },
+  {
+   "id": "battle",
+   "name": "Battle Phase",
+   "minutes": 5
+  },
+  {
+   "id": "maintenance",
+   "name": "Maintenance Phase",
+   "minutes": 5
+  },
+  {
+   "id": "encounter",
+   "name": "Encounter Phase",
+   "minutes": 10
+  }
+ ],
+ "momentumCap": 4,
+ "woundsFatal": 3,
+ "castleFloor": 2,
+ "raidSpoils": {
+  "farm": {
+   "food": 2
+  },
+  "town": {
+   "silver": 4
+  },
+  "church": {
+   "silver": 5
+  }
+ },
+ "tradeContractShires": [
+  "wrekinsets",
+  "kent",
+  "west_country"
+ ],
+ "attackersWinTies": true,
+ "leadTheChargeIsARatchet": true,
+ "defenderBonusAtDefendedSettlements": 3,
+ "leadership": {
+  "normal": {
+   "1": 0,
+   "2": 0,
+   "3": 0,
+   "4": 1,
+   "5": 1,
+   "6": 2
+  },
+  "lead": {
+   "1": -1,
+   "2": 1,
+   "3": 2,
+   "4": 3,
+   "5": 3,
+   "6": 4
+  },
+  "woundOnSix": true
+ },
+ "aftermath": {
+  "paganism": {
+   "start": 3,
+   "bands": [
+    [
+     0,
+     1
+    ],
+    [
+     2,
+     4
+    ],
+    [
+     5,
+     8
+    ],
+    [
+     9,
+     null
+    ]
+   ],
+   "sentences": [
+    "No significant pagan influence.",
+    "The church takes on some pagan influence.",
+    "The island becomes segregated between christian and pagan control.",
+    "Christianity once more leaves the shores of England."
+   ]
+  },
+  "danelaw": {
+   "start": 3,
+   "bands": [
+    [
+     0,
+     2
+    ],
+    [
+     3,
+     5
+    ],
+    [
+     6,
+     8
+    ],
+    [
+     9,
+     12
+    ],
+    [
+     13,
+     null
+    ]
+   ],
+   "sentences": [
+    "Little to no impact.",
+    "Some Danish enclaves.",
+    "Significant influence.",
+    "Danish becomes the dominant culture.",
+    "Saxon culture is replaced."
+   ]
+  },
+  "disorder": {
+   "start": 3,
+   "bands": [
+    [
+     0,
+     1
+    ],
+    [
+     2,
+     4
+    ],
+    [
+     5,
+     null
+    ]
+   ],
+   "sentences": [
+    "A generation or two of peace.",
+    "War is inevitable, but there is peace for the moment.",
+    "The war continues, the land will be devastated."
+   ]
+  },
+  "prosperity": {
+   "start": 74,
+   "bands": [
+    [
+     0,
+     59
+    ],
+    [
+     60,
+     69
+    ],
+    [
+     70,
+     null
+    ]
+   ],
+   "sentences": [
+    "Famine and poverty hit all levels of society.",
+    "England will take decades to rebuild to its former strength.",
+    "All of England prospers."
+   ]
+  },
+  "foreignInfluence": {
+   "note": "Should too many concessions be given for Frankish, Briton or Papal assistance this could have an effect on the country."
+  }
+ },
+ "dropOrder": [
+  "oscatel_the_brave",
+  "uchtred",
+  "king_ecgberht",
+  "godric"
+ ],
+ "startingCrowns": {
+  "wessex": "king_alfred",
+  "northumbria": "king_ecgberht"
+ },
+ "fixedFirstTargets": {
+  "halfdan_ragnarsson": "lindsey",
+  "guthrum_the_old": "essex"
+ },
+ "mercenaryCard": {
+  "extraClashesWon": 1
+ }
+}

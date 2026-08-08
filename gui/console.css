@@ -1,0 +1,2028 @@
+/* console.css — one stylesheet for both consoles.
+   No build step, so this is plain CSS with custom properties. Desktop-first,
+   because the game is played remotely with everyone at their own machine. */
+
+:root {
+  --rb-ink: #1c1815;
+  --rb-parchment: #efe6d4;
+  --rb-paper: #faf6ec;
+  --rb-blood: #7c2529;
+  --rb-gold: #b08d33;
+  --rb-muted: #6b6156;
+  --rb-rule: #c4b699;
+  --rb-green: #4a7c3f;
+  --rb-amber: #b8791b;
+
+  --rb-serif: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+  --rb-sans: system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  /* The header's own height, so the run control can pin itself directly
+     beneath it rather than guessing. */
+  --rb-bar-height: 3.2rem;
+}
+
+* { box-sizing: border-box; }
+
+/* A class elsewhere setting its own `display` (flex, grid…) beats the `hidden`
+   attribute's UA-stylesheet `display: none` on specificity alone — the
+   attribute selector below outranks that by being marked `!important`, so a
+   tab pane or banner stays actually hidden rather than merely dimmed by
+   whatever class it happens to carry. */
+[hidden] { display: none !important; }
+
+body.rb-shell {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--rb-parchment);
+  color: var(--rb-ink);
+  font-family: var(--rb-sans);
+  line-height: 1.55;
+}
+
+/* The player's shell alone locks to the viewport: the header stays put, and
+   the game screen fills what is left rather than pushing the whole page
+   down. Its own panels — the two rails, and whichever centre pane is open —
+   scroll inside themselves instead, the same way the game already refuses to
+   scroll sideways (see .rb-map-stage and friends). The simpler screens ahead
+   of it (the code, the name, the lobby) are short enough that this is never
+   felt; .rb-main keeps its own overflow as a fallback for a long role
+   picker on a short window. */
+.rb-shell-player {
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.rb-shell-player .rb-main {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.rb-shell-player #screen-game.rb-full {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  /* No border, radius or padding of its own. The game screen fills the
+     viewport rather than sitting on it as a card, and every region inside it
+     — both rails, the map stage — draws its own border. The panel's added a
+     second line half a millimetre outside those, which read as a doubled
+     edge in the corners. The simpler screens in front of it keep the card
+     look; only the one that goes full-bleed gives it up. */
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+  max-width: none;
+}
+
+/* Which leaves .rb-main's own padding as the only inset, and it is the thing
+   that should own it now. */
+.rb-shell-player .rb-main { padding: 1rem 1.2rem; }
+
+/* --- chrome ------------------------------------------------------------- */
+
+.rb-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.7rem 1.5rem;
+  background: var(--rb-ink);
+  color: var(--rb-paper);
+  position: sticky;
+  top: 0;
+  z-index: 30;
+}
+
+.rb-brand { font-family: var(--rb-serif); font-size: 1.15rem; letter-spacing: 0.02em; }
+
+/* Name, turn, phase and timer, on the strip that is always in view. It sits
+   between the brand and the connection dot and takes the space left over. */
+.rb-bar-status {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  flex: 1;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.rb-bar-role {
+  font-family: var(--rb-serif);
+  font-size: 1.05rem;
+  color: var(--rb-gold);
+  white-space: nowrap;
+}
+
+/* The clock is dark-on-parchment in a panel and light-on-ink up here. */
+.rb-bar-status rb-phase-clock { color: var(--rb-paper); }
+.rb-bar-status .rb-clock-note { display: none; }
+
+.rb-tag {
+  font-family: var(--rb-sans);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--rb-gold);
+  margin-left: 0.4rem;
+}
+
+.rb-main { padding: 2rem 1.5rem 4rem; }
+
+.rb-panel {
+  max-width: 34rem;
+  margin: 0 auto;
+  background: var(--rb-paper);
+  border: 1px solid var(--rb-rule);
+  border-radius: 4px;
+  padding: 2rem;
+}
+
+.rb-panel.rb-wide { max-width: 60rem; }
+
+/* The facilitator's running console, given half the side margin every other
+   panel keeps.
+
+   Most of that margin is not padding, it is the gutter `margin: 0 auto` leaves
+   either side once the panel has hit its cap, so it grows with the window —
+   and on the wide screen a facilitator actually runs a game from, the board,
+   the battle grid and the inspector were all being squeezed into the middle
+   third of a monitor with a hand's width of parchment down each side.
+
+   Written as an expression rather than a wider fixed cap so it holds at any
+   width: the panel takes its 60rem plus half of whatever the column it sits in
+   has spare, which is that gutter halved exactly. Below 60rem there is nothing
+   spare, the term goes negative, and the cap lands above the width available —
+   so a narrow window is unaffected and this degrades to full width rather than
+   to a sideways scroll.
+
+   100% rather than 100vw, and the difference is not pedantry: the percentage
+   resolves against .rb-main's content box, which is the box the centring is
+   actually happening in, so half means half. 100vw is a different quantity —
+   it counts .rb-main's own padding and, in several browsers, the scrollbar
+   gutter as well — and left the margins about a tenth narrower than asked for
+   on the window this was measured in. */
+.rb-panel.rb-wide#screen-running { max-width: calc(60rem + (100% - 60rem) / 2); }
+
+.rb-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+  gap: 2.5rem;
+}
+
+h1 {
+  font-family: var(--rb-serif);
+  font-size: 1.9rem;
+  font-weight: 600;
+  margin: 0 0 0.4rem;
+}
+
+h2 {
+  font-family: var(--rb-serif);
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin: 2rem 0 0.5rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid var(--rb-rule);
+}
+
+.rb-lede { color: var(--rb-muted); margin: 0 0 1.5rem; }
+.rb-meta { color: var(--rb-muted); font-size: 0.85rem; }
+.rb-empty { color: var(--rb-muted); font-style: italic; }
+
+.rb-error { color: var(--rb-blood); font-size: 0.9rem; min-height: 1.2em; margin: 0.4rem 0; }
+.rb-error:empty { margin: 0; }
+
+.rb-code {
+  font-family: ui-monospace, 'Cascadia Mono', Menlo, monospace;
+  letter-spacing: 0.12em;
+  color: var(--rb-blood);
+}
+
+/* --- forms -------------------------------------------------------------- */
+
+.rb-form { display: flex; flex-direction: column; gap: 0.4rem; }
+
+label {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--rb-muted);
+}
+
+input[type="text"], input:not([type]), input[type="file"] {
+  font: inherit;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid var(--rb-rule);
+  border-radius: 3px;
+  background: #fff;
+  color: inherit;
+  width: 100%;
+}
+
+#join-code {
+  font-family: ui-monospace, monospace;
+  font-size: 1.4rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+button {
+  font: inherit;
+  padding: 0.55rem 1.1rem;
+  border: 1px solid var(--rb-rule);
+  border-radius: 3px;
+  background: #fff;
+  color: inherit;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) { background: var(--rb-parchment); }
+button:disabled { opacity: 0.45; cursor: default; }
+
+.rb-primary {
+  align-self: flex-start;
+  margin-top: 0.6rem;
+  background: var(--rb-blood);
+  border-color: var(--rb-blood);
+  color: #fff;
+}
+
+.rb-primary:hover:not(:disabled) { background: #943034; }
+
+.rb-row { display: flex; gap: 0.5rem; align-items: center; }
+.rb-row input { flex: 1; }
+
+.rb-pin { margin-top: 1.5rem; }
+.rb-pin strong {
+  font-family: ui-monospace, monospace;
+  font-size: 1.2rem;
+  letter-spacing: 0.15em;
+  color: var(--rb-blood);
+}
+.rb-pin .rb-meta { display: block; }
+
+/* --- connection dot ----------------------------------------------------- */
+
+rb-connection-dot {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.rb-dot {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  background: var(--rb-amber);
+}
+
+rb-connection-dot[data-tone="ready"] .rb-dot { background: var(--rb-green); }
+rb-connection-dot[data-tone="away"] .rb-dot { background: var(--rb-blood); }
+rb-connection-dot[data-tone="connecting"] .rb-dot { animation: rb-pulse 1.4s ease-in-out infinite; }
+
+@keyframes rb-pulse { 50% { opacity: 0.25; } }
+
+.rb-dot-retry {
+  padding: 0.15rem 0.5rem;
+  font-size: 0.78rem;
+  background: transparent;
+  border-color: currentColor;
+  color: inherit;
+}
+
+/* --- roster ------------------------------------------------------------- */
+
+.rb-roster { list-style: none; margin: 0; padding: 0; }
+
+.rb-seat {
+  display: grid;
+  grid-template-columns: 0.6rem 1fr auto auto auto;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--rb-rule);
+}
+
+/* Only on the facilitator's copy, and quiet there. It empties somebody's
+   chair, so it should take a deliberate press and never catch the eye of an
+   umpire reaching for something else — until the seat has actually dropped,
+   which is when it becomes the useful button on the row. */
+.rb-seat-clear {
+  font-size: 0.7rem;
+  padding: 0.1rem 0.45rem;
+  opacity: 0.55;
+}
+
+.rb-seat-clear:hover,
+.rb-seat-clear:focus-visible { opacity: 1; }
+.rb-seat[data-connected="false"] .rb-seat-clear { opacity: 1; border-color: var(--rb-blood); }
+
+.rb-seat-dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: var(--rb-green);
+}
+
+.rb-seat[data-connected="false"] { opacity: 0.5; }
+.rb-seat[data-connected="false"] .rb-seat-dot { background: var(--rb-muted); }
+
+.rb-seat-role { font-family: var(--rb-serif); color: var(--rb-blood); }
+.rb-seat-role em { color: var(--rb-muted); }
+
+.rb-seat-tag {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--rb-gold);
+}
+
+/* --- role picker -------------------------------------------------------- */
+
+.rb-roles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  gap: 0.5rem;
+  margin: 1rem 0 0;
+}
+
+/* The facilitator's copy is dealt a team to a row instead. Four columns
+   always, not auto-fill: the point is that a team is a row, and a grid that
+   reflows to fit the window puts three of Wessex on one line and the fourth
+   on the next, which is exactly the gap it should be making obvious. */
+.rb-roles-by-team { margin: 1rem 0 0; }
+.rb-roles-team { margin: 0 0 0.9rem; }
+
+.rb-roles-team-name {
+  margin: 0 0 0.3rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--rb-muted);
+}
+
+.rb-roles-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.rb-role {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.1rem;
+  text-align: left;
+  padding: 0.7rem 0.8rem;
+  /* A <button> gets these from the generic button rule already; a plain
+     <div> — the facilitator's read-only mirror of this same grid — needs
+     them stated outright. */
+  border: 1px solid var(--rb-rule);
+  border-radius: 3px;
+  background: var(--rb-paper);
+}
+
+.rb-lobby-roles { margin-bottom: 1.5rem; }
+
+.rb-role-name {
+  font-family: var(--rb-serif);
+  font-size: 1.05rem;
+  text-transform: capitalize;
+}
+
+.rb-role-team {
+  font-size: 0.75rem;
+  color: var(--rb-muted);
+  text-transform: capitalize;
+}
+
+.rb-role-taken {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--rb-blood);
+}
+
+/* --- host odds and ends -------------------------------------------------- */
+
+.rb-resumes { list-style: none; margin: 0.5rem 0 0; padding: 0; display: grid; gap: 0.4rem; }
+.rb-resumes li { display: flex; gap: 0.4rem; align-items: stretch; flex-wrap: wrap; }
+
+/* The turns kept for a game, on their own line under it. Quiet, because going
+   back to one undoes everything since — it is a rope to grab, not a control
+   anybody should reach for by accident. */
+.rb-resume-turns {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.72rem;
+  color: var(--rb-muted);
+}
+
+.rb-resume-turns button { font-size: 0.72rem; padding: 0.05rem 0.4rem; }
+.rb-resume { display: flex; justify-content: space-between; gap: 1rem; flex: 1; }
+.rb-resume span { color: var(--rb-muted); font-size: 0.85rem; }
+.rb-resume-forget { flex: none; color: var(--rb-blood); }
+.rb-start-over { margin-top: 1.5rem; }
+
+/* Folded away, because it is for one person testing alone and never for a
+   real table. */
+.rb-testing { margin-top: 1rem; }
+.rb-testing summary { cursor: pointer; font-size: 0.85rem; color: var(--rb-muted); }
+.rb-testing input[type="number"] { width: 5rem; }
+
+/* The feudal web: one liege per row, their sworn men beside them. */
+.rb-homage { list-style: none; margin: 0.3rem 0 0; padding: 0; display: grid; gap: 0.3rem; }
+.rb-homage li { display: grid; gap: 0.1rem; }
+
+.rb-log {
+  font-family: ui-monospace, 'Cascadia Mono', Menlo, monospace;
+  font-size: 0.75rem;
+  color: var(--rb-muted);
+  background: var(--rb-parchment);
+  border: 1px solid var(--rb-rule);
+  border-radius: 3px;
+  padding: 0.6rem;
+  max-height: 14rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  margin: 0;
+}
+
+a { color: var(--rb-blood); text-underline-offset: 0.15em; }
+
+/* --- the game ------------------------------------------------------------ */
+
+.rb-panel.rb-full { max-width: 92rem; }
+
+.rb-game-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.2rem;
+}
+
+.rb-game-head h1 { margin: 0; }
+
+.rb-tabs { display: flex; gap: 0.3rem; }
+
+/* The three sheets sit together and read as one control, set a little apart
+   from the panes beside them. Dimmed while the board is not the pane in
+   front, because then they are a way back to it rather than a choice within
+   it. */
+.rb-map-buttons { display: flex; gap: 0.3rem; margin-right: 0.6rem; }
+.rb-map-buttons[data-active="false"] button { opacity: 0.6; }
+
+.rb-tabs button,
+.rb-map-tabs button {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  border-bottom-color: transparent;
+}
+
+.rb-tabs [aria-selected="true"],
+.rb-map-tabs [aria-selected="true"] {
+  background: var(--rb-ink);
+  border-color: var(--rb-ink);
+  color: var(--rb-paper);
+}
+
+/* Except the sheet that was last looked at, while the board is not the pane in
+   front. Which sheet is showing is not a fact about the page you are on, and
+   filling one of these in behind the Battle tab put two tabs up there looking
+   selected at once. Dimmed, yes — they are a way back — but not lit. */
+.rb-tabs .rb-map-buttons[data-active="false"] [aria-selected="true"] {
+  background: none;
+  border-color: var(--rb-rule);
+  color: inherit;
+}
+
+/* The map is the pane now. What used to be a second column beside it — the
+   player's shire read-out, the facilitator's editor — is a card on the map,
+   anchored to the shire it is about. */
+.rb-pane-map { display: block; }
+
+/* --- the map ------------------------------------------------------------- */
+
+rb-map { display: block; }
+
+.rb-map-tabs { display: flex; gap: 0.3rem; margin-bottom: -1px; }
+
+/* Not clipped, because the card is positioned against this box and a control
+   the facilitator cannot reach is worse than one that hangs over an edge. */
+.rb-map-stage {
+  position: relative;
+  overflow: visible;
+}
+
+/* Art and overlay are one element sharing one coordinate system, so the
+   border belongs to the sheet rather than to a box around it. */
+.rb-map-sheet {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--rb-rule);
+  border-radius: 3px;
+  background: var(--rb-paper);
+}
+
+/* The wash of whoever holds the ground, under everything else.
+   Deliberately weaker than it looks like it should be: Wessex is blue and so
+   is the sea, and at any more than a tenth the Channel and the shires either
+   side of it read as the same thing. The boundary does the work instead —
+   the shires are outlined in the same colour at full weight. */
+.rb-shire {
+  fill: currentColor;
+  fill-opacity: 0.1;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-opacity: 0.65;
+  color: var(--rb-muted);
+  cursor: pointer;
+  transition: fill-opacity 120ms ease;
+}
+
+.rb-shire:hover { fill-opacity: 0.3; }
+
+.rb-shire.is-selected {
+  fill-opacity: 0.34;
+  stroke-width: 5;
+  stroke-opacity: 1;
+}
+
+/* Held without support: the defended settlements pay nothing and the shire
+   counts toward Disorder, so it is hatched rather than merely tinted. Three
+   shires open this way, so it is a marker rather than an alarm — dashed enough
+   to find, quiet enough to live with for five turns. */
+.rb-shire.is-unsupported {
+  stroke-dasharray: 12 10;
+  stroke-width: 4;
+  stroke-opacity: 0.8;
+}
+
+/* A valid target of the action just chosen — an amber glow rather than the
+   blood-red the game already uses for "yours" and "unsupported", so a
+   highlighted shire cannot be mistaken for either. */
+.rb-shire.is-highlighted {
+  fill: var(--rb-amber);
+  fill-opacity: 0.4;
+  stroke: var(--rb-amber);
+  stroke-width: 5;
+  stroke-opacity: 1;
+  animation: rb-shire-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes rb-shire-pulse {
+  50% { fill-opacity: 0.18; }
+}
+
+/* --- the cells, which are the whole of what the art no longer says -------- */
+
+/* Ink on the sheet rather than an interface floating above it. The letters and
+   glyphs take no clicks; the shire outline underneath is the hit target.
+   The boxes are the exception, and have to be: a frame is drawn wherever it
+   fits, which for a narrow shire is out over its neighbour or over the sea,
+   and clicking straight at a steward's name there either selected the wrong
+   shire or nothing at all. They carry the shire's own id, so a click on the
+   box is a click on the shire it names whatever ground it happens to cover. */
+.rb-shire-cells, .rb-ghost { pointer-events: none; }
+.rb-cell-frame, .rb-cell-strip, .rb-ghost-box { pointer-events: all; cursor: pointer; }
+
+/* The Control/Steward box and the support strip ruled off beneath it, drawn as
+   the printed sheet drew them. Filled rather than merely outlined, because
+   they sit on terrain now and a name over a coastline is a name nobody can
+   read. Not quite opaque, so the ground still shows faintly through and the
+   box reads as printed on the map rather than laid on top of it. */
+.rb-cell-frame, .rb-cell-strip {
+  fill: var(--rb-paper);
+  fill-opacity: 0.92;
+  stroke: var(--rb-ink);
+  stroke-opacity: 0.75;
+  stroke-width: 1.5;
+}
+
+.rb-cell-strip { fill-opacity: 0.86; }
+
+/* The shire's own name, over its frame. */
+.rb-cell-shire {
+  font: 600 21px var(--rb-serif);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  fill: var(--rb-ink);
+  text-anchor: middle;
+  paint-order: stroke;
+  stroke: var(--rb-paper);
+  stroke-width: 4;
+  stroke-opacity: 0.85;
+}
+
+/* "CONTROL / STEWARD" in the corner of the box it names, as small and as quiet
+   as it is in print — it is a caption on a form, not information. */
+.rb-cell-label {
+  font: 8px var(--rb-sans);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  fill: var(--rb-muted);
+}
+
+.rb-cell-steward {
+  font: 600 19px var(--rb-serif);
+  fill: var(--rb-ink);
+  text-anchor: middle;
+}
+
+/* The faction letters leading the steward's name, set larger as the sheet sets
+   them: the letter is the thing another player reads across the table. */
+.rb-cell-faction {
+  font-weight: 700;
+  font-size: 22px;
+  fill: var(--rb-blood);
+}
+
+.rb-cell-support {
+  font: 600 11px var(--rb-sans);
+  letter-spacing: 0.08em;
+  fill: var(--rb-ink);
+  text-anchor: start;
+}
+
+/* The verdict, spelled out on the strip's second row. Said in words rather
+   than by ruling a line through the crowns above it: a line reads as "these
+   are cancelled", and what is meant is that none of them is behind the man
+   holding the ground. Red when it is bad news, but the words carry it on their
+   own — a facilitator reading a projected sheet from across a room should not
+   have to resolve a colour to know which way it went. */
+.rb-cell-verdict {
+  font: 600 11px var(--rb-sans);
+  letter-spacing: 0.08em;
+  fill: var(--rb-ink);
+  fill-opacity: 0.7;
+  text-anchor: middle;
+}
+
+.rb-cell-verdict.is-lost { fill: var(--rb-blood); fill-opacity: 1; }
+
+/* The ship value, on the sail of the longship the printed map moored there.
+   The boat itself is artwork — see .rb-map-marks — so all that is drawn here
+   is the digit. */
+.rb-sea-cost {
+  font: 700 13px var(--rb-sans);
+  fill: var(--rb-ink);
+  text-anchor: middle;
+}
+
+/* Moved off the printed number by a contract or a defensive fleet. */
+.rb-sea.is-moved .rb-sea-cost { fill: var(--rb-blood); }
+
+.rb-sea.is-selected .rb-sea-cost { fill: var(--rb-gold, #8a6d1f); }
+.rb-sea.is-selected .rb-sea-hit { fill-opacity: 0.14; }
+
+/* Same bargain as the settlement letters: the cells take no clicks, so the
+   boat has to put them back on for itself, and only on a facilitator's map. */
+.rb-sea-hit {
+  fill: var(--rb-ink);
+  fill-opacity: 0;
+  pointer-events: all;
+  cursor: pointer;
+}
+
+.rb-sea-hit:hover { fill-opacity: 0.08; }
+
+/* Outlined as well as filled: the stack stands off the frame's edge on open
+   ground, where a solid silhouette would read as a blot. */
+.rb-cell-castle {
+  fill: var(--rb-ink);
+  fill-opacity: 0.85;
+  stroke: var(--rb-paper);
+  stroke-width: 1.5;
+}
+
+.rb-cell-nocastle {
+  font: 22px var(--rb-serif);
+  fill: var(--rb-muted);
+  text-anchor: middle;
+}
+
+.rb-cell-cross { fill: var(--rb-gold); }
+
+.rb-settlement-letter {
+  font: 600 24px var(--rb-serif);
+  fill: var(--rb-ink);
+  text-anchor: middle;
+  dominant-baseline: central;
+  paint-order: stroke;
+  stroke: var(--rb-paper);
+  stroke-width: 4;
+}
+
+/* The ring the printed sheet draws round a settlement somebody has fortified. */
+.rb-settlement-ring {
+  fill: none;
+  stroke: var(--rb-ink);
+  stroke-width: 2.5;
+}
+
+/* Struck rather than removed: the letter is what the sheet said was there,
+   and its absence is the point — so the cross has to be thin enough to still
+   read the letter through. Four points wide obliterated it. */
+.rb-settlement-strike {
+  stroke: var(--rb-blood);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+
+.rb-settlement.is-destroyed .rb-settlement-letter { fill: var(--rb-muted); }
+.rb-settlement.is-destroyed .rb-settlement-ring { stroke: var(--rb-muted); }
+
+/* The one thing on an editable map that takes a click of its own. Its shire's
+   cells are pointer-events: none, so this has to put them back on for itself —
+   and only for itself, or the letters and castle stacks either side of it
+   would start swallowing clicks meant for the ground. Drawn at all only on a
+   facilitator's map; there is nothing here for a player to press. */
+.rb-settlement-hit {
+  fill: var(--rb-ink);
+  fill-opacity: 0;
+  pointer-events: all;
+  cursor: pointer;
+}
+
+.rb-settlement-hit:hover { fill-opacity: 0.08; }
+
+/* Which letter the state panel is about, since the panel opens beside it
+   rather than on it. */
+.rb-settlement.is-selected .rb-settlement-hit {
+  fill: var(--rb-amber);
+  fill-opacity: 0.35;
+  stroke: var(--rb-amber);
+  stroke-width: 2;
+}
+
+/* --- ghost shires -------------------------------------------------------- */
+
+/* A read-only copy of a shire played on another sheet. Quieter than the real
+   thing on purpose — there is one place to select a shire, and this is not it.
+   The paper fill is the same as a real frame's, because it has the same job of
+   holding a name up off the terrain; everything drawn in it is greyer. */
+.rb-ghost-box {
+  fill: var(--rb-paper);
+  fill-opacity: 0.82;
+  stroke: currentColor;
+  stroke-opacity: 0.5;
+  stroke-width: 1.5;
+  color: var(--rb-muted);
+}
+
+.rb-ghost-name {
+  font: 600 15px var(--rb-serif);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  fill: var(--rb-muted);
+  text-anchor: middle;
+  paint-order: stroke;
+  stroke: var(--rb-paper);
+  stroke-width: 3.5;
+  stroke-opacity: 0.85;
+}
+
+.rb-ghost-steward {
+  font: 15px var(--rb-serif);
+  fill: var(--rb-ink);
+  fill-opacity: 0.75;
+  text-anchor: middle;
+}
+
+/* --- what is pinned to the sheet ----------------------------------------- */
+
+/* Two panels open over the map — the shire's card, and the state of whichever
+   settlement the facilitator clicked — and both are pinned to the thing they
+   are about rather than parked in a column, because "which shire is this?" and
+   "which of these five churches?" are questions a side panel could only answer
+   by repeating a name at the top. They share this because they share
+   `anchor()` in rb-map.js, which is the one piece of code that decides which
+   side of a point either of them opens on. */
+.rb-map-card,
+.rb-map-settlement,
+.rb-map-sea {
+  position: absolute;
+  z-index: 2;
+  background: var(--rb-parchment);
+  border: 1px solid var(--rb-ink);
+  border-radius: 3px;
+  box-shadow: 0 6px 22px rgb(43 33 24 / 0.28);
+  /* These two shifts are the same numbers `anchor()` reasons about when it
+     works out which side of an anchor a panel fits on, so they have to stay
+     exactly a whole panel and half a panel — anything else and the panel it
+     thought was on the sheet is not. */
+  --rb-card-dx: -50%;
+  --rb-card-dy: 0%;
+  transform: translate(var(--rb-card-dx), var(--rb-card-dy));
+}
+
+.rb-map-card {
+  width: min(20rem, 78%);
+  max-height: 24rem;
+  overflow: auto;
+  padding: 0.85rem 1rem;
+}
+
+.rb-map-card[data-x="left"],
+.rb-map-settlement[data-x="left"],
+.rb-map-sea[data-x="left"] { --rb-card-dx: 0%; }
+.rb-map-card[data-x="right"],
+.rb-map-settlement[data-x="right"],
+.rb-map-sea[data-x="right"] { --rb-card-dx: -100%; }
+.rb-map-card[data-y="above"],
+.rb-map-settlement[data-y="above"],
+.rb-map-sea[data-y="above"] { --rb-card-dy: -100%; }
+
+/* Two buttons and the number between them. Same size and same manners as the
+   settlement panel next door: it opens over the board and wants dismissing as
+   soon as it has been used. */
+.rb-map-sea { padding: 0.4rem 0.55rem; }
+
+.rb-map-sea-name {
+  margin: 0 0 0.25rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.rb-map-sea-row { display: flex; align-items: center; gap: 0.45rem; }
+
+.rb-map-sea-row button {
+  min-width: 1.6rem;
+  padding: 0.05rem 0.3rem;
+  font-size: 0.95rem;
+  line-height: 1.3;
+}
+
+.rb-map-sea-row button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.rb-map-sea-value {
+  min-width: 1.1rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+/* Three radios and the word "Church". Deliberately the smallest control on the
+   page: it opens on top of the board the facilitator is reading, so it has to
+   get out of the way as soon as it has been answered. */
+.rb-map-settlement {
+  display: grid;
+  gap: 0.1rem;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.8rem;
+}
+
+.rb-map-settlement-name {
+  margin: 0 0 0.15rem;
+  font-family: var(--rb-serif);
+  font-weight: 600;
+}
+
+.rb-map-settlement label {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--rb-ink);
+  cursor: pointer;
+}
+
+.rb-map-settlement input { accent-color: var(--rb-blood); }
+
+.rb-map-card h3, .rb-map-card h4 { font-family: var(--rb-serif); margin: 0; }
+.rb-map-card h3 { font-size: 1.2rem; padding-right: 1.4rem; }
+
+.rb-map-card-close {
+  position: absolute;
+  top: 0.2rem;
+  right: 0.3rem;
+  border: 0;
+  background: none;
+  font-size: 1.2rem;
+  line-height: 1;
+  padding: 0.2rem 0.35rem;
+  cursor: pointer;
+  color: var(--rb-muted);
+}
+
+.rb-map-card-close:hover { color: var(--rb-ink); }
+
+/* --- shire detail -------------------------------------------------------- */
+
+.rb-detail { display: grid; grid-template-columns: auto 1fr; gap: 0.3rem 0.9rem; margin: 1rem 0 0; }
+.rb-detail dt { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--rb-muted); }
+.rb-detail dd { margin: 0; }
+
+.rb-warn {
+  color: var(--rb-blood);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-left: 0.4rem;
+}
+
+/* --- private sheet ------------------------------------------------------- */
+
+rb-private-sheet { display: block; max-width: 44rem; }
+
+.rb-sheet-head h2 { margin: 0; border: 0; padding: 0; font-size: 1.7rem; }
+
+.rb-momentum { display: flex; align-items: center; gap: 0.7rem; margin: 1.2rem 0; }
+.rb-track-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--rb-muted); }
+.rb-pips { display: inline-flex; gap: 0.3rem; }
+
+.rb-pip {
+  width: 0.85rem;
+  height: 0.85rem;
+  border: 1px solid var(--rb-gold);
+  border-radius: 50%;
+}
+
+.rb-pip.is-full { background: var(--rb-gold); }
+
+.rb-tracks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+  gap: 0.6rem;
+  margin: 0 0 1.2rem;
+}
+
+.rb-track {
+  background: var(--rb-parchment);
+  border: 1px solid var(--rb-rule);
+  border-radius: 3px;
+  padding: 0.6rem 0.8rem;
+}
+
+.rb-track dt { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--rb-muted); }
+.rb-track dd { margin: 0; font-family: var(--rb-serif); font-size: 1.6rem; display: inline-block; }
+
+/* A modifier sits on the card whose number it changes — what a stat is about
+   to become, next to what it is now — rather than in a paragraph underneath
+   everything a player has to go find and match back up themselves. */
+.rb-track-mod {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--rb-green);
+  margin-top: 0.1rem;
+}
+
+.rb-momentum .rb-track-mod { display: inline; margin: 0; }
+
+.rb-wounds {
+  border-left: 3px solid var(--rb-amber);
+  padding-left: 0.8rem;
+  color: var(--rb-amber);
+}
+
+.rb-wounds.is-grave { border-color: var(--rb-blood); color: var(--rb-blood); }
+
+.rb-lands { list-style: none; margin: 0; padding: 0; }
+.rb-lands li { display: flex; align-items: baseline; gap: 0.7rem; padding: 0.3rem 0; border-bottom: 1px solid var(--rb-rule); }
+.rb-land-name { font-family: var(--rb-serif); }
+
+.rb-goals, .rb-guidance { padding-left: 1.2rem; }
+.rb-goals li { margin-bottom: 0.4rem; }
+.rb-guidance li { margin-bottom: 0.5rem; color: var(--rb-muted); font-size: 0.9rem; }
+
+/* Independent accordion sections, not tabs: opening Lands should not close
+   Crowns, because a player often wants both in view while deciding. */
+.rb-sheet-accordion { display: grid; gap: 0.5rem; margin-top: 1rem; }
+
+.rb-sheet-section {
+  background: var(--rb-parchment);
+  border: 1px solid var(--rb-rule);
+  border-radius: 3px;
+  padding: 0.2rem 0.9rem 0.8rem;
+}
+
+.rb-sheet-section[open] { padding-bottom: 0.9rem; }
+
+.rb-sheet-section summary {
+  cursor: pointer;
+  font-family: var(--rb-serif);
+  font-size: 1.05rem;
+  padding: 0.6rem 0;
+}
+
+.rb-sheet-section h4 { margin: 0.8rem 0 0.3rem; font-size: 0.9rem; }
+
+h3 { font-family: var(--rb-serif); font-size: 1rem; margin: 1.6rem 0 0.4rem; }
+
+/* --- aftermath ----------------------------------------------------------- */
+
+.rb-counters {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 1rem;
+}
+
+.rb-counter {
+  background: var(--rb-parchment);
+  border: 1px solid var(--rb-rule);
+  border-radius: 3px;
+  padding: 0.9rem 1rem;
+}
+
+.rb-counter-head { display: flex; justify-content: space-between; align-items: baseline; }
+.rb-counter-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--rb-muted); }
+.rb-counter-value { font-family: var(--rb-serif); font-size: 1.7rem; }
+
+.rb-bands { display: flex; gap: 0.2rem; margin: 0.5rem 0; }
+
+.rb-band {
+  flex: 1;
+  height: 0.35rem;
+  background: var(--rb-rule);
+  border-radius: 2px;
+}
+
+.rb-band.is-here { background: var(--rb-blood); }
+
+.rb-counter-text { font-family: var(--rb-serif); margin: 0.4rem 0 0.2rem; }
+
+/* --- narrow windows ------------------------------------------------------ */
+
+/* The page body never scrolls sideways. Wide things — the map, the log —
+   scroll inside their own box instead, so the layout stays put while the
+   content moves. */
+.rb-map-stage, .rb-log { max-width: 100%; }
+
+@media (max-width: 30rem) {
+  .rb-main { padding: 1rem 0.75rem 3rem; }
+  .rb-panel { padding: 1.1rem; }
+  .rb-game-head { gap: 0.8rem; }
+  .rb-tabs, .rb-map-tabs { flex-wrap: wrap; }
+  .rb-tracks { grid-template-columns: repeat(auto-fit, minmax(5rem, 1fr)); }
+  .rb-seat { grid-template-columns: 0.6rem 1fr auto; }
+  .rb-seat-tag { grid-column: 2 / -1; }
+  .rb-detail { grid-template-columns: 1fr; gap: 0 0; }
+  .rb-detail dd { margin-bottom: 0.5rem; }
+}
+
+/* --- the phase clock ----------------------------------------------------- */
+
+rb-phase-clock { display: block; }
+
+.rb-clock-turn {
+  font-family: var(--rb-serif);
+  font-size: 1.05rem;
+}
+
+.rb-clock-time time {
+  font-family: ui-monospace, 'Cascadia Mono', Menlo, monospace;
+  font-size: 2.4rem;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.rb-clock-note { color: var(--rb-muted); font-size: 0.82rem; }
+
+rb-phase-clock[data-state="soon"] time { color: var(--rb-amber); }
+rb-phase-clock[data-state="over"] time { color: var(--rb-blood); }
+rb-phase-clock[data-state="paused"] time { color: var(--rb-muted); }
+rb-phase-clock[data-state="paused"] .rb-clock-time::after { content: ' paused'; font-size: 0.8rem; color: var(--rb-muted); }
+
+.rb-run-control {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.4rem 1.5rem;
+  align-items: center;
+  background: var(--rb-parchment);
+  border: 1px solid var(--rb-rule);
+  border-radius: 3px;
+  padding: 1rem 1.2rem;
+  margin-bottom: 1.5rem;
+  position: sticky;
+  top: var(--rb-bar-height);
+  z-index: 20;
+}
+
+.rb-run-control .rb-meta { grid-column: 1 / -1; margin: 0; }
+.rb-clock-buttons { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+
+/* --- the game body: what you can do | the board | your sheet ------------- */
+
+.rb-game-head { flex: none; }
+
+.rb-game-body {
+  display: grid;
+  grid-template-columns: minmax(15rem, 0.9fr) minmax(0, 2.4fr) minmax(15rem, 0.9fr);
+  gap: 1.5rem;
+  align-items: start;
+  /* Fills whatever height #screen-game has left below the head, rather than
+     growing with its content — that growth is what used to push the whole
+     page into a scroll. Each column scrolls inside itself instead. */
+  flex: 1;
+  min-height: 0;
+}
+
+.rb-game-body > * { min-height: 0; }
+
+/* The rails are tabs only where they have to be. Above the breakpoint they are
+   columns that are always in view, and a tab selecting something already on
+   screen would do nothing at all. */
+.rb-tab-rail { display: none; }
+
+@media (max-width: 75rem) {
+  /* One thing at a time. The rails stop being columns and become two more
+     tabs beside the board, the battle and the tracker.
+
+     They used to stack instead — board, then actions, then your sheet, in one
+     long scroll. That reads fine on paper and badly in play: a phase is five
+     minutes, and "what can I do" was three screens of map away from the map
+     it was about. A tab is one press from anywhere. */
+  .rb-game-body {
+    grid-template-columns: 1fr;
+    display: block;
+    min-height: 0;
+  }
+  .rb-tab-rail { display: inline-block; }
+  /* Five panes and three sheets is more than a phone has room for on one
+     line, and a row that merely overflows puts the last tab somewhere it
+     cannot be pressed. Wrapping costs nothing at the wide end of this range,
+     where it all fits on one line anyway. */
+  #game-tabs, #game-tabs .rb-map-buttons { flex-wrap: wrap; }
+  /* Whichever one is showing owns the height and does its own scrolling, the
+     same bargain the three columns make above the breakpoint — so the header
+     and the tab row stay put and only the panel under them moves. */
+  .rb-game-body > :not([hidden]) {
+    height: 100%;
+    max-height: 100%;
+    overflow-y: auto;
+  }
+  .rb-rail { border-radius: 3px; }
+}
+
+/* Above the breakpoint the rails are furniture rather than panes, and simply
+   never carry `hidden` — see applyPanes() in player-app.js. Overruling the
+   attribute here instead was the first attempt and the wrong one: `[hidden]`
+   is `!important` on purpose at the top of this file, so that a pane is
+   actually hidden and not merely dimmed by whatever class it carries, and
+   beating it with a second `!important` would spend that guarantee to save a
+   line of script. The script asks this stylesheet where the breakpoint is by
+   looking at whether the rail tabs are showing, so the number still lives in
+   exactly one place. */
+
+.rb-rail {
+  background: var(--rb-parchment);
+  border: 1px solid var(--rb-rule);
+  border-radius: 3px;
+  padding: 0.4rem 1.1rem 1.1rem;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.rb-game-main {
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.rb-game-main > [data-pane-body] {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* Something is waiting on an answer that is not on screen right now — a
+   settle request, a vote — and the rail says so without needing a tab to
+   flash, since the rail is never the thing hidden behind another tab. */
+.rb-action-rail[data-waiting="true"] { border-left: 3px solid var(--rb-blood); }
+
+.rb-character-rail rb-private-sheet { max-width: none; }
+
+/* --- the action list ----------------------------------------------------- */
+
+.rb-actions { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.7rem; }
+.rb-action button { width: 100%; text-align: left; }
+.rb-action[data-ok="false"] button { border-style: dashed; }
+
+.rb-action-note {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--rb-muted);
+  margin-top: 0.15rem;
+}
+
+.rb-action[data-ok="false"] .rb-action-note { color: var(--rb-blood); }
+
+/* A shire was clicked on the map, and this is one of the things it could be
+   used for — promoted to the top of the list and picked out here. */
+.rb-action[data-relevant="true"] button {
+  border-color: var(--rb-blood);
+  box-shadow: 0 0 0 1px var(--rb-blood);
+}
+
+.rb-actions-heading {
+  margin: 1rem 0 0.4rem;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--rb-muted);
+}
+
+.rb-actions-unavailable { opacity: 0.85; }
+
+/* --- action choosers ----------------------------------------------------- */
+
+.rb-chooser-panel {
+  background: var(--rb-paper);
+  border: 1px solid var(--rb-blood);
+  border-radius: 3px;
+  padding: 0.8rem 0.9rem;
+  margin-bottom: 0.8rem;
+}
+
+.rb-chooser { display: grid; gap: 0.6rem; }
+.rb-chooser label { display: grid; gap: 0.2rem; }
+
+.rb-chooser select,
+.rb-chooser input {
+  font: inherit;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--rb-rule);
+  border-radius: 3px;
+  background: #fff;
+  color: inherit;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.rb-chooser-buttons { display: flex; gap: 0.4rem; }
+.rb-chooser-buttons .rb-primary { margin-top: 0; }
+
+/* --- the battle ---------------------------------------------------------- */
+
+rb-clash-panel { display: block; }
+
+.rb-battles { display: grid; gap: 0.8rem; margin-bottom: 1.5rem; }
+
+.rb-battle, .rb-clash, .rb-other-clashes, .rb-battle-block, .rb-steward {
+  background: var(--rb-parchment);
+  border: 1px solid var(--rb-rule);
+  border-radius: 3px;
+  padding: 0.9rem 1.1rem;
+}
+
+.rb-battle h3, .rb-clash h3, .rb-battle-block h3, .rb-steward h3 { margin-top: 0; }
+.rb-side-buttons, .rb-lead-buttons, .rb-steward-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+
+.rb-steward-buttons button.is-chosen {
+  background: var(--rb-blood);
+  border-color: var(--rb-blood);
+  color: #fff;
+}
+
+.rb-prompt { font-family: var(--rb-serif); font-size: 1.05rem; }
+
+.rb-hand {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+  gap: 0.5rem;
+  margin: 0.8rem 0;
+}
+
+.rb-card {
+  display: grid;
+  gap: 0.1rem;
+  padding: 0.7rem 0.5rem;
+  text-align: center;
+  background: var(--rb-paper);
+}
+
+.rb-card-rank { font-family: var(--rb-serif); font-size: 1.8rem; line-height: 1; }
+.rb-card-name { font-family: var(--rb-serif); }
+.rb-card-detail { font-size: 0.72rem; color: var(--rb-muted); }
+
+.rb-card.is-chosen {
+  background: var(--rb-blood);
+  border-color: var(--rb-blood);
+  color: #fff;
+}
+.rb-card.is-chosen .rb-card-detail { color: rgba(255, 255, 255, 0.75); }
+
+.rb-reveal {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin: 0.8rem 0;
+  padding: 0.7rem;
+  background: var(--rb-paper);
+  border: 1px solid var(--rb-rule);
+  border-radius: 3px;
+}
+
+.rb-card-shown b { font-family: var(--rb-serif); font-size: 1.3rem; }
+.rb-card-shown em { display: block; font-size: 0.75rem; color: var(--rb-muted); }
+
+.rb-roll { margin: 0.8rem 0; }
+.rb-rolled { font-family: var(--rb-serif); font-size: 1.15rem; margin: 0 0 0.2rem; }
+.rb-rolled strong { font-size: 1.6rem; }
+
+.rb-clash-result {
+  margin-top: 0.9rem;
+  padding: 0.8rem;
+  border-left: 3px solid var(--rb-blood);
+  background: var(--rb-paper);
+}
+.rb-clash-result[data-won="true"] { border-left-color: var(--rb-green); }
+.rb-clash-verdict { font-family: var(--rb-serif); font-size: 1.15rem; margin: 0 0 0.4rem; }
+
+.rb-other-clashes ul { list-style: none; margin: 0; padding: 0; }
+.rb-other-clashes li { padding: 0.2rem 0; }
+
+/* the facilitator's grid */
+.rb-battle-panel { margin-bottom: 1.5rem; }
+.rb-battle-block { margin-bottom: 1rem; }
+.rb-sides { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 0.6rem 0; }
+
+.rb-clash-rows { list-style: none; margin: 0.6rem 0; padding: 0; display: grid; gap: 0.35rem; }
+
+.rb-clash-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.35rem 0.5rem;
+  background: var(--rb-paper);
+  border: 1px solid var(--rb-rule);
+  border-radius: 3px;
+}
+
+.rb-clash-row[data-stage="rolling"] { border-color: var(--rb-blood); }
+.rb-clash-row[data-stage="resolved"] { opacity: 0.65; }
+
+/* Two lines the facilitator has to read before pressing the button — a token
+   that will not move, and who the conqueror named — then the button. They get
+   a row each rather than being squeezed alongside it. */
+.rb-settle { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: flex-end; margin-top: 0.6rem; }
+.rb-settle > p { flex-basis: 100%; margin: 0; }
+
+#tab-battle[data-live="true"],
+#tab-actions[data-live="true"],
+#facilitator-tabs [data-live="true"] { border-color: var(--rb-blood); font-weight: 600; }
+
+#facilitator-tabs { margin: 1.2rem 0 -1px; }
+
+/* --- envoys -------------------------------------------------------------- */
+
+/* Sits in the action rail now, beneath the actions, rather than filling a
+   tab of its own — empty (nothing open) it renders nothing and takes no
+   space. */
+rb-envoy-channel { display: block; margin-top: 1rem; }
+rb-envoy-channel h4 { margin: 0 0 0.5rem; }
+
+.rb-threads, .rb-envoy-queue { display: grid; gap: 0.7rem; }
+
+.rb-thread, .rb-envoy-item {
+  background: var(--rb-parchment);
+  border: 1px solid var(--rb-rule);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.rb-thread-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font-family: var(--rb-serif);
+}
+
+.rb-envoy-item { padding: 0.9rem 1.1rem; }
+.rb-envoy-item header { display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap; }
+.rb-envoy-item[data-waiting="true"] { border-left: 3px solid var(--rb-blood); }
+.rb-envoy-item[data-open="false"] { opacity: 0.6; }
+
+.rb-waiting {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--rb-blood);
+}
+
+.rb-messages {
+  list-style: none;
+  margin: 0.6rem 0;
+  padding: 0 1.1rem;
+  display: grid;
+  gap: 0.5rem;
+  max-height: 18rem;
+  overflow-y: auto;
+}
+
+.rb-envoy-item .rb-messages { padding: 0; }
+
+.rb-message {
+  display: grid;
+  gap: 0.1rem;
+  padding: 0.45rem 0.6rem;
+  background: var(--rb-paper);
+  border-radius: 3px;
+  border-left: 2px solid var(--rb-rule);
+}
+
+.rb-message[data-mine="true"] { border-left-color: var(--rb-blood); }
+
+.rb-message-who {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--rb-muted);
+}
+
+.rb-message-text { white-space: pre-wrap; }
+
+.rb-envoy-form { display: grid; gap: 0.4rem; padding: 0 1.1rem 1rem; }
+.rb-envoy-item .rb-envoy-form { padding: 0; }
+
+.rb-envoy-form textarea {
+  font: inherit;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--rb-rule);
+  border-radius: 3px;
+  background: #fff;
+  color: inherit;
+  resize: vertical;
+}
+
+.rb-envoy-buttons { display: flex; gap: 0.4rem; }
+.rb-envoy-panel, .rb-inspector-panel, .rb-consent-panel { margin-bottom: 1.5rem; }
+
+.rb-foreign-influence textarea {
+  font: inherit;
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--rb-rule);
+  border-radius: 3px;
+  background: #fff;
+  color: inherit;
+  resize: vertical;
+  margin-bottom: 0.5rem;
+}
+
+/* --- what the app decided where the rules said nothing -------------------- */
+
+.rb-gaps-panel { margin-bottom: 1.5rem; }
+.rb-gaps-panel summary { font-family: var(--rb-serif); cursor: pointer; }
+.rb-gaps { margin: 0.6rem 0 0; font-size: 0.85rem; }
+.rb-gaps dt { font-weight: 600; margin-top: 0.6rem; }
+.rb-gaps dd { margin: 0.15rem 0 0; color: var(--rb-muted); }
+
+/* --- the second facilitator ----------------------------------------------- */
+
+.rb-co-form { display: grid; gap: 0.4rem; margin-bottom: 1rem; max-width: 22rem; }
+.rb-co-form label { display: grid; gap: 0.15rem; font-size: 0.85rem; }
+.rb-co-form input {
+  font: inherit;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--rb-rule);
+  border-radius: 3px;
+  background: #fff;
+}
+
+.rb-co-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.6rem 0.9rem;
+  margin-bottom: 1rem;
+  background: var(--rb-parchment);
+  border: 1px solid var(--rb-rule);
+  border-left: 3px solid var(--rb-blood);
+  border-radius: 3px;
+}
+
+.rb-co-banner p { margin: 0; }
+
+/* --- the debrief ---------------------------------------------------------- */
+
+.rb-epilogue-panel { margin-bottom: 1.5rem; }
+.rb-epilogue-buttons { display: flex; gap: 0.4rem; margin-bottom: 0.8rem; }
+.rb-epilogue h3 { margin: 1rem 0 0.3rem; }
+
+.rb-verdicts dt { font-weight: 600; margin-top: 0.5rem; }
+.rb-verdicts dd { margin: 0 0 0.2rem; font-family: var(--rb-serif); }
+
+.rb-factions { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
+.rb-factions li { display: grid; gap: 0.1rem; }
+
+.rb-final { border-collapse: collapse; width: 100%; font-size: 0.85rem; }
+.rb-final th, .rb-final td {
+  text-align: left;
+  padding: 0.25rem 0.5rem;
+  border-bottom: 1px solid var(--rb-rule);
+  vertical-align: top;
+}
+
+/* Printing is what the debrief is for, so the page is the report and nothing
+   else — no controls, no console furniture. */
+@media print {
+  body * { visibility: hidden; }
+  .rb-epilogue, .rb-epilogue * { visibility: visible; }
+  .rb-epilogue { position: absolute; inset: 0; margin: 0; }
+  .rb-epilogue-buttons { display: none; }
+}
+
+/* --- the courts, and what was promised them ------------------------------- */
+
+.rb-court-brief { margin: 0.4rem 0; font-size: 0.85rem; }
+.rb-court-brief summary { cursor: pointer; font-family: var(--rb-serif); }
+.rb-court-brief p { margin: 0.35rem 0; }
+
+.rb-openings { display: grid; gap: 0.25rem; margin-top: 0.4rem; }
+.rb-openings button {
+  text-align: left;
+  font-style: italic;
+  font-size: 0.8rem;
+  padding: 0.3rem 0.5rem;
+}
+
+.rb-concede { display: flex; align-items: flex-end; gap: 0.4rem; }
+.rb-concede label { display: grid; gap: 0.15rem; flex: 1; font-size: 0.8rem; }
+.rb-concede input {
+  font: inherit;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--rb-rule);
+  border-radius: 3px;
+  background: #fff;
+  width: 100%;
+}
+
+.rb-ledger { list-style: none; margin: 0.5rem 0 0; padding: 0; display: grid; gap: 0.2rem; }
+.rb-ledger li { display: flex; align-items: baseline; gap: 0.4rem; font-size: 0.8rem; }
+.rb-ledger li[data-kept="false"] { color: var(--rb-muted); }
+.rb-ledger button { font-size: 0.7rem; padding: 0.1rem 0.4rem; }
+
+/* --- elections ------------------------------------------------------------ */
+
+.rb-crown-panel { margin-bottom: 1.5rem; }
+.rb-crowns h3,
+.rb-feudal h3 { margin: 0.9rem 0 0.2rem; font-size: 0.95rem; }
+.rb-feudal-main > h3:first-child,
+.rb-feudal-side > h3:first-child { margin-top: 0; }
+
+/* The standing arrangement on the left, the queue waiting on this desk on the
+   right. Collapses to one column on a narrow screen, tree first — the queue is
+   the shorter of the two and reads fine underneath, where the reverse would
+   bury it. */
+.rb-feudal {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 20rem);
+  gap: 1.4rem;
+  align-items: start;
+}
+
+@media (max-width: 60rem) {
+  .rb-feudal { grid-template-columns: minmax(0, 1fr); }
+}
+
+.rb-feudal-side {
+  border-left: 1px solid var(--rb-rule);
+  padding-left: 1.1rem;
+}
+
+@media (max-width: 60rem) {
+  .rb-feudal-side {
+    border-left: none;
+    border-top: 1px solid var(--rb-rule);
+    padding: 0.9rem 0 0;
+  }
+}
+
+/* The homage tree. Indented with a rule down the left of each generation, so
+   the eye can run up from any name to the man at the top of it — which is the
+   question this whole panel exists to answer. */
+.rb-tree { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.3rem; }
+
+.rb-tree .rb-tree {
+  margin: 0.3rem 0 0.1rem 0.55rem;
+  padding-left: 0.9rem;
+  border-left: 1px solid var(--rb-rule);
+}
+
+.rb-tree-name {
+  font-family: var(--rb-serif);
+  font-size: 0.95rem;
+}
+
+/* A crown on anyone wearing one, and which crown it is under the name. Said
+   twice on purpose: the glyph is what you find when scanning, and the word is
+   what you need once you have found it — there are eleven crowns in this game
+   and no glyph can tell you which. */
+.rb-tree-crown {
+  margin-right: 0.3rem;
+  color: var(--rb-gold, #8a6d1f);
+}
+
+.rb-tree-node[data-crowned="true"] > .rb-tree-name { font-weight: 700; }
+
+.rb-tree-crowns {
+  display: block;
+  margin-left: 0.1rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--rb-gold, #8a6d1f);
+}
+
+.rb-ballots { list-style: none; margin: 0 0 0.9rem; padding: 0; display: grid; gap: 0.6rem; }
+
+.rb-ballot {
+  background: var(--rb-parchment);
+  border: 1px solid var(--rb-rule);
+  border-left: 3px solid var(--rb-rule);
+  border-radius: 3px;
+  padding: 0.7rem 0.9rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.rb-ballot[data-asking="true"] { border-left-color: var(--rb-blood); }
+.rb-ballot[data-resolved="true"] { opacity: 0.6; }
+.rb-ballot-head, .rb-ballot-outcome { margin: 0; font-family: var(--rb-serif); }
+.rb-ballot-buttons { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+
+.rb-relief { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
+.rb-relief label { display: grid; gap: 0.15rem; font-size: 0.85rem; }
+.rb-relief select {
+  font: inherit;
+  padding: 0.3rem;
+  border: 1px solid var(--rb-rule);
+  border-radius: 3px;
+}
+
+/* --- consent: the one place you wait on other people ---------------------- */
+
+.rb-consents { list-style: none; margin: 0 0 0.9rem; padding: 0; display: grid; gap: 0.6rem; }
+
+.rb-consent {
+  background: var(--rb-parchment);
+  border: 1px solid var(--rb-rule);
+  border-left: 3px solid var(--rb-rule);
+  border-radius: 3px;
+  padding: 0.7rem 0.9rem;
+  display: grid;
+  gap: 0.4rem;
+}
+
+/* Asked and not yet answered: the only one that wants looking at. */
+.rb-consent[data-asking="true"] { border-left-color: var(--rb-blood); }
+.rb-consent[data-resolved="true"] { opacity: 0.6; }
+
+.rb-consent-ask { margin: 0; font-family: var(--rb-serif); }
+.rb-consent-outcome { margin: 0; font-size: 0.85rem; }
+
+.rb-consent-who {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.2rem;
+  font-size: 0.8rem;
+  color: var(--rb-muted);
+}
+
+.rb-consent-who li { display: flex; align-items: center; gap: 0.35rem; }
+.rb-consent-who li[data-answer="true"] { color: inherit; }
+.rb-consent-who li[data-answer="false"] { color: var(--rb-blood); }
+.rb-consent-who button { font-size: 0.7rem; padding: 0.1rem 0.4rem; }
+
+.rb-consent-buttons { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+
+/* --- the inspector ------------------------------------------------------- */
+
+.rb-inspector-cardgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+  gap: 0.8rem;
+  margin-bottom: 1rem;
+}
+
+/* Cards are grouped by whose man each role is, so the heading has to read as a
+   band across the page rather than as another card. */
+.rb-inspector-household { margin: 0 0 0.6rem; }
+
+.rb-inspector-household h5 {
+  margin: 0 0 0.4rem;
+  padding-bottom: 0.2rem;
+  border-bottom: 1px solid var(--rb-rule);
+  font-size: 0.8rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--rb-muted);
+}
+
+.rb-inspector-card {
+  background: var(--rb-parchment);
+  border: 1px solid var(--rb-rule);
+  border-radius: 3px;
+  padding: 0.7rem 0.9rem;
+  display: grid;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.rb-inspector-card header h5 { margin: 0; font-family: var(--rb-serif); font-size: 1rem; }
+
+.rb-inspector-stats { display: grid; gap: 0.35rem; }
+
+.rb-inspector-stat {
+  display: grid;
+  grid-template-columns: 5rem 2rem 3.5rem auto 1fr;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.rb-inspector-stat-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--rb-muted);
+}
+
+.rb-inspector-stat-value { font-family: var(--rb-serif); }
+.rb-inspector-stat input[type="number"] { width: 100%; padding: 0.2rem 0.3rem; font-size: 0.82rem; }
+.rb-inspector-stat button { font-size: 0.72rem; padding: 0.15rem 0.4rem; }
+.rb-inspector-error { grid-column: 1 / -1; color: var(--rb-blood); font-size: 0.72rem; }
+
+.rb-inspector-claim-list {
+  list-style: none;
+  margin: 0.2rem 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.rb-inspector-claim-list li {
+  background: var(--rb-paper);
+  border: 1px solid var(--rb-rule);
+  border-radius: 3px;
+  padding: 0.1rem 0.4rem;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.rb-inspector-claim-list button {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--rb-blood);
+  cursor: pointer;
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
+.rb-inspector-claims form { display: flex; gap: 0.3rem; margin-top: 0.2rem; }
+
+.rb-inspector-steward-list {
+  list-style: none;
+  margin: 0.2rem 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.rb-inspector-steward-list li {
+  background: var(--rb-paper);
+  border: 1px solid var(--rb-rule);
+  border-radius: 3px;
+  padding: 0.1rem 0.4rem;
+  font-size: 0.8rem;
+}
+
+.rb-inspector-toggle { display: flex; align-items: center; gap: 0.4rem; }
+
+.rb-inspector-tokens {
+  border: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+}
+
+.rb-inspector-tokens legend {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--rb-muted);
+  padding: 0;
+}
+
+.rb-inspector-tokens label { display: flex; align-items: center; gap: 0.25rem; font-size: 0.8rem; }
+
+.rb-inspector-remove {
+  justify-self: start;
+  font-size: 0.75rem;
+  color: var(--rb-blood);
+  border-color: var(--rb-blood);
+}
+
+.rb-inspector-addrole {
+  background: var(--rb-parchment);
+  border: 1px solid var(--rb-rule);
+  border-radius: 3px;
+  padding: 0.7rem 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.rb-inspector-addrole-form fieldset {
+  border: 1px solid var(--rb-rule);
+  border-radius: 3px;
+  margin: 0.5rem 0;
+}
+
+.rb-inspector-addrole-form label { display: flex; align-items: center; gap: 0.35rem; font-size: 0.85rem; }
+
+/* --- the facilitator's shire editor, on the map --------------------------- */
+
+/* It sits inside the map's card now rather than in a column beside it, so the
+   parchment, the border and the box shadow are the card's job and this is just
+   its contents. */
+rb-shire-editor { display: block; }
+
+.rb-editor-row { display: grid; gap: 0.2rem; margin-bottom: 0.6rem; font-size: 0.85rem; }
+.rb-editor-row select { padding: 0.3rem; font-size: 0.85rem; }
+
+/* The settlements this card used to list are edited on the map itself now —
+   see .rb-map-settlement, and rb-map.js for why. */
+
+/* --- the replay: the whole country, and the whole log --------------------- */
+
+/* Wider than any other panel, for a plain reason: it is three printed sheets
+   side by side with a rail either side of them. At the running console's width
+   England comes out as three thumbnails, which is not a view of anything. */
+.rb-panel.rb-replay { max-width: 110rem; }
+
+/* Three columns, and the middle one is the point. The history is narrow
+   because an action is one line, and the aftermath rail is narrow because four
+   counters are four counters — everything else goes to England. */
+.rb-replay-body {
+  display: grid;
+  grid-template-columns: minmax(14rem, 0.8fr) minmax(0, 3fr) minmax(14rem, 0.8fr);
+  gap: 1.2rem;
+  align-items: start;
+}
+
+.rb-replay-head { margin-bottom: 1rem; }
+.rb-replay-head h1 { margin-bottom: 0.2rem; }
+
+.rb-replay-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+}
+
+.rb-replay-controls button { font-size: 1rem; padding: 0.25rem 0.7rem; }
+.rb-replay-controls input[type="range"] { flex: 1; min-width: 8rem; accent-color: var(--rb-blood); }
+.rb-replay-close { margin-left: auto; font-size: 0.85rem !important; }
+
+/* The rails scroll inside themselves rather than making the page as long as
+   the log — a five-turn game is a few thousand actions, and a scroll bar three
+   screens tall is not a control anybody uses. */
+.rb-replay-rail, .rb-replay-side { max-height: 78vh; }
+
+/* --- all three sheets at once --------------------------------------------- */
+
+.rb-england {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.8rem;
+  align-items: start;
+}
+
+.rb-england-sheet { margin: 0; }
+
+.rb-england-sheet figcaption {
+  font-family: var(--rb-serif);
+  font-size: 0.85rem;
+  color: var(--rb-muted);
+  margin-bottom: 0.2rem;
+}
+
+/* Side by side, a card sized for a full-width map would cover its neighbour,
+   so it is told to be a small one. `anchor()` measures whatever it is given
+   and picks its side from that, so nothing else has to change. */
+.rb-england .rb-map-card { max-width: 14rem; font-size: 0.8rem; }
+.rb-replay-shire h3 { margin: 0 0 0.3rem; font-size: 0.95rem; }
+.rb-replay-shire .rb-detail { margin-top: 0.4rem; gap: 0.15rem 0.6rem; }
+
+/* --- the log, step by step ------------------------------------------------ */
+
+.rb-replay-history { list-style: none; margin: 0.4rem 0 0; padding: 0; display: grid; gap: 1px; }
+
+.rb-replay-history button {
+  display: grid;
+  grid-template-columns: 2.4rem 1fr;
+  gap: 0.1rem 0.5rem;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+  padding: 0.2rem 0.35rem;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.rb-replay-history button:hover { background: var(--rb-paper); }
+
+.rb-replay-seq { color: var(--rb-muted); font-variant-numeric: tabular-nums; font-size: 0.75rem; }
+.rb-replay-who { grid-column: 2; color: var(--rb-muted); font-size: 0.75rem; }
+
+/* Not yet. Everything after the cursor is faded rather than absent, so the
+   length of what is still to come is visible while you are watching it. */
+.rb-replay-history li[data-applied="false"] { opacity: 0.4; }
+
+.rb-replay-history li[aria-current] button {
+  background: var(--rb-paper);
+  box-shadow: inset 3px 0 0 var(--rb-gold);
+}
+
+/* An umpire's hand, marked wherever the log is read. The whole point of
+   putting overrides through the reducer is being able to answer "what did the
+   facilitator change?", which needs them to look different from what the
+   players did. */
+.rb-replay-override, .rb-replay-refused {
+  grid-column: 2;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.rb-replay-override { color: var(--rb-gold); }
+.rb-replay-refused { color: var(--rb-blood); text-transform: none; letter-spacing: 0; }
+
+.rb-replay-history li[data-override="true"] button { box-shadow: inset 3px 0 0 var(--rb-gold); }
+.rb-replay-history li[data-refused="true"] .rb-replay-label { text-decoration: line-through; }
+
+@media (max-width: 80rem) {
+  /* England first and whole: on a narrow window the two rails stack under the
+     map rather than squeezing it, because the map is what this page is. */
+  .rb-replay-body { grid-template-columns: 1fr; }
+  .rb-replay-main { order: -1; }
+  .rb-replay-rail, .rb-replay-side { max-height: none; }
+  .rb-england { grid-template-columns: 1fr; }
+}
+
+/* --- the replay's role rail ----------------------------------------------- */
+
+/* One column, not the lobby's auto-fill grid: this lives in a rail a quarter
+   of the screen wide, and sixteen names two-up there are unreadable. */
+.rb-replay-roles {
+  grid-template-columns: 1fr;
+  gap: 0.25rem;
+  margin-top: 0.5rem;
+}
+
+.rb-replay-roles .rb-role { padding: 0.35rem 0.6rem; cursor: pointer; }
+.rb-replay-roles .rb-role-name { font-size: 0.9rem; }
+
+/* Which sheet is open. A pressed toggle rather than a selected tab, because
+   clicking it again puts it away. */
+.rb-replay-roles [aria-pressed="true"] {
+  background: var(--rb-parchment);
+  border-color: var(--rb-blood);
+  box-shadow: inset 3px 0 0 var(--rb-blood);
+}
+
+.rb-replay-role-panel {
+  margin-top: 0.7rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--rb-rule);
+}
+
+.rb-replay-role-panel rb-private-sheet { max-width: none; }

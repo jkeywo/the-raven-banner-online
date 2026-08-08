@@ -1,0 +1,36 @@
+{
+ "_generated": "raven_banner gamespec @ analogue-projects fbc9bbc via tools/export_web_data.py",
+ "_doNotEdit": true,
+ "tactics": {
+  "A": {
+   "name": "Withdraw",
+   "score": 1,
+   "lossesDealt": -1,
+   "lossesReceived": -1
+  },
+  "2": {
+   "name": "Defensive",
+   "score": 2,
+   "lossesDealt": 0,
+   "lossesReceived": -1
+  },
+  "3": {
+   "name": "Ambush",
+   "score": 3,
+   "lossesDealt": 2,
+   "lossesReceived": 0
+  },
+  "4": {
+   "name": "Stand Firm",
+   "score": 4,
+   "lossesDealt": 1,
+   "lossesReceived": 0
+  },
+  "5": {
+   "name": "Charge",
+   "score": 5,
+   "lossesDealt": 2,
+   "lossesReceived": 1
+  }
+ }
+}

@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Raven Banner — Facilitator</title>
+  <link rel="icon" href="favicon.ico">
+  <link rel="stylesheet" href="gui/console.css">
+  <script src="vendor/peerjs.min.js"></script>
+</head>
+<body class="rb-shell">
+  <header class="rb-bar">
+    <span class="rb-brand">The Raven Banner <span class="rb-tag">facilitator</span></span>
+    <rb-connection-dot id="connection" status="connecting"></rb-connection-dot>
+  </header>
+
+  <main class="rb-main">
+    <!-- starting or resuming ---------------------------------------------- -->
+    <section id="screen-start" class="rb-panel" hidden>
+      <h1>Run a game</h1>
+      <p class="rb-lede">
+        The game lives in this tab. Keep it open, keep the laptop plugged in,
+        and turn off sleep.
+      </p>
+      <label for="player-count">How many players?</label>
+      <select id="player-count">
+        <option value="16" selected>16 — the full game</option>
+        <option value="15">15 — no Oscatel</option>
+        <option value="14">14 — no Oscatel or Uchtred</option>
+        <option value="13">13 — no Oscatel, Uchtred or Ecgberht</option>
+        <option value="12">12 — no Oscatel, Uchtred, Ecgberht or Godric</option>
+      </select>
+      <p class="rb-meta">
+        The guide's table is applied for you: the remaining players are topped
+        up, a dropped steward's lands change hands, and mercenary cards are
+        dealt — or at twelve, a castle comes off a four-castle shire instead.
+      </p>
+
+      <button id="new-game" type="button" class="rb-primary">Start a new game</button>
+      <p id="start-error" class="rb-error" role="alert"></p>
+
+      <div id="resume" hidden>
+        <h2>Or pick up where you left off</h2>
+        <ul id="resume-list" class="rb-resumes"></ul>
+      </div>
+
+      <h2>Or help run somebody else's</h2>
+      <p class="rb-meta">
+        The other facilitator holds the game. You get the same console over the
+        wire, and a full copy of the game on this machine — so if their laptop
+        dies, you can pick it up without anybody re-entering anything.
+      </p>
+      <form id="join-as-co" class="rb-co-form">
+        <label>Game code <input id="co-code" maxlength="8" autocomplete="off"></label>
+        <label>Facilitator PIN <input id="co-pin" maxlength="8" autocomplete="off"></label>
+        <label>Your name <input id="co-name" maxlength="40" autocomplete="off"></label>
+        <button type="submit">Join as co-facilitator</button>
+      </form>
+
+      <h2>Or open a saved game</h2>
+      <p class="rb-meta">
+        A downloaded save can be opened on any machine — this is how a game
+        survives a laptop dying.
+      </p>
+      <input id="import-file" type="file" accept="application/json,.json">
+    </section>
+
+    <!-- running ------------------------------------------------------------ -->
+    <section id="screen-running" class="rb-panel rb-wide" hidden>
+      <section id="co-banner" class="rb-co-banner" hidden>
+        <p>
+          <strong>You are the co-facilitator.</strong>
+          The game is on the other machine and mirrored here.
+          <span id="co-mirror" class="rb-meta"></span>
+        </p>
+        <button id="take-over" type="button">Take over hosting</button>
+      </section>
+
+      <section class="rb-run-control">
+        <rb-phase-clock id="clock"></rb-phase-clock>
+        <div class="rb-clock-buttons">
+          <button id="advance-phase" type="button" class="rb-primary">Next phase</button>
+          <button id="pause-clock" type="button">Pause</button>
+          <button id="extend-clock" type="button" data-minutes="1">+1 min</button>
+          <button id="shorten-clock" type="button" data-minutes="-1">−1 min</button>
+          <button id="end-game" type="button">Call time</button>
+        </div>
+        <p class="rb-meta">
+          The clock runs past zero rather than stopping. A phase ends when you
+          say it does — every negotiation overruns a little.
+        </p>
+      </section>
+
+      <nav id="facilitator-tabs" class="rb-tabs" role="tablist">
+        <!-- The three printed sheets are three buttons rather than one "Map"
+             tab, the same as the player's console: England is the thing being
+             looked at, and which corner of it you want is the question
+             actually being asked. Filled from shires.json so the row cannot
+             disagree with the maps that exist. -->
+        <span id="fac-map-buttons" class="rb-map-buttons"></span>
+        <button type="button" role="tab" data-pane="battle" id="tab-fac-battle" aria-selected="false">Battle</button>
+        <button type="button" role="tab" data-pane="crowns" id="tab-fac-crowns" aria-selected="false">Feudalism</button>
+        <button type="button" role="tab" data-pane="envoys" id="tab-fac-envoys" aria-selected="false">Envoys</button>
+        <button type="button" role="tab" data-pane="debrief" id="tab-fac-debrief" aria-selected="false">Debrief</button>
+        <button type="button" role="tab" data-pane="inspector" aria-selected="false">Inspector</button>
+        <button type="button" role="tab" data-pane="game" id="tab-fac-game" aria-selected="false">Game &amp; roster</button>
+      </nav>
+
+      <div data-pane-body="map" class="rb-pane rb-pane-map">
+        <!-- The umpire's pencil is on the shire being corrected rather than in
+             a second column: the map is the control now, and the editor is
+             what opens when you click one. `editable` is the whole of what
+             separates this map from the identical one a player has open — it
+             is what makes a settlement letter take a click and offer its
+             state, so it is granted here rather than assumed by the
+             component. `tabs="off"` because the three sheets are in the tab
+             row above; without it the map draws its own second row. -->
+        <rb-map id="fac-map" sheet="northern" tabs="off" editable>
+          <rb-shire-editor id="shire-editor" slot="card"></rb-shire-editor>
+        </rb-map>
+      </div>
+
+      <div data-pane-body="battle" class="rb-pane" hidden>
+        <section id="battle-panel" class="rb-battle-panel">
+          <h2>Targets &amp; battles</h2>
+          <rb-facilitator-grid id="battle-grid"></rb-facilitator-grid>
+        </section>
+      </div>
+
+      <div data-pane-body="crowns" class="rb-pane" hidden>
+        <!-- "Feudalism" rather than "Crowns & consents", which named two of
+             the things on it and missed the one people come here for. Homage,
+             crowns, elections and rebellion are one system, and this is the
+             page you open to see the shape of it. -->
+        <section class="rb-crown-panel">
+          <h2>Feudalism</h2>
+          <rb-crown-panel id="crowns"></rb-crown-panel>
+        </section>
+
+        <section id="consent-panel" class="rb-consent-panel" hidden>
+          <h2>Waiting on the neighbours</h2>
+          <p class="rb-meta">
+            Nobody settles a shire without the stewards either side agreeing.
+            If one of them is not at their screen, ask the table and answer
+            for them.
+          </p>
+          <rb-consent-queue id="consent-queue"></rb-consent-queue>
+        </section>
+      </div>
+
+      <div data-pane-body="envoys" class="rb-pane" hidden>
+        <section class="rb-envoy-panel">
+          <h2>Envoys <span id="envoy-count" class="rb-meta"></span></h2>
+          <p class="rb-meta">
+            You are the Franks, the Britons, the Danish Kings and the Pope.
+            Each wants something; none of them gives anything away.
+          </p>
+          <rb-envoy-queue id="envoy-queue"></rb-envoy-queue>
+        </section>
+
+        <section class="rb-foreign-influence">
+          <h2>Foreign Influence</h2>
+          <p class="rb-meta">
+            The counter itself is a facilitator's judgement, not a number the
+            game keeps — write the note the debrief should read from.
+          </p>
+          <textarea id="foreign-influence-note" rows="4"></textarea>
+          <button id="foreign-influence-commit" type="button">Save note</button>
+        </section>
+      </div>
+
+      <div data-pane-body="debrief" class="rb-pane" hidden>
+        <section id="epilogue-panel" class="rb-epilogue-panel" hidden>
+          <h2>The debrief</h2>
+          <p class="rb-meta">
+            Read from this. Everything on it is worked out from the board, so
+            it cannot disagree with the maps the players are looking at.
+          </p>
+          <p id="epilogue-provisional" class="rb-meta rb-warn" hidden>
+            As it stands. The game is still being played, so this is the
+            debrief for a turn that has not happened yet — do not read it out
+            until you have called time.
+          </p>
+          <div class="rb-epilogue-buttons">
+            <button id="print-epilogue" type="button" class="rb-primary">Print it</button>
+            <button id="save-epilogue" type="button">Save as a page</button>
+          </div>
+          <rb-epilogue id="epilogue"></rb-epilogue>
+        </section>
+        <!-- Shown only in the lobby. It used to say the debrief filled in
+             "once you call time", which is not what happens and is why nobody
+             thought to look at it during a game: it starts filling the moment
+             play does, and is a preview from then on. -->
+        <p id="debrief-waiting" class="rb-meta">
+          Nothing to read yet. This starts filling the moment the game begins,
+          and you can watch the four counters move on it as the turns go by —
+          it is only the ending once you have called time.
+        </p>
+      </div>
+
+      <div data-pane-body="inspector" class="rb-pane" hidden>
+        <section class="rb-inspector-panel">
+          <h2>Change anything</h2>
+          <rb-state-inspector id="inspector"></rb-state-inspector>
+        </section>
+
+        <section class="rb-gaps-panel">
+          <details>
+            <summary>Where the rules are silent</summary>
+            <p class="rb-meta">
+              The printed rules were written for a room with you in it, so a
+              few questions are never answered on paper. The app had to pick
+              something before anybody sat down. Here is what it picked —
+              overrule any of it with the inspector above.
+            </p>
+            <dl id="rules-gaps" class="rb-gaps"></dl>
+          </details>
+        </section>
+      </div>
+
+      <div data-pane-body="game" class="rb-pane" hidden>
+        <section id="lobby-roles" class="rb-lobby-roles" hidden>
+          <h2>Choosing characters</h2>
+          <p class="rb-meta">
+            The same picker every player has open right now. Begin the game
+            above once enough of the table has sat down — a seat can still be
+            claimed or re-claimed after that, same as any late arrival.
+          </p>
+          <!-- Not .rb-roles: that is the player's picker, an auto-filling grid
+               of seats. This one is stacked team-blocks, each of which lays
+               out its own four across. -->
+          <div id="role-grid" class="rb-roles-by-team"></div>
+        </section>
+
+        <div class="rb-columns">
+          <div>
+            <h1>Game <span id="join-code" class="rb-code"></span></h1>
+            <p class="rb-lede">Read the code out. Paste the link.</p>
+
+            <label for="player-link">Player link</label>
+            <div class="rb-row">
+              <input id="player-link" readonly>
+              <button id="copy-link" type="button">Copy</button>
+            </div>
+
+            <details class="rb-testing">
+              <summary>Testing on one machine</summary>
+              <p class="rb-meta">
+                Opens tabs that each take a seat of their own rather than
+                sharing this machine's. For trying the game out alone — not
+                something to reach for at a real table.
+              </p>
+              <div class="rb-row">
+                <label for="test-seats">How many</label>
+                <input id="test-seats" type="number" min="1" max="8" value="2">
+                <button id="open-test-seats" type="button">Open test players</button>
+              </div>
+            </details>
+
+            <p class="rb-pin">
+              Facilitator PIN <strong id="facilitator-pin"></strong>
+              <span class="rb-meta">
+                Only the other facilitator gets this. Anyone with it can edit the game.
+              </span>
+            </p>
+
+            <h2>Keeping the game</h2>
+            <p class="rb-meta">
+              Saved automatically as you go. Download one before anything
+              important — it is the only copy that survives this machine.
+            </p>
+            <button id="download-save" type="button">Download save</button>
+            <p id="save-warning" class="rb-error" role="alert" hidden>
+              Could not save to this browser — storage is full or blocked.
+              Download a save instead.
+            </p>
+            <p id="replay-warning" class="rb-error" role="alert" hidden></p>
+          </div>
+
+          <div>
+            <h2>Who is here</h2>
+            <p id="seated-count" class="rb-meta"></p>
+            <p class="rb-meta">
+              Clearing a seat empties the chair, not the character: whoever was
+              in it can no longer resume, and their role stays on the board with
+              everything it holds for somebody else to take.
+            </p>
+            <!-- `editable` is the whole of what separates this roster from the
+                 identical one every player has open. -->
+            <rb-seat-roster id="roster" editable></rb-seat-roster>
+
+            <h2>Connections</h2>
+            <pre id="host-log" class="rb-log"></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script type="module">
+    import { startHostApp } from './gui/host/host-app.js';
+    startHostApp();
+  </script>
+</body>
+</html>

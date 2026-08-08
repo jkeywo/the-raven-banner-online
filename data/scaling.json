@@ -1,0 +1,115 @@
+{
+ "_generated": "raven_banner gamespec @ analogue-projects fbc9bbc via tools/export_web_data.py",
+ "_doNotEdit": true,
+ "dropOrder": [
+  "oscatel_the_brave",
+  "uchtred",
+  "king_ecgberht",
+  "godric"
+ ],
+ "onDrop": {
+  "oscatel_the_brave": {
+   "grant": {
+    "guthrum_the_old": {
+     "soldiers": 3,
+     "food": 2,
+     "silver": 4
+    },
+    "anwend_the_steady": {
+     "soldiers": 3,
+     "food": 1,
+     "ships": 2,
+     "silver": 2
+    },
+    "gyda_the_bold": {
+     "soldiers": 3,
+     "food": 1,
+     "ships": 2,
+     "silver": 2
+    }
+   },
+   "stewardship": {}
+  },
+  "uchtred": {
+   "grant": {
+    "abbess_wenyld": {
+     "soldiers": 1
+    },
+    "ceowulf": {
+     "soldiers": 1,
+     "silver": 2,
+     "food": 2
+    },
+    "gainbeald": {
+     "soldiers": 1,
+     "silver": 2,
+     "food": 2
+    }
+   },
+   "stewardship": {
+    "middle_anglia": "abbess_wenyld",
+    "lundenwic": "abbess_wenyld"
+   }
+  },
+  "king_ecgberht": {
+   "grant": {
+    "halfdan_ragnarsson": {
+     "soldiers": 1,
+     "food": 1,
+     "silver": 2
+    },
+    "ubba_ragnarsson": {
+     "soldiers": 1,
+     "food": 1,
+     "silver": 1
+    },
+    "frida_anundottir": {
+     "soldiers": 1,
+     "food": 1,
+     "silver": 1
+    }
+   },
+   "stewardship": {
+    "bernicia": "halfdan_ragnarsson"
+   }
+  },
+  "godric": {
+   "grant": {
+    "king_alfred": {
+     "soldiers": 1,
+     "silver": 1,
+     "food": 1
+    },
+    "archbishop_aethelred": {
+     "soldiers": 1,
+     "silver": 2,
+     "food": 1
+    },
+    "cenred": {
+     "soldiers": 1,
+     "silver": 1,
+     "food": 2
+    }
+   },
+   "stewardship": {}
+  }
+ },
+ "mercenariesAt": {
+  "15": [
+   "guthrum_the_old",
+   "gyda_the_bold",
+   "anwend_the_steady",
+   "oscatel_the_brave"
+  ],
+  "14": [
+   "guthrum_the_old",
+   "ceowulf"
+  ],
+  "13": [
+   "guthrum_the_old",
+   "ceowulf",
+   "halfdan_ragnarsson"
+  ]
+ },
+ "castleRemovalAt": 12
+}

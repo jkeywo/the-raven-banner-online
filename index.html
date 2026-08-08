@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Raven Banner</title>
+  <link rel="icon" href="favicon.ico">
+  <link rel="stylesheet" href="gui/console.css">
+  <script src="vendor/peerjs.min.js"></script>
+</head>
+<body class="rb-shell rb-shell-player">
+  <header class="rb-bar">
+    <span class="rb-brand">The Raven Banner</span>
+    <!-- Who you are and where the turn is: the four things a player looks up
+         most, on the one strip that is on screen whichever tab is open. -->
+    <div id="bar-status" class="rb-bar-status" hidden>
+      <span id="bar-role" class="rb-bar-role"></span>
+      <rb-phase-clock id="clock"></rb-phase-clock>
+    </div>
+    <rb-connection-dot id="connection" status="connecting"></rb-connection-dot>
+  </header>
+
+  <main class="rb-main">
+    <!-- 1. the code ------------------------------------------------------- -->
+    <section id="screen-code" class="rb-panel" hidden>
+      <h1>Join the game</h1>
+      <p class="rb-lede">Your facilitator will read out a seven-character code.</p>
+      <form id="code-form" class="rb-form">
+        <label for="join-code">Join code</label>
+        <input id="join-code" name="join-code" autocomplete="off" autocapitalize="characters"
+               spellcheck="false" maxlength="12" placeholder="RAVEN7Z" required>
+        <p id="code-error" class="rb-error" role="alert"></p>
+        <button type="submit" class="rb-primary">Continue</button>
+      </form>
+    </section>
+
+    <!-- 2. the name ------------------------------------------------------- -->
+    <section id="screen-name" class="rb-panel" hidden>
+      <h1>Who are you?</h1>
+      <p class="rb-lede">
+        Your own name, not your character's — you will choose a character next.
+        This is what the others see on the roster.
+      </p>
+      <form id="name-form" class="rb-form">
+        <label for="player-name">Your name</label>
+        <input id="player-name" name="player-name" autocomplete="nickname"
+               maxlength="40" required>
+        <button type="submit" class="rb-primary">Join</button>
+      </form>
+    </section>
+
+    <!-- 3. the lobby ------------------------------------------------------ -->
+    <section id="screen-lobby" class="rb-panel rb-wide" hidden>
+      <h1>England, 871</h1>
+      <p class="rb-lede">
+        Game <strong id="lobby-code" class="rb-code"></strong>.
+        <span id="lobby-message"></span>
+      </p>
+      <p id="claim-error" class="rb-error" role="alert"></p>
+
+      <div id="role-picker" class="rb-roles" hidden></div>
+
+      <h2>Who is here</h2>
+      <rb-seat-roster id="roster"></rb-seat-roster>
+
+      <button id="start-over" type="button" class="rb-start-over" hidden>
+        Not this game — start over
+      </button>
+    </section>
+
+    <!-- 4. the game ------------------------------------------------------- -->
+    <section id="screen-game" class="rb-panel rb-full" hidden>
+      <header class="rb-game-head">
+        <!-- The three printed sheets are three buttons rather than one "The
+             board" tab: England is the thing being looked at, and which
+             corner of it you want is the question actually being asked.
+             Filled from shires.json so the row cannot disagree with the maps
+             that exist. -->
+        <nav id="game-tabs" class="rb-tabs" role="tablist">
+          <span id="map-buttons" class="rb-map-buttons"></span>
+          <button type="button" role="tab" data-pane="battle" id="tab-battle" aria-selected="false">Battle</button>
+          <button type="button" role="tab" data-pane="aftermath" aria-selected="false">Aftermath</button>
+          <!-- The two rails, for a screen with no room to put them beside the
+               board. They are tabs only there: on a wide window the rails are
+               always in view and a tab that selects something already on
+               screen is a tab that does nothing. -->
+          <button type="button" role="tab" data-pane="actions" id="tab-actions"
+                  class="rb-tab-rail" aria-selected="false">Actions</button>
+          <button type="button" role="tab" data-pane="you" id="tab-you"
+                  class="rb-tab-rail" aria-selected="false">Your sheet</button>
+        </nav>
+      </header>
+
+      <div class="rb-game-body">
+        <!-- what you can do, always in view whichever tab the main pane shows -->
+        <aside id="action-rail" class="rb-rail rb-action-rail" data-pane-body="actions">
+          <rb-ballot id="ballot"></rb-ballot>
+          <rb-consent-panel id="consents"></rb-consent-panel>
+          <h2>What you can do</h2>
+          <p id="action-error" class="rb-error" role="alert"></p>
+          <div id="chooser" class="rb-chooser-panel" hidden></div>
+          <rb-action-list id="actions"></rb-action-list>
+          <!-- Sending the first envoy is itself an action above, gated to the
+               Encounter Phase like everything else on this list. This is only
+               for a conversation already under way, which stays reachable
+               whatever phase it is now (see envoy-message, phases: '*'). -->
+          <rb-envoy-channel id="envoys"></rb-envoy-channel>
+        </aside>
+
+        <!-- the board, or how England is doing, or a battle -->
+        <div id="game-main" class="rb-game-main">
+          <div data-pane-body="map" class="rb-pane rb-pane-map">
+            <!-- What a shire is worth is a card on the shire, not a column
+                 beside the map: the answer to "who holds this?" belongs next
+                 to the thing that was clicked. The map decides when the card
+                 is on screen and where; this is only what goes in it. -->
+            <rb-map id="map" sheet="northern" tabs="off">
+              <div id="shire-card" slot="card"></div>
+            </rb-map>
+          </div>
+
+          <div data-pane-body="battle" class="rb-pane" hidden>
+            <rb-clash-panel id="clash"></rb-clash-panel>
+          </div>
+
+          <div data-pane-body="aftermath" class="rb-pane" hidden>
+            <rb-aftermath id="aftermath"></rb-aftermath>
+            <h2>Who is here</h2>
+            <rb-seat-roster id="game-roster"></rb-seat-roster>
+          </div>
+        </div>
+
+        <!-- your own sheet, always in view where there is room for it -->
+        <aside id="character-rail" class="rb-rail rb-character-rail" data-pane-body="you">
+          <rb-private-sheet id="sheet"></rb-private-sheet>
+        </aside>
+      </div>
+    </section>
+  </main>
+
+  <script type="module">
+    import { startPlayerApp } from './gui/client/player-app.js';
+    startPlayerApp();
+  </script>
+</body>
+</html>
